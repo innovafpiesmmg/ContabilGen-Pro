@@ -21,10 +21,10 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Settings as SettingsIcon, Save, Bot, Cpu, Share2 } from "lucide-react";
+import { Settings as SettingsIcon, Save, Cpu, Share2 } from "lucide-react";
 
 const settingsSchema = z.object({
-  provider: z.enum(["openai", "deepseek", "shared_deepseek"]),
+  provider: z.enum(["deepseek", "shared_deepseek"]),
   deepseekApiKey: z.string().optional(),
   deepseekBaseUrl: z.string().min(1, "La URL base es requerida"),
   deepseekModel: z.string().min(1, "El modelo es requerido"),
@@ -52,7 +52,7 @@ export default function SettingsPage() {
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
     defaultValues: {
-      provider: "openai",
+      provider: "deepseek",
       deepseekApiKey: "",
       deepseekBaseUrl: "https://api.deepseek.com",
       deepseekModel: "deepseek-chat",
@@ -61,8 +61,9 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (settings) {
+      const p = settings.provider as AiSettingsProvider;
       form.reset({
-        provider: (settings.provider as AiSettingsProvider) ?? "openai",
+        provider: (p === "deepseek" || p === "shared_deepseek") ? p : "deepseek",
         deepseekApiKey: settings.deepseekApiKey || "",
         deepseekBaseUrl: settings.deepseekBaseUrl || "https://api.deepseek.com",
         deepseekModel: settings.deepseekModel || "deepseek-chat",
@@ -96,12 +97,6 @@ export default function SettingsPage() {
         description: "Hubo un problema al guardar la configuración.",
       });
     }
-  };
-
-  const getProviderLabel = () => {
-    if (provider === "openai") return "OpenAI";
-    if (provider === "shared_deepseek") return "DeepSeek compartido";
-    return "DeepSeek";
   };
 
   if (isLoading) {
@@ -147,9 +142,9 @@ export default function SettingsPage() {
             
             <CardHeader className="pb-6 relative">
               <div className="absolute right-6 top-6">
-                <Badge variant={provider === "openai" ? "default" : "secondary"} className="shadow-sm gap-1.5 px-3 py-1">
-                  {provider === "openai" ? <Bot className="w-3.5 h-3.5" /> : provider === "shared_deepseek" ? <Share2 className="w-3.5 h-3.5" /> : <Cpu className="w-3.5 h-3.5" />}
-                  Usando: {getProviderLabel()} ✓
+                <Badge variant="secondary" className="shadow-sm gap-1.5 px-3 py-1">
+                  {provider === "shared_deepseek" ? <Share2 className="w-3.5 h-3.5" /> : <Cpu className="w-3.5 h-3.5" />}
+                  Usando: {provider === "shared_deepseek" ? "DeepSeek compartido" : "DeepSeek"} ✓
                 </Badge>
               </div>
               <CardTitle className="text-xl">Configuración de IA</CardTitle>
@@ -163,23 +158,9 @@ export default function SettingsPage() {
                 <Label className="text-base font-semibold">Proveedor de IA</Label>
                 <RadioGroup 
                   value={provider} 
-                  onValueChange={(value) => form.setValue("provider", value as "openai" | "deepseek" | "shared_deepseek", { shouldValidate: true })}
-                  className={`grid gap-4 ${sharedAvailable ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"}`}
+                  onValueChange={(value) => form.setValue("provider", value as "deepseek" | "shared_deepseek", { shouldValidate: true })}
+                  className={`grid gap-4 ${sharedAvailable ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}
                 >
-                  <div>
-                    <RadioGroupItem value="openai" id="openai" className="peer sr-only" />
-                    <Label
-                      htmlFor="openai"
-                      className="flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
-                    >
-                      <Bot className="mb-3 h-8 w-8" />
-                      <div className="text-center">
-                        <div className="font-semibold">OpenAI (por defecto)</div>
-                        <div className="text-xs text-muted-foreground mt-1">Usa la IA integrada</div>
-                      </div>
-                    </Label>
-                  </div>
-                  
                   <div>
                     <RadioGroupItem value="deepseek" id="deepseek" className="peer sr-only" />
                     <Label
@@ -188,8 +169,8 @@ export default function SettingsPage() {
                     >
                       <Cpu className="mb-3 h-8 w-8" />
                       <div className="text-center">
-                        <div className="font-semibold">DeepSeek propio</div>
-                        <div className="text-xs text-muted-foreground mt-1">Requiere API Key propia</div>
+                        <div className="font-semibold">DeepSeek (API Key propia)</div>
+                        <div className="text-xs text-muted-foreground mt-1">Introduce tu propia clave de DeepSeek</div>
                       </div>
                     </Label>
                   </div>
@@ -199,13 +180,13 @@ export default function SettingsPage() {
                       <RadioGroupItem value="shared_deepseek" id="shared_deepseek" className="peer sr-only" />
                       <Label
                         htmlFor="shared_deepseek"
-                        className="flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all relative"
+                        className="flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
                       >
                         <Share2 className="mb-3 h-8 w-8 text-green-600" />
                         <div className="text-center">
                           <div className="font-semibold">DeepSeek compartido</div>
                           <div className="text-xs text-muted-foreground mt-1">
-                            {sharedModel ? `Modelo: ${sharedModel}` : "Proporcionado por el admin"}
+                            {sharedModel ? `Modelo: ${sharedModel}` : "Proporcionado por el administrador"}
                           </div>
                         </div>
                       </Label>

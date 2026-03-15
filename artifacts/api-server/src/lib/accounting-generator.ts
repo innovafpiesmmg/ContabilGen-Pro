@@ -1,4 +1,3 @@
-import { openai } from "@workspace/integrations-openai-ai-server";
 import OpenAI from "openai";
 
 interface GenerateParams {
@@ -299,20 +298,17 @@ IMPORTANTE:
 }
 
 function getClient(config: AiConfig): OpenAI {
-  if (config.provider === "deepseek" && config.deepseekApiKey) {
-    return new OpenAI({
-      apiKey: config.deepseekApiKey,
-      baseURL: config.deepseekBaseUrl || "https://api.deepseek.com",
-    });
+  if (!config.deepseekApiKey) {
+    throw new Error("No hay ninguna API Key de DeepSeek configurada. Añade tu clave en Configuración o contacta al administrador.");
   }
-  return openai;
+  return new OpenAI({
+    apiKey: config.deepseekApiKey,
+    baseURL: config.deepseekBaseUrl || "https://api.deepseek.com",
+  });
 }
 
 function getModel(config: AiConfig): string {
-  if (config.provider === "deepseek" && config.deepseekApiKey) {
-    return config.deepseekModel || "deepseek-chat";
-  }
-  return "gpt-5.2";
+  return config.deepseekModel || "deepseek-chat";
 }
 
 export async function generateAccountingUniverse(params: GenerateParams, aiConfig: AiConfig): Promise<unknown> {

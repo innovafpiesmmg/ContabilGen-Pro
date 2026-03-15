@@ -7,7 +7,7 @@ const router: IRouter = Router();
 
 const SETTINGS_KEYS = ["provider", "deepseekApiKey", "deepseekBaseUrl", "deepseekModel"] as const;
 const DEFAULTS: Record<string, string> = {
-  provider: "openai",
+  provider: "deepseek",
   deepseekApiKey: "",
   deepseekBaseUrl: "https://api.deepseek.com",
   deepseekModel: "deepseek-chat",
@@ -44,7 +44,7 @@ router.get("/settings", async (req, res): Promise<void> => {
     getSharedDeepseekConfig(),
   ]);
   res.json({
-    provider: settings.provider as "openai" | "deepseek" | "shared_deepseek",
+    provider: settings.provider as "deepseek" | "shared_deepseek",
     deepseekApiKey: settings.deepseekApiKey || null,
     deepseekBaseUrl: settings.deepseekBaseUrl,
     deepseekModel: settings.deepseekModel,
@@ -89,7 +89,7 @@ router.put("/settings", async (req, res): Promise<void> => {
 
   const shared = await getSharedDeepseekConfig();
   res.json({
-    provider: provider as "openai" | "deepseek" | "shared_deepseek",
+    provider: provider as "deepseek" | "shared_deepseek",
     deepseekApiKey: deepseekApiKey ?? null,
     deepseekBaseUrl,
     deepseekModel,

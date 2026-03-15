@@ -13,7 +13,6 @@ export type AiSettingsProvider =
   (typeof AiSettingsProvider)[keyof typeof AiSettingsProvider];
 
 export const AiSettingsProvider = {
-  openai: "openai",
   deepseek: "deepseek",
   shared_deepseek: "shared_deepseek",
 } as const;

@@ -99,7 +99,7 @@ export const ResetPasswordResponse = zod.object({
  */
 export const GetSettingsResponse = zod.object({
   provider: zod
-    .enum(["openai", "deepseek", "shared_deepseek"])
+    .enum(["deepseek", "shared_deepseek"])
     .describe("Which AI provider to use for generation"),
   deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
   deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
@@ -121,7 +121,7 @@ export const GetSettingsResponse = zod.object({
  */
 export const UpdateSettingsBody = zod.object({
   provider: zod
-    .enum(["openai", "deepseek", "shared_deepseek"])
+    .enum(["deepseek", "shared_deepseek"])
     .describe("Which AI provider to use for generation"),
   deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
   deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
@@ -140,7 +140,7 @@ export const UpdateSettingsBody = zod.object({
 
 export const UpdateSettingsResponse = zod.object({
   provider: zod
-    .enum(["openai", "deepseek", "shared_deepseek"])
+    .enum(["deepseek", "shared_deepseek"])
     .describe("Which AI provider to use for generation"),
   deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
   deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),

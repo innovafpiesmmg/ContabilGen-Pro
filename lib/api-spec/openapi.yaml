@@ -397,7 +397,7 @@ components:
       properties:
         provider:
           type: string
-          enum: [openai, deepseek, shared_deepseek]
+          enum: [deepseek, shared_deepseek]
           description: "Which AI provider to use for generation"
         deepseekApiKey:
           type: ["string", "null"]
