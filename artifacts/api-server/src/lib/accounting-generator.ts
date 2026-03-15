@@ -328,7 +328,7 @@ Importes realistas para sector ${params.sector}. Usa datos del escenario.`;
   return await callAI(client, model, prompt, 2500) as Record<string, unknown>;
 }
 
-// ─── CALL 2A-MONTHLY: INVOICES PER MONTH ──────────────────────────────────────
+// ─── CALL 2A-MONTHLY: MONTHLY BUNDLE (invoices + bank statement + card moves) ──
 function getMonthsInPeriod(params: GenerateParams) {
   const { periodStart, periodEnd } = getPeriodInfo(params);
   const [sy, sm] = periodStart.split("-").map(Number);
@@ -350,7 +350,7 @@ function getMonthsInPeriod(params: GenerateParams) {
   return months;
 }
 
-async function generateMonthlyInvoices(
+async function generateMonthlyBundle(
   params: GenerateParams,
   scenario: Record<string, unknown>,
   client: OpenAI,
@@ -358,130 +358,68 @@ async function generateMonthlyInvoices(
   monthStart: string,
   monthEnd: string,
   monthLabel: string,
-  monthNumStr: string,
   invoicesPerMonth: number,
   invoiceStartNum: number,
-): Promise<{ invoices: unknown[] }> {
+  openingBalance: number,
+): Promise<{ invoices: unknown[]; bankStatement: unknown; cardMovements: unknown[] }> {
   const rates = TAX_RATES[params.taxRegime];
   const sectorCtx = getSectorContext(params.sector, params.taxRegime);
 
   const sectorSaleHint = params.sector === "Servicios"
-    ? "servicios prestados (consultoría, diseño, formación…), cuenta 705"
+    ? "servicios prestados (consultoría, diseño, formación), cta 705"
     : params.sector === "Industria"
-    ? "productos fabricados, cuenta 701"
+    ? "productos fabricados, cta 701"
     : params.sector === "Hostelería"
-    ? "servicios de hostelería/restauración, cuenta 705"
-    : "mercaderías, cuenta 700";
+    ? "hostelería/restauración, cta 705"
+    : "mercaderías, cta 700";
 
   const sectorBuyHint = params.sector === "Servicios"
-    ? "gastos de explotación: subcontratación, software, telefonía, oficina… cuentas 62x"
+    ? "subcontratación/software/telefonía/oficina, cuentas 62x"
     : params.sector === "Industria"
-    ? "materias primas o componentes, cuenta 601"
-    : "mercaderías o alimentos, cuenta 600";
+    ? "materias primas/componentes, cta 601"
+    : "mercaderías o alimentos, cta 600";
 
   const nums = Array.from({ length: invoicesPerMonth }, (_, i) =>
     `F-${params.year}/${String(invoiceStartNum + i).padStart(3, "0")}`
   );
 
-  const prompt = `Genera ${invoicesPerMonth} facturas de ${monthLabel} para empresa "${scenario.companyName}" (${params.sector}, ${params.taxRegime}).
-Fechas: ${monthStart} a ${monthEnd}. IVA general ${rates.standard}%, reducido ${rates.reduced}%.
-Ventas: ${sectorSaleHint}. Compras: ${sectorBuyHint}.
-Mezcla compras y ventas. Números: ${nums.join(", ")}.
+  const saleAcc = sectorCtx.saleAccount;
+  const buyAcc = sectorCtx.purchaseAccount;
+  const iva = rates.standard;
 
-JSON exacto (sin texto extra):
-{"invoices":[{"invoiceNumber":"${nums[0]}","date":"${monthStart.slice(0,7)}-DD","type":"sale","partyName":"...","partyNif":"B12345678","lines":[{"description":"...","quantity":1,"unitPrice":500,"discount":0,"subtotal":500,"taxRate":${rates.standard},"taxAmount":${(rates.standard / 100 * 500).toFixed(2)},"total":${(500 * (1 + rates.standard / 100)).toFixed(2)}}],"subtotal":500,"taxBase":500,"taxAmount":${(rates.standard / 100 * 500).toFixed(2)},"total":${(500 * (1 + rates.standard / 100)).toFixed(2)},"paymentMethod":"transfer","dueDate":"${monthEnd}","accountDebits":[{"accountCode":"430","accountName":"Clientes","amount":${(500 * (1 + rates.standard / 100)).toFixed(2)},"description":"..."}],"accountCredits":[{"accountCode":"${sectorCtx.saleAccount.code}","accountName":"${sectorCtx.saleAccount.name}","amount":500,"description":"..."},{"accountCode":"477","accountName":"IVA repercutido","amount":${(rates.standard / 100 * 500).toFixed(2)},"description":"..."}]}]}
+  const prompt = `Datos contables de ${monthLabel} para "${scenario.companyName}" (${params.sector}, ${params.taxRegime}). Banco: ${scenario.bankEntity}, cta ${scenario.bankAccount}.
+IVA ${iva}%. Ventas→${sectorSaleHint}. Compras→${sectorBuyHint}.
 
-Genera exactamente ${invoicesPerMonth} objetos en el array. Importes variados y realistas.`;
+JSON exacto:
+{"invoices":[{"invoiceNumber":"${nums[0]}","date":"${monthStart.slice(0,7)}-10","type":"sale","partyName":"Cliente SA","partyNif":"A11111111","lines":[{"description":"Descripción venta","quantity":1,"unitPrice":1000,"discount":0,"subtotal":1000,"taxRate":${iva},"taxAmount":${iva * 10},"total":${1000 + iva * 10}}],"subtotal":1000,"taxBase":1000,"taxAmount":${iva * 10},"total":${1000 + iva * 10},"paymentMethod":"transfer","dueDate":"${monthEnd}","accountDebits":[{"accountCode":"430","accountName":"Clientes","amount":${1000 + iva * 10},"description":"Factura venta"}],"accountCredits":[{"accountCode":"${saleAcc.code}","accountName":"${saleAcc.name}","amount":1000,"description":"Venta"},{"accountCode":"477","accountName":"IVA repercutido","amount":${iva * 10},"description":"IVA"}]}],"bankStatement":{"bank":"${scenario.bankEntity}","accountNumber":"${scenario.bankAccount}","period":"${monthLabel}","openingBalance":${openingBalance},"closingBalance":${openingBalance + 500},"transactions":[{"date":"${monthStart.slice(0,7)}-05","concept":"Cobro cliente","debit":null,"credit":1210,"balance":${openingBalance + 1210}},{"date":"${monthStart.slice(0,7)}-20","concept":"Pago proveedor","debit":726,"credit":null,"balance":${openingBalance + 484}}]},"cardMovements":[{"date":"${monthStart.slice(0,7)}-15","description":"Gasto empresa","amount":150,"category":"Servicios","accountCode":"629","accountName":"Otros servicios"}]}
 
-  return await callAI(client, model, prompt, 4000) as { invoices: unknown[] };
+GENERA: ${invoicesPerMonth} facturas (mezcla compra/venta, al menos 1 de cada), 4-5 transacciones bancarias y 2-3 movimientos tarjeta. Todas las fechas entre ${monthStart} y ${monthEnd}. Usa números de factura: ${nums.join(", ")}. Ventas→cta ${saleAcc.code}. Compras→cta ${buyAcc.code}. Saldo cierre = apertura ± transacciones.`;
+
+  const result = await callAI(client, model, prompt, 3500) as Record<string, unknown>;
+  return {
+    invoices: Array.isArray(result.invoices) ? result.invoices : [],
+    bankStatement: result.bankStatement ?? null,
+    cardMovements: Array.isArray(result.cardMovements) ? result.cardMovements : [],
+  };
 }
 
-// ─── CALL 2B: BANKING & INSURANCE BLOCK ───────────────────────────────────────
-async function generateBankingBlock(
+// ─── CALL 2B: INSURANCE & CASUALTY (annual, small) ────────────────────────────
+async function generateInsuranceCasualty(
   params: GenerateParams,
   scenario: Record<string, unknown>,
   client: OpenAI,
   model: string,
 ) {
-  const rates = TAX_RATES[params.taxRegime];
-  const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
-  const sc = JSON.stringify({
-    companyName: scenario.companyName,
-    sector: params.sector,
-    bankEntity: scenario.bankEntity,
-    bankAccount: scenario.bankAccount,
-    taxRegime: params.taxRegime,
-    year: params.year,
-  }, null, 0);
+  const { periodStart, periodEnd } = getPeriodInfo(params);
 
-  const prompt = `Genera el BLOQUE BANCARIO Y SEGUROS del universo contable.
+  const prompt = `Genera seguros y siniestro para "${scenario.companyName}" (${params.sector}), período ${periodStart}–${periodEnd}.
 
-EMPRESA: ${sc}
-PERÍODO: ${periodStart} a ${periodEnd} (${numMonths} mes${numMonths > 1 ? "es" : ""})
-RÉGIMEN FISCAL: ${params.taxRegime} (IVA general ${rates.standard}%)
+JSON exacto:
+{"insurancePolicies":[{"policyNumber":"SEG-${params.year}-001","insurer":"Mapfre Seguros","type":"Seguro multirriesgo","annualPremium":1800.00,"startDate":"${periodStart}","endDate":"${periodEnd}","prepaidExpense":900.00,"journalNote":"Prima anual; parte siguiente ejercicio en cta 480.","accountDebits":[{"accountCode":"625","accountName":"Primas de seguros","amount":900.00,"description":"Parte ${params.year}"},{"accountCode":"480","accountName":"Gastos anticipados","amount":900.00,"description":"Parte ${params.year + 1}"}],"accountCredits":[{"accountCode":"572","accountName":"Bancos","amount":1800.00,"description":"Pago prima"}]}],"casualtyEvent":{"date":"${periodStart.slice(0,7)}-15","description":"Incendio en almacén","assetAffected":"Equipo informático","bookValue":5000.00,"insuranceCompensation":3500.00,"netLoss":1500.00,"journalNote":"678 (pérdida) y 430 (indemnización a cobrar) contra 300/202 (baja bien) y 778 (ingreso excepcional).","accountDebits":[{"accountCode":"678","accountName":"Gastos excepcionales","amount":5000.00,"description":"Baja bien siniestrado"},{"accountCode":"430","accountName":"Clientes (seguro)","amount":3500.00,"description":"Indemnización a cobrar"}],"accountCredits":[{"accountCode":"216","accountName":"Mobiliario","amount":5000.00,"description":"Baja por siniestro"},{"accountCode":"778","accountName":"Ingresos excepcionales","amount":3500.00,"description":"Indemnización seguro"}]}}
 
-Genera exactamente este JSON:
-{
-  "creditCardStatement": {
-    "cardNumber": "**** **** **** 1234",
-    "entity": "(del escenario bankEntity)",
-    "statementPeriod": "Extracto ${params.year}",
-    "movements": [
-      {"date": "YYYY-MM-DD", "description": "...", "amount": 120.00, "category": "...", "accountCode": "629", "accountName": "Otros servicios"}
-    ],
-    "totalCharges": 120.00,
-    "settlementDate": "YYYY-MM-DD",
-    "journalNote": "Cada gasto con tarjeta: gasto (xxx) a deuda (5201). Al cargo bancario: 5201 a 572.",
-    "accountDebits": [{"accountCode": "629", "accountName": "Otros servicios", "amount": 120.00, "description": "Gastos tarjeta"}],
-    "accountCredits": [{"accountCode": "5201", "accountName": "Deudas tarjeta crédito", "amount": 120.00, "description": "Total pendiente"}]
-  },
-  "insurancePolicies": [
-    {
-      "policyNumber": "SEG-${params.year}-001",
-      "insurer": "Mapfre Seguros",
-      "type": "Seguro multirriesgo",
-      "annualPremium": 1800.00,
-      "startDate": "YYYY-MM-DD",
-      "endDate": "YYYY-MM-DD",
-      "prepaidExpense": 900.00,
-      "journalNote": "Prima anual. Parte del siguiente ejercicio se periodifica en cuenta 480 (gastos anticipados).",
-      "accountDebits": [{"accountCode": "625", "accountName": "Primas de seguros", "amount": 900.00, "description": "Parte año ${params.year}"},{"accountCode": "480", "accountName": "Gastos anticipados", "amount": 900.00, "description": "Parte año ${params.year + 1}"}],
-      "accountCredits": [{"accountCode": "572", "accountName": "Bancos", "amount": 1800.00, "description": "Pago prima"}]
-    }
-  ],
-  "casualtyEvent": {
-    "date": "YYYY-MM-DD",
-    "description": "...",
-    "assetAffected": "...",
-    "bookValue": 5000.00,
-    "insuranceCompensation": 3500.00,
-    "netLoss": 1500.00,
-    "journalNote": "Siniestro: pérdida (678) compensada parcialmente por seguro (778). El cobro pendiente se registra en 430.",
-    "accountDebits": [{"accountCode": "678", "accountName": "Gastos excepcionales", "amount": 5000.00, "description": "Baja bienes siniestrados"},{"accountCode": "430", "accountName": "Clientes (seguro)", "amount": 3500.00, "description": "Indemnización a cobrar"}],
-    "accountCredits": [{"accountCode": "300", "accountName": "Mercaderías / Inmovilizado", "amount": 5000.00, "description": "Baja por siniestro"},{"accountCode": "778", "accountName": "Ingresos excepcionales", "amount": 3500.00, "description": "Indemnización seguro"}]
-  },
-  "bankStatements": [
-    {
-      "bank": "(del escenario bankEntity)",
-      "accountNumber": "(del escenario bankAccount)",
-      "period": "MMMM ${params.year}",
-      "openingBalance": 25000.00,
-      "closingBalance": 22500.00,
-      "transactions": [
-        {"date": "YYYY-MM-DD", "concept": "...", "debit": null, "credit": 3500.00, "balance": 28500.00},
-        {"date": "YYYY-MM-DD", "concept": "...", "debit": 6000.00, "credit": null, "balance": 22500.00}
-      ]
-    }
-  ]
-}
+Adapta datos al sector ${params.sector} y al período. 1-2 pólizas de seguro realistas.`;
 
-REGLAS CRÍTICAS:
-- EXTRACTOS BANCARIOS: genera ${numMonths} extracto(s) mensuales con al menos 4 transacciones cada uno, cubriendo todos los meses de ${periodStart} a ${periodEnd}
-- TARJETA: mínimo ${Math.min(numMonths * 2, 12)} movimientos distribuidos en todos los meses del período
-- Todas las fechas dentro del período ${periodStart}–${periodEnd}
-- Importes coherentes con el sector ${params.sector}`;
-
-  return await callAI(client, model, prompt, 4500) as Record<string, unknown>;
+  return await callAI(client, model, prompt, 2000) as Record<string, unknown>;
 }
 
 // ─── CALL 3: OPERATIONS BLOCK ─────────────────────────────────────────────────
@@ -916,26 +854,29 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     params.includeShareholderAccounts !== false ||
     (params.includeDividends !== false && params.isNewCompany !== true);
 
-  // Compute per-month invoice count (2–5 based on operationsPerMonth)
+  // Compute per-month invoice count (2–4 based on operationsPerMonth)
   const opsPerMonth = params.operationsPerMonth ?? 8;
-  const invoicesPerMonth = Math.max(2, Math.min(Math.ceil(opsPerMonth * 0.35), 5));
+  const invoicesPerMonth = Math.max(2, Math.min(Math.ceil(opsPerMonth * 0.3), 4));
 
-  // Build monthly invoice promises (one small AI call per month, all in parallel)
+  // Build monthly bundle promises — each month: invoices + bank statement + card moves
   const months = getMonthsInPeriod(params);
   let invoiceNum = 1;
-  const monthlyInvoicePromises = months.map((m) => {
+  let rollingBalance = 20000; // starting bank balance; each month passes closing to next
+  const monthlyBundlePromises = months.map((m) => {
     const startNum = invoiceNum;
     invoiceNum += invoicesPerMonth;
-    return generateMonthlyInvoices(
+    const balance = rollingBalance;
+    rollingBalance += Math.floor(Math.random() * 4000) - 1000; // estimated delta
+    return generateMonthlyBundle(
       params, scenario, client, model,
-      m.start, m.end, m.label, m.numStr,
-      invoicesPerMonth, startNum,
+      m.start, m.end, m.label,
+      invoicesPerMonth, startNum, balance,
     );
   });
 
   const blockPromises: Promise<Record<string, unknown>>[] = [
     generateCommercialBlock(params, scenario, client, model),
-    generateBankingBlock(params, scenario, client, model),
+    generateInsuranceCasualty(params, scenario, client, model),
     generateOperationsBlock(params, scenario, client, model),
     generateJournalBlock(params, scenario, client, model),
   ];
@@ -943,13 +884,13 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     blockPromises.push(generateEquityBlock(params, scenario, client, model));
   }
 
-  // Run all blocks + monthly invoice calls in parallel
+  // Run all blocks + all monthly bundles in parallel
   const [blocks, monthlyResults] = await Promise.all([
     Promise.all(blockPromises),
-    Promise.all(monthlyInvoicePromises),
+    Promise.all(monthlyBundlePromises),
   ]);
 
-  // Phase 3: Merge all blocks into one universe object
+  // Phase 3: Merge annual blocks
   const universe: Record<string, unknown> = {};
   for (const block of blocks) {
     if (block && typeof block === "object") {
@@ -957,14 +898,35 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     }
   }
 
-  // Merge all monthly invoices into a single sorted array
+  // Merge monthly bundles
   const allInvoices: unknown[] = [];
+  const allBankStatements: unknown[] = [];
+  const allCardMovements: unknown[] = [];
+
   for (const result of monthlyResults) {
-    if (result?.invoices && Array.isArray(result.invoices)) {
-      allInvoices.push(...result.invoices);
-    }
+    if (result.invoices?.length) allInvoices.push(...result.invoices);
+    if (result.bankStatement) allBankStatements.push(result.bankStatement);
+    if (result.cardMovements?.length) allCardMovements.push(...result.cardMovements);
   }
+
   universe.invoices = allInvoices;
+  universe.bankStatements = allBankStatements;
+
+  // Build creditCardStatement from collected monthly movements
+  const totalCardCharges = allCardMovements.reduce(
+    (sum, m: unknown) => sum + ((m as Record<string, unknown>).amount as number || 0), 0
+  );
+  universe.creditCardStatement = {
+    cardNumber: "**** **** **** 1234",
+    entity: scenario.bankEntity,
+    statementPeriod: `Ejercicio ${params.year}`,
+    movements: allCardMovements,
+    totalCharges: Math.round(totalCardCharges * 100) / 100,
+    settlementDate: months[months.length - 1]?.end ?? `${params.year}-12-31`,
+    journalNote: "Cada gasto con tarjeta: gasto (xxx) a deuda (5201). Al pago bancario: 5201 a 572.",
+    accountDebits: [{ accountCode: "629", accountName: "Otros servicios", amount: totalCardCharges, description: "Gastos tarjeta ejercicio" }],
+    accountCredits: [{ accountCode: "5201", accountName: "Deudas tarjeta crédito", amount: totalCardCharges, description: "Total liquidado" }],
+  };
 
   return universe;
 }
