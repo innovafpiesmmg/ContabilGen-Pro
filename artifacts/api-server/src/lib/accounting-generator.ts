@@ -284,9 +284,11 @@ Genera exactamente este JSON con datos reales y coherentes con el escenario:
   ]
 }
 
-REGLAS:
-- Mínimo 5 facturas (mezcla compras y ventas, al menos 2 de cada)
-- Todas las fechas dentro del período ${periodStart}–${periodEnd}
+REGLAS CRÍTICAS:
+- FACTURAS: genera exactamente ${Math.min(Math.max(Math.ceil((params.operationsPerMonth ?? 8) * numMonths * 0.45), numMonths * 2), 20)} facturas (mezcla de compras y ventas, al menos 2 de cada tipo), DISTRIBUIDAS en todos los meses del período — no acumules facturas en un solo mes
+- EXTRACTOS BANCARIOS: genera ${numMonths} extracto(s) mensuales con al menos 4 transacciones cada uno, cubriendo todos los meses de ${periodStart} a ${periodEnd}
+- TARJETA: mínimo ${Math.min(numMonths * 2, 12)} movimientos distribuidos en todos los meses del período
+- Todas las fechas estrictamente dentro del período ${periodStart}–${periodEnd}
 - Cálculos de ${params.taxRegime} exactos
 - Importes realistas para sector ${params.sector}
 - Usa nombres/NIF exactos del escenario para proveedores y clientes`;
@@ -679,11 +681,12 @@ Formato JSON:
 
 REGLAS CRÍTICAS:
 - Cada asiento DEBE cuadrar: suma(débitos) = suma(créditos) = totalAmount
-- Fechas en orden cronológico, distribuidas por todos los meses del período
+- DISTRIBUCIÓN OBLIGATORIA: al menos ${Math.min(numMonths, targetEntries)} meses distintos deben tener asientos — no agrupes todos en los primeros meses
+- Asientos en orden cronológico estricto (date ascendente)
 - Cuentas PGC correctas (3 o 4 dígitos)
-- Conceptos claros y educativos
+- Conceptos claros y educativos (máximo 8 palabras)
 - Importes coherentes con los datos del escenario
-- SÉ CONCISO: description de cada línea en máximo 4 palabras, concept en máximo 8 palabras
+- SÉ CONCISO: description de cada línea en máximo 4 palabras
 - Máximo 3 líneas de débito y 3 de crédito por asiento`;
 
   return await callAI(client, model, prompt, 4000) as Record<string, unknown>;

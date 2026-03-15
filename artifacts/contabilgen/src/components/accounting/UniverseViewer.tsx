@@ -38,6 +38,7 @@ import {
   InitialBalanceSheetView,
   ShareholderAccountsView,
   DividendsView,
+  CronologiaView,
 } from "./UniverseViews";
 import { usePdfExport, PdfTab } from "@/hooks/usePdfExport";
 
@@ -80,12 +81,13 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
   const rDividendos = useRef<HTMLDivElement>(null);
   const rBancos = useRef<HTMLDivElement>(null);
   const rDiario = useRef<HTMLDivElement>(null);
+  const rCronologia = useRef<HTMLDivElement>(null);
   const hiddenRefs = {
     empresa: rEmpresa, inventarios: rInventarios, facturas: rFacturas,
     financiero: rFinanciero, hipoteca: rHipoteca, extraordinario: rExtraordinario,
     nominas: rNominas, ss: rSS, impuestos: rImpuestos, inmovilizado: rInmovilizado,
     socios: rSocios, balance_apertura: rApertura, cc_socios: rCCSocios,
-    dividendos: rDividendos, bancos: rBancos, diario: rDiario,
+    dividendos: rDividendos, bancos: rBancos, diario: rDiario, cronologia: rCronologia,
   };
 
   function buildActiveTabs(): PdfTab[] {
@@ -107,13 +109,14 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
     if (hasDividends) tabs.push({ id: "14_dividendos", label: "Dividendos", ref: hiddenRefs.dividendos });
     tabs.push({ id: "15_bancos", label: "Extracto Bancario", ref: hiddenRefs.bancos });
     tabs.push({ id: "16_diario", label: "Libro Diario", ref: hiddenRefs.diario });
+    tabs.push({ id: "00_cronologia", label: "Cronología", ref: hiddenRefs.cronologia });
     return tabs;
   }
 
   const handleExportCurrentTab = async () => {
     if (!contentRef.current) return;
     const labels: Record<string, string> = {
-      empresa: "Empresa", inventarios: "Inventarios", facturas: "Facturas",
+      cronologia: "Cronología", empresa: "Empresa", inventarios: "Inventarios", facturas: "Facturas",
       financiero: "Préstamo y Crédito", hipoteca: "Hipoteca", extraordinario: "Extraordinarios",
       nominas: "Nóminas", ss: "SS TC1", impuestos: "Impuestos", inmovilizado: "Inmovilizado",
       socios: "Socios", balance_apertura: "Balance Apertura", cc_socios: "CC Socios",
@@ -208,6 +211,9 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
         <div ref={hiddenRefs.diario} style={{ background: "#fff", padding: "32px" }}>
           <JournalView entries={universe.journalEntries} />
         </div>
+        <div ref={hiddenRefs.cronologia} style={{ background: "#fff", padding: "32px" }}>
+          <CronologiaView data={universe} />
+        </div>
       </div>
 
       {/* Header */}
@@ -272,6 +278,9 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
       <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
         <div className="px-6 pt-4 border-b overflow-x-auto no-print scrollbar-hide">
           <TabsList className="h-12 bg-transparent space-x-1 pb-2 w-max min-w-full justify-start border-b-0">
+            <TabsTrigger value="cronologia" className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-700 rounded-lg gap-2 font-semibold">
+              <FileText className="w-4 h-4" /> Cronología
+            </TabsTrigger>
             <TabsTrigger value="empresa" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg gap-2">
               <Building2 className="w-4 h-4" /> Empresa
             </TabsTrigger>
@@ -340,6 +349,9 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
         </div>
 
         <div ref={contentRef} className="flex-1 p-6 sm:px-8 bg-white print:p-0">
+          <TabsContent value="cronologia" className="mt-0 outline-none">
+            <CronologiaView data={universe} />
+          </TabsContent>
           <TabsContent value="empresa" className="mt-0 outline-none">
             <CompanyProfileView data={universe} />
           </TabsContent>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   AccountingUniverse, 
   AccountEntry, 
@@ -1482,6 +1482,291 @@ export const ShareholderAccountsView = ({ data }: { data?: ShareholderAccounts |
           <AsientoContable debits={data.accountDebits} credits={data.accountCredits} note={data.journalNote} />
         </CardContent>
       </Card>
+    </div>
+  );
+};
+
+// ─── CRONOLOGÍA VIEW ──────────────────────────────────────────────────────────
+
+type EventKind =
+  | "factura_venta" | "factura_compra" | "factura_rectif"
+  | "asiento" | "banco" | "tarjeta"
+  | "prestamo" | "hipoteca"
+  | "ss" | "impuesto"
+  | "nomina" | "socio" | "dividendo" | "apertura" | "inmovilizado";
+
+interface ChronoEvent {
+  date: string;
+  kind: EventKind;
+  label: string;
+  subtitle: string;
+  amount?: number;
+}
+
+const KIND_META: Record<EventKind, { color: string; bg: string; text: string; dot: string }> = {
+  factura_venta:  { color: "text-blue-700",   bg: "bg-blue-50 border-blue-200",   text: "Factura venta",  dot: "bg-blue-500" },
+  factura_compra: { color: "text-orange-700",  bg: "bg-orange-50 border-orange-200", text: "Factura compra", dot: "bg-orange-500" },
+  factura_rectif: { color: "text-red-700",     bg: "bg-red-50 border-red-200",     text: "Rectificativa",  dot: "bg-red-500" },
+  asiento:        { color: "text-slate-700",   bg: "bg-slate-50 border-slate-200", text: "Asiento diario", dot: "bg-slate-500" },
+  banco:          { color: "text-green-700",   bg: "bg-green-50 border-green-200", text: "Mov. bancario",  dot: "bg-green-500" },
+  tarjeta:        { color: "text-indigo-700",  bg: "bg-indigo-50 border-indigo-200", text: "Cargo tarjeta", dot: "bg-indigo-500" },
+  prestamo:       { color: "text-teal-700",    bg: "bg-teal-50 border-teal-200",   text: "Cuota préstamo", dot: "bg-teal-500" },
+  hipoteca:       { color: "text-cyan-700",    bg: "bg-cyan-50 border-cyan-200",   text: "Cuota hipoteca", dot: "bg-cyan-500" },
+  ss:             { color: "text-amber-700",   bg: "bg-amber-50 border-amber-200", text: "Pago SS / TC1",  dot: "bg-amber-500" },
+  impuesto:       { color: "text-red-700",     bg: "bg-red-50 border-red-200",     text: "Liquidación fiscal", dot: "bg-red-600" },
+  nomina:         { color: "text-purple-700",  bg: "bg-purple-50 border-purple-200", text: "Nómina",       dot: "bg-purple-500" },
+  socio:          { color: "text-pink-700",    bg: "bg-pink-50 border-pink-200",   text: "Oper. socios",   dot: "bg-pink-500" },
+  dividendo:      { color: "text-yellow-700",  bg: "bg-yellow-50 border-yellow-200", text: "Dividendos",   dot: "bg-yellow-500" },
+  apertura:       { color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", text: "Bal. apertura", dot: "bg-emerald-500" },
+  inmovilizado:   { color: "text-gray-700",    bg: "bg-gray-50 border-gray-200",   text: "Inmovilizado",  dot: "bg-gray-500" },
+};
+
+function parsePayrollDate(month: string, year: number): string {
+  const meses: Record<string, string> = {
+    enero:"01", febrero:"02", marzo:"03", abril:"04", mayo:"05", junio:"06",
+    julio:"07", agosto:"08", septiembre:"09", octubre:"10", noviembre:"11", diciembre:"12",
+    january:"01", february:"02", march:"03", april:"04", may:"05", june:"06",
+    july:"07", august:"08", september:"09", october:"10", november:"11", december:"12",
+  };
+  const lower = month.toLowerCase();
+  for (const [name, num] of Object.entries(meses)) {
+    if (lower.includes(name)) {
+      const yr = lower.match(/\d{4}/)?.[0] ?? String(year);
+      return `${yr}-${num}-28`;
+    }
+  }
+  return `${year}-06-28`;
+}
+
+function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
+  const events: ChronoEvent[] = [];
+
+  (universe.invoices ?? []).forEach((inv) => {
+    const kind: EventKind = inv.type === "sale" ? "factura_venta"
+      : inv.type === "rectification" ? "factura_rectif" : "factura_compra";
+    events.push({ date: inv.date, kind, label: inv.invoiceNumber,
+      subtitle: inv.partyName, amount: inv.total });
+  });
+
+  (universe.journalEntries ?? []).forEach((e) => {
+    events.push({ date: e.date, kind: "asiento", label: `Asiento ${e.entryNumber}`,
+      subtitle: e.concept, amount: e.totalAmount });
+  });
+
+  (universe.bankStatements ?? []).forEach((bs) => {
+    (bs.transactions ?? []).forEach((t) => {
+      events.push({ date: t.date, kind: "banco", label: bs.bank,
+        subtitle: t.concept, amount: t.debit ?? t.credit ?? undefined });
+    });
+  });
+
+  (universe.creditCardStatement?.movements ?? []).forEach((m) => {
+    events.push({ date: m.date, kind: "tarjeta", label: "Tarjeta crédito",
+      subtitle: m.description, amount: m.amount });
+  });
+
+  (universe.bankLoan?.amortizationTable ?? []).forEach((r) => {
+    events.push({ date: r.date, kind: "prestamo",
+      label: `Cuota ${r.period} préstamo`, subtitle: universe.bankLoan!.entity, amount: r.installment });
+  });
+
+  (universe.mortgage?.amortizationTable ?? []).forEach((r) => {
+    events.push({ date: r.date, kind: "hipoteca",
+      label: `Cuota ${r.period} hipoteca`, subtitle: universe.mortgage!.entity, amount: r.installment });
+  });
+
+  (universe.socialSecurityPayments ?? []).forEach((ss) => {
+    if (ss.dueDate) events.push({ date: ss.dueDate, kind: "ss", label: "Pago TC1",
+      subtitle: ss.month, amount: ss.totalPayment });
+  });
+
+  (universe.taxLiquidations ?? []).forEach((t) => {
+    if (t.dueDate) events.push({ date: t.dueDate, kind: "impuesto",
+      label: `Mod.${t.model} – ${t.period}`, subtitle: "Liquidación", amount: t.result });
+  });
+
+  if (universe.payroll?.month) {
+    const yr = (universe.companyProfile?.fiscalYear as number) ?? new Date().getFullYear();
+    events.push({ date: parsePayrollDate(universe.payroll.month, yr), kind: "nomina",
+      label: "Nómina", subtitle: universe.payroll.month, amount: universe.payroll.totalGross });
+  }
+
+  (universe.shareholderAccounts?.transactions ?? []).forEach((t) => {
+    events.push({ date: t.date, kind: "socio", label: t.accountName,
+      subtitle: `${t.shareholderName} — ${t.concept}`, amount: t.debit ?? t.credit ?? undefined });
+  });
+
+  if (universe.dividendDistribution) {
+    const dd = universe.dividendDistribution;
+    if (dd.approvalDate) events.push({ date: dd.approvalDate, kind: "dividendo",
+      label: "Aprobación dividendos", subtitle: `Junta − ejercicio ${dd.fiscalYear}`, amount: dd.totalDividends });
+    if (dd.paymentDate) events.push({ date: dd.paymentDate, kind: "dividendo",
+      label: "Pago dividendos", subtitle: "Distribución a socios", amount: dd.totalDividends });
+  }
+
+  if (universe.initialBalanceSheet?.date) {
+    events.push({ date: universe.initialBalanceSheet.date, kind: "apertura",
+      label: "Balance de apertura", subtitle: universe.initialBalanceSheet.description ?? "Asiento de apertura", amount: universe.initialBalanceSheet.totalAssets });
+  }
+
+  (universe.fixedAssets ?? []).forEach((a) => {
+    if (a.purchaseDate) events.push({ date: a.purchaseDate, kind: "inmovilizado",
+      label: `Alta: ${a.description}`, subtitle: `Cta. ${a.accountCode}`, amount: a.purchaseValue });
+  });
+
+  return events.filter(e => e.date && /^\d{4}-\d{2}-\d{2}/.test(e.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+const MONTH_NAMES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+
+export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data }) => {
+  const events = useMemo(() => collectEvents(data), [data]);
+
+  const byMonth = useMemo(() => {
+    const map: Record<string, ChronoEvent[]> = {};
+    events.forEach(e => {
+      const key = e.date.substring(0, 7);
+      if (!map[key]) map[key] = [];
+      map[key].push(e);
+    });
+    return map;
+  }, [events]);
+
+  const months = Object.keys(byMonth).sort();
+
+  const countByKind = useMemo(() => {
+    const counts: Partial<Record<EventKind, number>> = {};
+    events.forEach(e => { counts[e.kind] = (counts[e.kind] ?? 0) + 1; });
+    return counts;
+  }, [events]);
+
+  const statGroups: { label: string; kinds: EventKind[]; color: string }[] = [
+    { label: "Facturas", kinds: ["factura_compra","factura_venta","factura_rectif"], color: "text-orange-600" },
+    { label: "Asientos", kinds: ["asiento"], color: "text-slate-600" },
+    { label: "Mov. bancarios", kinds: ["banco"], color: "text-green-600" },
+    { label: "Préstamo/Hipoteca", kinds: ["prestamo","hipoteca"], color: "text-teal-600" },
+    { label: "SS e Impuestos", kinds: ["ss","impuesto"], color: "text-red-600" },
+    { label: "Nóminas", kinds: ["nomina"], color: "text-purple-600" },
+    { label: "Tarjeta", kinds: ["tarjeta"], color: "text-indigo-600" },
+    { label: "Socios/Dividendos", kinds: ["socio","dividendo"], color: "text-pink-600" },
+    { label: "Apertura/Inmov.", kinds: ["apertura","inmovilizado"], color: "text-emerald-600" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <SectionTitle
+        title="Cronología de documentos"
+        description={`${events.length} documentos generados en ${months.length} mes${months.length !== 1 ? "es" : ""} — ordenados cronológicamente`}
+      />
+
+      {/* ── Summary stats ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <Card className="rounded-2xl border-border/50 shadow-sm col-span-2 sm:col-span-3 lg:col-span-1 bg-slate-800 text-white">
+          <CardContent className="p-4 flex flex-col items-center justify-center h-full">
+            <p className="text-4xl font-bold font-mono">{events.length}</p>
+            <p className="text-slate-300 text-sm mt-1">Total documentos</p>
+            <p className="text-slate-400 text-xs">{months.length} meses cubiertos</p>
+          </CardContent>
+        </Card>
+        {statGroups.map(g => {
+          const count = g.kinds.reduce((s, k) => s + (countByKind[k] ?? 0), 0);
+          if (count === 0) return null;
+          return (
+            <Card key={g.label} className="rounded-2xl border-border/50 shadow-sm">
+              <CardContent className="p-4 flex flex-col items-center justify-center text-center">
+                <p className={`text-3xl font-bold font-mono ${g.color}`}>{count}</p>
+                <p className="text-muted-foreground text-xs mt-1">{g.label}</p>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      {/* ── Month coverage heatmap ── */}
+      <Card className="rounded-2xl border-border/50 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-semibold">Cobertura mensual</CardTitle>
+          <CardDescription>Documentos generados por mes</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            {months.length === 0 ? (
+              <p className="text-muted-foreground text-sm">Sin datos</p>
+            ) : (
+              months.map(m => {
+                const count = byMonth[m].length;
+                const [yr, mo] = m.split("-");
+                const moName = MONTH_NAMES[parseInt(mo) - 1] ?? mo;
+                const intensity = count >= 10 ? "bg-primary text-white" :
+                  count >= 5 ? "bg-primary/60 text-white" :
+                  count >= 3 ? "bg-primary/30 text-primary" :
+                  "bg-primary/10 text-primary/70";
+                return (
+                  <div key={m} className={`rounded-xl px-3 py-2 text-center min-w-[64px] ${intensity}`}>
+                    <div className="text-xs font-medium">{moName} {yr}</div>
+                    <div className="text-xl font-bold font-mono leading-tight">{count}</div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Chronological list ── */}
+      {months.map(m => {
+        const [yr, mo] = m.split("-");
+        const moName = MONTH_NAMES[parseInt(mo) - 1] ?? mo;
+        const evs = byMonth[m];
+        return (
+          <div key={m}>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="bg-slate-800 text-white rounded-xl px-3 py-1 text-sm font-bold">
+                {moName} {yr}
+              </div>
+              <div className="flex-1 border-b border-border/50" />
+              <Badge variant="secondary" className="rounded-lg">{evs.length} docs</Badge>
+            </div>
+            <div className="space-y-2 pl-2">
+              {evs.map((e, i) => {
+                const meta = KIND_META[e.kind];
+                return (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-3 rounded-xl border px-3 py-2 ${meta.bg}`}
+                  >
+                    <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${meta.dot}`} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>
+                          {meta.text}
+                        </span>
+                        <span className="text-xs text-muted-foreground">{formatDate(e.date)}</span>
+                      </div>
+                      <div className="text-sm font-medium text-foreground truncate">{e.label}</div>
+                      {e.subtitle && <div className="text-xs text-muted-foreground truncate">{e.subtitle}</div>}
+                    </div>
+                    {e.amount !== undefined && (
+                      <div className={`text-sm font-mono font-semibold flex-shrink-0 ${meta.color}`}>
+                        {formatEuro(Math.abs(e.amount))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+
+      {events.length === 0 && (
+        <Card className="rounded-2xl border-border/50 shadow-sm">
+          <CardContent className="p-12 text-center text-muted-foreground">
+            No hay documentos con fecha en este universo.
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
