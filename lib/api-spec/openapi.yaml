@@ -37,9 +37,6 @@ paths:
       tags: [Auth]
       operationId: getCurrentAuthUser
       summary: Get the currently authenticated user
-      parameters:
-        - $ref: '#/components/parameters/AuthorizationSessionHeader'
-        - $ref: '#/components/parameters/SessionCookie'
       responses:
         '200':
           description: Auth status resolved successfully.
@@ -47,55 +44,128 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuthUserEnvelope'
-  /login:
-    get:
+
+  /auth/register:
+    post:
       tags: [Auth]
-      operationId: beginBrowserLogin
-      summary: Start the browser OIDC login flow
-      parameters:
-        - name: returnTo
-          in: query
-          required: false
-          schema:
-            type: string
+      operationId: registerUser
+      summary: Register a new account with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterBody'
       responses:
-        '302':
-          description: Redirect to the OIDC authorization endpoint.
-  /callback:
-    get:
+        '201':
+          description: Account created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+        '400':
+          description: Validation error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Email already registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
       tags: [Auth]
-      operationId: handleBrowserLoginCallback
-      summary: Complete the browser OIDC login flow
-      parameters:
-        - name: code
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: state
-          in: query
-          required: false
-          schema:
-            type: string
-        - name: iss
-          in: query
-          required: false
-          schema:
-            type: string
+      operationId: loginUser
+      summary: Log in with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginBody'
       responses:
-        '302':
-          description: Redirect on success or failure.
-  /logout:
-    get:
+        '200':
+          description: Login successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+        '401':
+          description: Invalid credentials.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
       tags: [Auth]
-      operationId: logoutBrowserSession
-      summary: Clear the session and begin OIDC logout
-      parameters:
-        - $ref: '#/components/parameters/AuthorizationSessionHeader'
-        - $ref: '#/components/parameters/SessionCookie'
+      operationId: logoutUser
+      summary: Clear the session
       responses:
-        '302':
-          description: Redirect to the OIDC provider logout URL.
+        '200':
+          description: Logged out successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      operationId: forgotPassword
+      summary: Request a password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordBody'
+      responses:
+        '200':
+          description: Reset email sent (or silently ignored if email not found).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      operationId: resetPassword
+      summary: Reset password using a token from the reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordBody'
+      responses:
+        '200':
+          description: Password reset successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '400':
+          description: Invalid or expired token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /settings:
     get:
@@ -252,17 +322,15 @@ components:
   schemas:
     AuthUser:
       type: object
-      required: [id, email, firstName, lastName, profileImageUrl]
+      required: [id, email]
       properties:
         id:
           type: string
         email:
-          type: [string, 'null']
+          type: string
         firstName:
           type: [string, 'null']
         lastName:
-          type: [string, 'null']
-        profileImageUrl:
           type: [string, 'null']
     AuthUserEnvelope:
       type: object
@@ -272,6 +340,49 @@ components:
           oneOf:
             - $ref: '#/components/schemas/AuthUser'
             - type: 'null'
+
+    RegisterBody:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        firstName:
+          type: string
+        lastName:
+          type: string
+
+    LoginBody:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    ForgotPasswordBody:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordBody:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+          minLength: 8
 
     HealthStatus:
       type: object

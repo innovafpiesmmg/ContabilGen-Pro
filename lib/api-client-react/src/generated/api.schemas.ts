@@ -7,18 +7,38 @@
  */
 export interface AuthUser {
   id: string;
+  email: string;
   /** @nullable */
-  email: string | null;
+  firstName?: string | null;
   /** @nullable */
-  firstName: string | null;
-  /** @nullable */
-  lastName: string | null;
-  /** @nullable */
-  profileImageUrl: string | null;
+  lastName?: string | null;
 }
 
 export interface AuthUserEnvelope {
   user: AuthUser | null;
+}
+
+export interface RegisterBody {
+  email: string;
+  /** @minLength 8 */
+  password: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+export interface LoginBody {
+  email: string;
+  password: string;
+}
+
+export interface ForgotPasswordBody {
+  email: string;
+}
+
+export interface ResetPasswordBody {
+  token: string;
+  /** @minLength 8 */
+  newPassword: string;
 }
 
 export interface HealthStatus {
@@ -398,12 +418,14 @@ export interface SaveGenerationRequest {
  */
 export type AuthorizationSessionHeaderParameter = string;
 
-export type BeginBrowserLoginParams = {
-  returnTo?: string;
+export type LogoutUser200 = {
+  success?: boolean;
 };
 
-export type HandleBrowserLoginCallbackParams = {
-  code?: string;
-  state?: string;
-  iss?: string;
+export type ForgotPassword200 = {
+  message?: string;
+};
+
+export type ResetPassword200 = {
+  message?: string;
 };

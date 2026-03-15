@@ -6,11 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export interface AuthUser {
-  id: string;
+export interface LoginBody {
   email: string;
-  /** @nullable */
-  firstName?: string | null;
-  /** @nullable */
-  lastName?: string | null;
+  password: string;
 }

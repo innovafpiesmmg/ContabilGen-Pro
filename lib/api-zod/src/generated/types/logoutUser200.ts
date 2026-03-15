@@ -6,6 +6,6 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type BeginBrowserLoginParams = {
-  returnTo?: string;
+export type LogoutUser200 = {
+  success?: boolean;
 };

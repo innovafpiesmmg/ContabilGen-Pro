@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useListGenerations, useDeleteGeneration } from "@workspace/api-client-react";
-import { useAuth } from "@workspace/replit-auth-web";
+import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -46,7 +46,7 @@ export default function Layout({ children }: LayoutProps) {
         if (location === `/generations/${id}`) {
           setLocation("/");
         }
-      } catch (err) {
+      } catch {
         toast({ variant: "destructive", title: "Error", description: "No se pudo eliminar el universo." });
       }
     }
@@ -151,11 +151,7 @@ export default function Layout({ children }: LayoutProps) {
 
         <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-muted/40 border border-border/50">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            {user?.profileImageUrl ? (
-              <img src={user.profileImageUrl} alt={displayName} className="w-8 h-8 rounded-full object-cover" />
-            ) : (
-              <User className="w-4 h-4 text-primary" />
-            )}
+            <User className="w-4 h-4 text-primary" />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold truncate text-foreground">{displayName}</p>
@@ -177,12 +173,10 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="flex h-screen w-full bg-gradient-to-br from-slate-50 to-blue-50/30 overflow-hidden">
-      {/* Desktop Sidebar */}
       <aside className="hidden md:block w-80 shrink-0 h-full z-10 no-print">
         <SidebarContent />
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {sidebarOpen && (
           <>
@@ -212,7 +206,6 @@ export default function Layout({ children }: LayoutProps) {
         )}
       </AnimatePresence>
 
-      {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
         <header className="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-border flex items-center justify-between px-4 sm:px-8 sticky top-0 z-20 no-print">
           <div className="flex items-center gap-4">

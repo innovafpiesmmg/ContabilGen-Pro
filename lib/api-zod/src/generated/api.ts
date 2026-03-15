@@ -18,50 +18,80 @@ export const HealthCheckResponse = zod.object({
 /**
  * @summary Get the currently authenticated user
  */
-export const GetCurrentAuthUserHeader = zod.object({
-  Authorization: zod
-    .string()
-    .optional()
-    .describe("Opaque session token — `Bearer <sid>`."),
-});
-
 export const GetCurrentAuthUserResponse = zod.object({
   user: zod.union([
     zod.object({
       id: zod.string(),
-      email: zod.string().nullable(),
-      firstName: zod.string().nullable(),
-      lastName: zod.string().nullable(),
-      profileImageUrl: zod.string().nullable(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
     }),
     zod.null(),
   ]),
 });
 
 /**
- * @summary Start the browser OIDC login flow
+ * @summary Register a new account with email and password
  */
-export const BeginBrowserLoginQueryParams = zod.object({
-  returnTo: zod.coerce.string().optional(),
+export const registerUserBodyPasswordMin = 8;
+
+export const RegisterUserBody = zod.object({
+  email: zod.string().email(),
+  password: zod.string().min(registerUserBodyPasswordMin),
+  firstName: zod.string().optional(),
+  lastName: zod.string().optional(),
 });
 
 /**
- * @summary Complete the browser OIDC login flow
+ * @summary Log in with email and password
  */
-export const HandleBrowserLoginCallbackQueryParams = zod.object({
-  code: zod.coerce.string().optional(),
-  state: zod.coerce.string().optional(),
-  iss: zod.coerce.string().optional(),
+export const LoginUserBody = zod.object({
+  email: zod.string().email(),
+  password: zod.string(),
+});
+
+export const LoginUserResponse = zod.object({
+  user: zod.union([
+    zod.object({
+      id: zod.string(),
+      email: zod.string(),
+      firstName: zod.string().nullish(),
+      lastName: zod.string().nullish(),
+    }),
+    zod.null(),
+  ]),
 });
 
 /**
- * @summary Clear the session and begin OIDC logout
+ * @summary Clear the session
  */
-export const LogoutBrowserSessionHeader = zod.object({
-  Authorization: zod
-    .string()
-    .optional()
-    .describe("Opaque session token — `Bearer <sid>`."),
+export const LogoutUserResponse = zod.object({
+  success: zod.boolean().optional(),
+});
+
+/**
+ * @summary Request a password reset email
+ */
+export const ForgotPasswordBody = zod.object({
+  email: zod.string().email(),
+});
+
+export const ForgotPasswordResponse = zod.object({
+  message: zod.string().optional(),
+});
+
+/**
+ * @summary Reset password using a token from the reset email
+ */
+export const resetPasswordBodyNewPasswordMin = 8;
+
+export const ResetPasswordBody = zod.object({
+  token: zod.string(),
+  newPassword: zod.string().min(resetPasswordBodyNewPasswordMin),
+});
+
+export const ResetPasswordResponse = zod.object({
+  message: zod.string().optional(),
 });
 
 /**
