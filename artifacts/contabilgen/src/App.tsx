@@ -6,7 +6,6 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Loader2 } from "lucide-react";
 
 import Layout from "@/components/layout";
-import AdminLayout from "@/components/admin-layout";
 import Dashboard from "@/pages/dashboard";
 import SavedUniverse from "@/pages/saved-universe";
 import SettingsPage from "@/pages/settings";
@@ -44,14 +43,16 @@ function AdminSection() {
   const { user } = useAuth();
   if (!user?.isAdmin) return <LoginPage />;
   return (
-    <Switch>
-      <Route path="/admin/users" component={AdminUsersPage} />
-      <Route path="/admin/email" component={AdminEmailConfigPage} />
-      <Route path="/admin/ai" component={AdminAiConfigPage} />
-      <Route>
-        <AdminUsersPage />
-      </Route>
-    </Switch>
+    <Layout>
+      <Switch>
+        <Route path="/admin/users" component={AdminUsersPage} />
+        <Route path="/admin/email" component={AdminEmailConfigPage} />
+        <Route path="/admin/ai" component={AdminAiConfigPage} />
+        <Route>
+          <AdminUsersPage />
+        </Route>
+      </Switch>
+    </Layout>
   );
 }
 

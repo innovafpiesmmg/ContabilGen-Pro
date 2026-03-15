@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
-import AdminLayout from "@/components/admin-layout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Cpu, Save, Trash2, Eye, EyeOff, KeyRound, CheckCircle2, XCircle } from "lucide-react";
+import { AdminShell } from "@/components/admin-layout";
 
 interface DeepseekConfig {
   shared_deepseek_enabled?: string;
@@ -93,18 +93,11 @@ export default function AdminAiConfigPage() {
   const keyIsSet = config.shared_deepseek_api_key_set === "true";
 
   return (
-    <AdminLayout>
-      <div className="p-8 max-w-2xl">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-3">
-            <Cpu className="w-6 h-6 text-primary" />
-            DeepSeek compartido
-          </h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Configura una clave API de DeepSeek para que todos los usuarios puedan usarla sin necesidad de la suya propia.
-          </p>
-        </div>
-
+    <AdminShell
+      title="IA compartida"
+      description="Configura una clave API de DeepSeek para que todos los usuarios puedan usarla sin necesidad de la suya propia."
+    >
+      <div className="max-w-2xl">
         {loading ? (
           <div className="space-y-4">
             <Skeleton className="h-32 w-full rounded-xl" />
@@ -240,6 +233,6 @@ export default function AdminAiConfigPage() {
           </div>
         )}
       </div>
-    </AdminLayout>
+    </AdminShell>
   );
 }

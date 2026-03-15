@@ -1,13 +1,19 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Mail, CheckCircle, Trash2, Info } from "lucide-react";
+import { Loader2, Mail, CheckCircle, Trash2, Info, Send, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
+import { AdminShell } from "@/components/admin-layout";
 
 async function apiFetch(path: string, options?: RequestInit) {
-  const res = await fetch(`/api${path}`, { ...options, credentials: "include", headers: { "Content-Type": "application/json", ...(options?.headers ?? {}) } });
+  const res = await fetch(`/api${path}`, {
+    ...options,
+    credentials: "include",
+    headers: { "Content-Type": "application/json", ...(options?.headers ?? {}) },
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Error en la petición");
   return data;
@@ -33,7 +39,7 @@ export default function EmailConfigPage() {
       apiFetch("/admin/email-config", { method: "PUT", body: JSON.stringify(body) }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["admin-email-config"] });
-      toast({ title: "Configuración guardada" });
+      toast({ title: "Configuración guardada", description: "Los cambios han sido aplicados correctamente." });
       setApiKey("");
     },
     onError: (e) => toast({ title: "Error", description: (e as Error).message, variant: "destructive" }),
@@ -60,103 +66,131 @@ export default function EmailConfigPage() {
   const keyIsSet = data?.resend_api_key_set === "true";
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4 sm:px-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-foreground">Servidor de correo</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Configura Resend para enviar correos de recuperación de contraseña
-        </p>
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 flex gap-3">
-        <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-700">
-          <p className="font-medium mb-1">¿Cómo obtener una clave API de Resend?</p>
-          <ol className="list-decimal list-inside space-y-1 text-blue-600">
-            <li>Crea una cuenta gratuita en <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="underline font-medium">resend.com</a></li>
-            <li>En el panel, ve a «API Keys» y crea una nueva clave</li>
-            <li>Verifica tu dominio o usa el dominio de prueba de Resend</li>
-            <li>Pega la clave y el remitente a continuación</li>
-          </ol>
-        </div>
-      </div>
-
+    <AdminShell
+      title="Servidor de correo"
+      description="Configura Resend para enviar correos de recuperación de contraseña a los usuarios"
+    >
       {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-7 h-7 animate-spin text-primary" />
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-border shadow-sm p-6">
-          <div className="mb-6 flex items-center gap-3 pb-5 border-b border-border">
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${keyIsSet ? "bg-green-100" : "bg-slate-100"}`}>
-              {keyIsSet
-                ? <CheckCircle className="w-5 h-5 text-green-600" />
-                : <Mail className="w-5 h-5 text-muted-foreground" />}
-            </div>
-            <div>
-              <p className="font-medium text-sm text-foreground">
-                {keyIsSet ? "Clave API configurada" : "Sin clave API"}
-              </p>
-              {keyIsSet && data?.resend_api_key_masked && (
-                <p className="text-xs text-muted-foreground font-mono">{data.resend_api_key_masked}</p>
+        <div className="max-w-2xl space-y-5">
+          {/* Status card */}
+          <Card className={`rounded-2xl border shadow-sm ${keyIsSet ? "border-emerald-200 bg-emerald-50/40" : "border-border/50"}`}>
+            <CardContent className="p-5 flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${keyIsSet ? "bg-emerald-100" : "bg-slate-100"}`}>
+                {keyIsSet
+                  ? <CheckCircle className="w-6 h-6 text-emerald-600" />
+                  : <Mail className="w-6 h-6 text-muted-foreground" />
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`font-semibold text-sm ${keyIsSet ? "text-emerald-800" : "text-foreground"}`}>
+                  {keyIsSet ? "Servidor de correo configurado" : "Sin servidor de correo"}
+                </p>
+                {keyIsSet && data?.resend_api_key_masked ? (
+                  <p className="text-xs text-emerald-700 font-mono mt-0.5">{data.resend_api_key_masked}</p>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Sin clave configurada — los correos de recuperación solo aparecen en el log del servidor
+                  </p>
+                )}
+              </div>
+              {keyIsSet && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 gap-1.5 shrink-0"
+                  onClick={() => deleteKeyMutation.mutate()}
+                  disabled={deleteKeyMutation.isPending}
+                >
+                  {deleteKeyMutation.isPending
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Trash2 className="w-4 h-4" />
+                  }
+                  Eliminar clave
+                </Button>
               )}
-              {!keyIsSet && (
-                <p className="text-xs text-muted-foreground">Los correos de recuperación se muestran solo en el log del servidor</p>
-              )}
-            </div>
-            {keyIsSet && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-auto text-destructive hover:text-destructive"
-                onClick={() => deleteKeyMutation.mutate()}
-                disabled={deleteKeyMutation.isPending}
-              >
-                <Trash2 className="w-4 h-4 mr-1" /> Eliminar clave
-              </Button>
-            )}
-          </div>
+            </CardContent>
+          </Card>
 
-          <form onSubmit={handleSave} className="flex flex-col gap-5">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="apiKey">
-                {keyIsSet ? "Actualizar clave API de Resend" : "Clave API de Resend"}
-              </Label>
-              <Input
-                id="apiKey"
-                type="password"
-                placeholder={keyIsSet ? "Escribe para reemplazar la clave actual" : "re_xxxxxxxxxxxxxxxxxxxxxxxx"}
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
-                className="rounded-xl font-mono"
-              />
-            </div>
+          {/* How to guide */}
+          <Card className="rounded-2xl border-blue-200 bg-blue-50/50 shadow-sm">
+            <CardContent className="p-5">
+              <div className="flex gap-3">
+                <Info className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-800 mb-2">¿Cómo configurar Resend?</p>
+                  <ol className="list-decimal list-inside space-y-1.5 text-sm text-blue-700">
+                    <li>Crea una cuenta gratuita en <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="underline font-medium inline-flex items-center gap-1">resend.com <ExternalLink className="w-3 h-3" /></a></li>
+                    <li>Ve a «API Keys» en el panel y crea una nueva clave</li>
+                    <li>Verifica tu dominio o usa el dominio de prueba de Resend</li>
+                    <li>Pega la clave y el remitente en el formulario de abajo</li>
+                  </ol>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="emailFrom">Dirección de remitente</Label>
-              <Input
-                id="emailFrom"
-                type="text"
-                placeholder="ContabilGen Pro <noreply@tudominio.com>"
-                value={emailFrom}
-                onChange={(e) => setEmailFrom(e.target.value)}
-                className="rounded-xl"
-              />
-              <p className="text-xs text-muted-foreground">
-                Formato: «Nombre &lt;correo@dominio.com&gt;» — El dominio debe estar verificado en Resend.
-              </p>
-            </div>
+          {/* Config form */}
+          <Card className="rounded-2xl shadow-sm border-border/50">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Send className="w-4 h-4 text-primary" />
+                {keyIsSet ? "Actualizar configuración" : "Configurar Resend"}
+              </CardTitle>
+              <CardDescription>
+                La clave API se almacena cifrada en la base de datos.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSave} className="flex flex-col gap-5">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="apiKey" className="text-sm font-medium">
+                    {keyIsSet ? "Nueva clave API de Resend" : "Clave API de Resend"}
+                  </Label>
+                  <Input
+                    id="apiKey"
+                    type="password"
+                    placeholder={keyIsSet ? "Escribe para reemplazar la clave actual" : "re_xxxxxxxxxxxxxxxxxxxxxxxx"}
+                    value={apiKey}
+                    onChange={(e) => setApiKey(e.target.value)}
+                    className="rounded-xl font-mono"
+                  />
+                </div>
 
-            <Button
-              type="submit"
-              disabled={saveMutation.isPending || (!apiKey.trim() && !emailFrom.trim())}
-              className="w-full rounded-xl py-5 font-semibold"
-            >
-              {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Guardar configuración"}
-            </Button>
-          </form>
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="emailFrom" className="text-sm font-medium">Dirección del remitente</Label>
+                  <Input
+                    id="emailFrom"
+                    type="text"
+                    placeholder='ContabilGen Pro <noreply@tudominio.com>'
+                    value={emailFrom}
+                    onChange={(e) => setEmailFrom(e.target.value)}
+                    className="rounded-xl"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Formato: <span className="font-mono">Nombre &lt;correo@dominio.com&gt;</span> — El dominio debe estar verificado en Resend.
+                  </p>
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={saveMutation.isPending || (!apiKey.trim() && !emailFrom.trim())}
+                  className="rounded-xl py-5 font-semibold gap-2"
+                >
+                  {saveMutation.isPending
+                    ? <Loader2 className="w-4 h-4 animate-spin" />
+                    : <Send className="w-4 h-4" />
+                  }
+                  Guardar configuración
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </div>
       )}
-    </div>
+    </AdminShell>
   );
 }
