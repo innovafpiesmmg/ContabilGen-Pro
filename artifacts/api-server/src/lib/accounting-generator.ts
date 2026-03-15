@@ -15,6 +15,11 @@ interface GenerateParams {
   includeMortgage?: boolean | null;
   includeCreditPolicy?: boolean | null;
   includeFixedAssets?: boolean | null;
+  includeShareholdersInfo?: boolean | null;
+  isNewCompany?: boolean | null;
+  includeInitialBalance?: boolean | null;
+  includeShareholderAccounts?: boolean | null;
+  includeDividends?: boolean | null;
 }
 
 interface AiConfig {
@@ -41,6 +46,11 @@ function buildPrompt(params: GenerateParams): string {
   const withMortgage = params.includeMortgage === true;
   const withPolicy = params.includeCreditPolicy !== false;
   const withFixedAssets = params.includeFixedAssets !== false;
+  const withShareholders = params.includeShareholdersInfo !== false;
+  const isNew = params.isNewCompany === true;
+  const withInitialBalance = params.includeInitialBalance !== false && !isNew;
+  const withShareholderAccounts = params.includeShareholderAccounts !== false;
+  const withDividends = params.includeDividends !== false;
 
   const levelNote = level === "Superior"
     ? "Nivel Superior (FP Grado Superior): incluye operaciones complejas como periodificaciones contables, ajustes de ejercicio, operaciones con efectos comerciales, factoring, leasing, y mayor detalle en impuestos."
@@ -275,6 +285,193 @@ function buildPrompt(params: GenerateParams): string {
     conditionalSections.push(`  "fixedAssets": [],`);
   }
 
+  if (withShareholders) {
+    conditionalSections.push(`  "shareholdersInfo": {
+    "companyType": "SL",
+    "legalForm": "Sociedad de Responsabilidad Limitada",
+    "shareCapital": 10000.00,
+    "nominalValuePerShare": 100.00,
+    "totalShares": 100,
+    "constitutionDate": "${params.year - 3}-06-15",
+    "registryEntry": "Tomo 1234, Folio 56, Sección 8ª, Hoja M-123456",
+    "shareholders": [
+      {
+        "name": "Ana Martínez Ruiz",
+        "nif": "12345678A",
+        "role": "socio_administrador",
+        "participationPercentage": 60,
+        "nominalValuePerShare": 100.00,
+        "numberOfShares": 60,
+        "totalCapitalAmount": 6000.00
+      },
+      {
+        "name": "Carlos López Sánchez",
+        "nif": "87654321B",
+        "role": "socio",
+        "participationPercentage": 40,
+        "nominalValuePerShare": 100.00,
+        "numberOfShares": 40,
+        "totalCapitalAmount": 4000.00
+      }
+    ],
+    "journalNote": "La cuenta 100 (Capital social) recoge las aportaciones de los socios. Cada socio tiene participaciones con valor nominal. Las reservas (112, 113) son beneficios no distribuidos de ejercicios anteriores.",
+    "accountDebits": [
+      { "accountCode": "572", "accountName": "Bancos e instituciones de crédito c/c", "amount": 10000.00, "description": "Desembolso del capital en cuenta bancaria" }
+    ],
+    "accountCredits": [
+      { "accountCode": "100", "accountName": "Capital social", "amount": 10000.00, "description": "Capital suscrito y desembolsado" }
+    ]
+  },`);
+  }
+
+  if (withInitialBalance) {
+    conditionalSections.push(`  "initialBalanceSheet": {
+    "date": "${params.year}-01-01",
+    "description": "Balance de situación a 1 de enero de ${params.year} - Asiento de apertura del ejercicio",
+    "nonCurrentAssets": [
+      { "accountCode": "216", "accountName": "Mobiliario", "amount": 8500.00, "note": "Valor contable neto" },
+      { "accountCode": "217", "accountName": "Equipos informáticos", "amount": 3150.00, "note": "Valor contable neto" }
+    ],
+    "currentAssets": [
+      { "accountCode": "300", "accountName": "Mercaderías", "amount": 12000.00, "note": "Existencias iniciales" },
+      { "accountCode": "430", "accountName": "Clientes", "amount": 8500.00, "note": "Saldo clientes pendiente" },
+      { "accountCode": "472", "accountName": "${params.taxRegime} soportado", "amount": 1200.00, "note": "${params.taxRegime} pendiente deducción" },
+      { "accountCode": "572", "accountName": "Bancos c/c", "amount": 25000.00, "note": "Saldo banco IBAN ...7890" }
+    ],
+    "equity": [
+      { "accountCode": "100", "accountName": "Capital social", "amount": 10000.00, "note": "Capital social escriturado" },
+      { "accountCode": "112", "accountName": "Reserva legal", "amount": 1000.00, "note": "Reserva legal acumulada" },
+      { "accountCode": "113", "accountName": "Reservas voluntarias", "amount": 2000.00, "note": "Reservas voluntarias" },
+      { "accountCode": "129", "accountName": "Resultado del ejercicio anterior", "amount": 5000.00, "note": "Beneficio pendiente aplicación" }
+    ],
+    "nonCurrentLiabilities": [
+      { "accountCode": "170", "accountName": "Deudas a largo plazo con entidades de crédito", "amount": 35000.00, "note": "Préstamo bancario vto. > 1 año" }
+    ],
+    "currentLiabilities": [
+      { "accountCode": "400", "accountName": "Proveedores", "amount": 5350.00, "note": "Deuda proveedores pendiente" },
+      { "accountCode": "477", "accountName": "${params.taxRegime} repercutido", "amount": 1050.00, "note": "${params.taxRegime} pendiente ingreso" }
+    ],
+    "totalAssets": 58350.00,
+    "totalEquityAndLiabilities": 58350.00,
+    "journalNote": "El asiento de apertura (1 de enero) regenera el balance del ejercicio anterior. Se cargan todos los activos y se abonan todos los pasivos y el patrimonio neto. Total Activo = Total Pasivo + PN.",
+    "accountDebits": [
+      { "accountCode": "216", "accountName": "Mobiliario", "amount": 8500.00, "description": "Inmovilizado material" },
+      { "accountCode": "217", "accountName": "Equipos informáticos", "amount": 3150.00, "description": "Inmovilizado material" },
+      { "accountCode": "300", "accountName": "Mercaderías", "amount": 12000.00, "description": "Existencias" },
+      { "accountCode": "430", "accountName": "Clientes", "amount": 8500.00, "description": "Derechos de cobro" },
+      { "accountCode": "472", "accountName": "${params.taxRegime} soportado", "amount": 1200.00, "description": "Hacienda deudora" },
+      { "accountCode": "572", "accountName": "Bancos c/c", "amount": 25000.00, "description": "Tesorería" }
+    ],
+    "accountCredits": [
+      { "accountCode": "100", "accountName": "Capital social", "amount": 10000.00, "description": "Patrimonio neto" },
+      { "accountCode": "112", "accountName": "Reserva legal", "amount": 1000.00, "description": "Patrimonio neto" },
+      { "accountCode": "113", "accountName": "Reservas voluntarias", "amount": 2000.00, "description": "Patrimonio neto" },
+      { "accountCode": "129", "accountName": "Resultado del ejercicio anterior", "amount": 5000.00, "description": "Patrimonio neto" },
+      { "accountCode": "170", "accountName": "Deudas a largo plazo c.e.c.", "amount": 35000.00, "description": "Pasivo no corriente" },
+      { "accountCode": "400", "accountName": "Proveedores", "amount": 5350.00, "description": "Pasivo corriente" },
+      { "accountCode": "477", "accountName": "${params.taxRegime} repercutido", "amount": 1050.00, "description": "Pasivo corriente" }
+    ]
+  },`);
+  }
+
+  if (withShareholderAccounts) {
+    conditionalSections.push(`  "shareholderAccounts": {
+    "description": "Cuenta corriente con socios y administradores - ejercicio ${params.year}",
+    "transactions": [
+      {
+        "date": "${params.year}-03-15",
+        "concept": "Anticipo a cuenta de dividendos futuros",
+        "shareholderName": "Ana Martínez Ruiz",
+        "accountCode": "553",
+        "accountName": "Cuenta corriente con socios y administradores",
+        "debit": null,
+        "credit": 2000.00,
+        "balance": -2000.00
+      },
+      {
+        "date": "${params.year}-06-10",
+        "concept": "Préstamo del socio Carlos López a la empresa",
+        "shareholderName": "Carlos López Sánchez",
+        "accountCode": "553",
+        "accountName": "Cuenta corriente con socios y administradores",
+        "debit": null,
+        "credit": 5000.00,
+        "balance": -7000.00
+      },
+      {
+        "date": "${params.year}-09-01",
+        "concept": "Devolución parcial préstamo socio",
+        "shareholderName": "Carlos López Sánchez",
+        "accountCode": "553",
+        "accountName": "Cuenta corriente con socios y administradores",
+        "debit": 3000.00,
+        "credit": null,
+        "balance": -4000.00
+      },
+      {
+        "date": "${params.year}-10-20",
+        "concept": "Retribución administrador pendiente de pago",
+        "shareholderName": "Ana Martínez Ruiz",
+        "accountCode": "551",
+        "accountName": "Cuenta corriente con administradores",
+        "debit": null,
+        "credit": 1500.00,
+        "balance": -1500.00
+      }
+    ],
+    "closingBalance551": -1500.00,
+    "closingBalance553": -4000.00,
+    "journalNote": "Cuenta 551: operaciones con administradores (retribuciones, anticipos, préstamos). Cuenta 553: operaciones con socios. Saldo acreedor = empresa debe a socio/admin. Saldo deudor = socio/admin debe a empresa. Intereses según art. 18 LIS.",
+    "accountDebits": [
+      { "accountCode": "651", "accountName": "Retribución de administradores", "amount": 1500.00, "description": "Remuneración órgano administración" }
+    ],
+    "accountCredits": [
+      { "accountCode": "551", "accountName": "Cuenta corriente con administradores", "amount": 1500.00, "description": "Retribución pendiente pago" }
+    ]
+  },`);
+  }
+
+  if (withDividends) {
+    conditionalSections.push(`  "dividendDistribution": {
+    "fiscalYear": ${params.year - 1},
+    "approvalDate": "${params.year}-06-30",
+    "paymentDate": "${params.year}-07-15",
+    "totalNetProfit": 20000.00,
+    "legalReserve": 2000.00,
+    "voluntaryReserve": 3000.00,
+    "totalDividends": 15000.00,
+    "dividendPerShare": 150.00,
+    "irpfWithholdingRate": 19,
+    "perShareholder": [
+      {
+        "shareholderName": "Ana Martínez Ruiz",
+        "participationPercentage": 60,
+        "grossDividend": 9000.00,
+        "irpfWithholdingRate": 19,
+        "irpfWithholdingAmount": 1710.00,
+        "netDividend": 7290.00
+      },
+      {
+        "shareholderName": "Carlos López Sánchez",
+        "participationPercentage": 40,
+        "grossDividend": 6000.00,
+        "irpfWithholdingRate": 19,
+        "irpfWithholdingAmount": 1140.00,
+        "netDividend": 4860.00
+      }
+    ],
+    "journalNote": "Distribución del resultado: (1) Dotación Reserva Legal mín. 10% hasta 20% capital social (cta 112); (2) Reserva voluntaria (113); (3) Dividendos aprobados en Junta (526). Al pagar: 526 a 572 + retención IRPF 19% (4751). La retención se ingresa en Hacienda Mod.123.",
+    "accountDebits": [
+      { "accountCode": "129", "accountName": "Resultado del ejercicio", "amount": 20000.00, "description": "Aplicación del resultado ${params.year - 1}" }
+    ],
+    "accountCredits": [
+      { "accountCode": "112", "accountName": "Reserva legal", "amount": 2000.00, "description": "Dotación reserva legal 10%" },
+      { "accountCode": "113", "accountName": "Reservas voluntarias", "amount": 3000.00, "description": "Reserva voluntaria" },
+      { "accountCode": "526", "accountName": "Dividendo activo a pagar", "amount": 15000.00, "description": "Dividendos aprobados en Junta" }
+    ]
+  },`);
+  }
+
   const optionalSectionsText = conditionalSections.join("\n");
 
   return `Eres un experto contable español y debes generar un universo contable completo para prácticas de contabilidad.
@@ -287,6 +484,10 @@ PARÁMETROS:
 - Operaciones en el libro diario: mínimo ${opsPerMonth} asientos por mes (total año: mínimo ${opsPerMonth * 12})
 - ${companyHint}
 
+TIPO DE EMPRESA:
+- Empresa nueva (primer ejercicio): ${isNew ? "SÍ" : "NO"}
+- Si NO es nueva, el tipo de sociedad es coherente con los socios y reservas existentes.
+
 SECCIONES A INCLUIR:
 - Facturas: SÍ (mínimo 6, mix compras y ventas)
 - Nóminas: ${withPayroll ? "SÍ" : "NO"}
@@ -296,6 +497,10 @@ SECCIONES A INCLUIR:
 - Hipoteca: ${withMortgage ? "SÍ" : "NO"}
 - Póliza de crédito: ${withPolicy ? "SÍ" : "NO"}
 - Inmovilizado y amortizaciones: ${withFixedAssets ? "SÍ" : "NO"}
+- Socios y capital social (shareholdersInfo): ${withShareholders ? "SÍ (incluye estructura de socios, participaciones, tipo de sociedad y asiento de constitución/aportación)" : "NO - omitir el campo shareholdersInfo del JSON"}
+- Balance de apertura (initialBalanceSheet): ${withInitialBalance ? "SÍ (asiento de apertura a 1 enero con activos, pasivos y patrimonio neto coherentes con los socios)" : "NO - omitir el campo initialBalanceSheet del JSON"}
+- Cuenta corriente con socios/administradores (shareholderAccounts): ${withShareholderAccounts ? "SÍ (operaciones con cuentas 551 y 553: anticipos, préstamos, retribuciones administrador)" : "NO - omitir el campo shareholderAccounts del JSON"}
+- Reparto de dividendos (dividendDistribution): ${withDividends ? "SÍ (junta aprobación resultado, dotación reservas, dividendo con retención IRPF 19%)" : "NO - omitir el campo dividendDistribution del JSON"}
 - Seguros: SÍ (2 pólizas)
 - Siniestro/extraordinario: SÍ
 - Extractos bancarios: SÍ
@@ -323,7 +528,9 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura:
     "sector": "${params.sector}",
     "taxRegime": "${params.taxRegime}",
     "fiscalYear": ${params.year},
-    "description": "Descripción breve del negocio..."
+    "description": "Descripción breve del negocio...",
+    "companyType": "SL",
+    "legalForm": "Sociedad de Responsabilidad Limitada"
   },
   "inventory": {
     "initialInventory": [

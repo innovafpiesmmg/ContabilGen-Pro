@@ -17,7 +17,11 @@ import {
   Landmark,
   Home,
   BarChart3,
-  Receipt
+  Receipt,
+  PieChart,
+  Scale,
+  Banknote,
+  TrendingUp
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -58,6 +62,11 @@ const formSchema = z.object({
   includeMortgage: z.boolean().optional(),
   includeCreditPolicy: z.boolean().optional(),
   includeFixedAssets: z.boolean().optional(),
+  includeShareholdersInfo: z.boolean().optional(),
+  isNewCompany: z.boolean().optional(),
+  includeInitialBalance: z.boolean().optional(),
+  includeShareholderAccounts: z.boolean().optional(),
+  includeDividends: z.boolean().optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -85,6 +94,13 @@ const checkOptions: CheckOption[] = [
   { name: "includeFixedAssets", label: "Inmovilizado y amortización", description: "Elementos del activo fijo con dotación anual de amortización", icon: Building2 },
 ];
 
+const societyOptions: CheckOption[] = [
+  { name: "includeShareholdersInfo", label: "Socios y capital social", description: "Estructura de socios, participaciones y tipo de sociedad (SL, SA...)", icon: PieChart },
+  { name: "includeInitialBalance", label: "Balance de apertura", description: "Asiento de apertura con activos, pasivos y patrimonio neto inicial", icon: Scale, dependsOn: "isNewCompany" as any },
+  { name: "includeShareholderAccounts", label: "C/C socios y administradores", description: "Operaciones en cuentas 551 y 553: anticipos, préstamos y retribuciones", icon: Banknote },
+  { name: "includeDividends", label: "Reparto de dividendos", description: "Junta de socios: dotación de reservas y pago de dividendos con retención IRPF", icon: TrendingUp },
+];
+
 export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   
@@ -105,20 +121,31 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
       includeMortgage: false,
       includeCreditPolicy: true,
       includeFixedAssets: true,
+      includeShareholdersInfo: true,
+      isNewCompany: false,
+      includeInitialBalance: true,
+      includeShareholderAccounts: true,
+      includeDividends: true,
     },
   });
 
   const watchPayroll = form.watch("includePayroll");
+  const watchIsNew = form.watch("isNewCompany");
   const watchOps = form.watch("operationsPerMonth") ?? 8;
 
   const handleSubmit = (data: FormValues) => {
     if (!data.includePayroll) {
       data.includeSocialSecurity = false;
     }
+    if (data.isNewCompany) {
+      data.includeInitialBalance = false;
+      data.includeDividends = false;
+    }
     onSubmit(data as GenerateUniverseRequest);
   };
 
-  const enabledCount = checkOptions.filter(opt => {
+  const allOptions = [...checkOptions, ...societyOptions];
+  const enabledCount = allOptions.filter(opt => {
     if (opt.dependsOn && !form.watch(opt.dependsOn as any)) return false;
     return form.watch(opt.name as any) === true;
   }).length;
@@ -341,6 +368,66 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
                                 </div>
                                 <p className="text-xs text-muted-foreground leading-tight">{opt.description}</p>
                                 {disabled && <p className="text-xs text-amber-600">Requiere activar Nóminas</p>}
+                              </div>
+                            </FormItem>
+                          )}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="border-t border-border/40 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm font-semibold">Sociedad y socios</Label>
+                    <FormField
+                      control={form.control}
+                      name="isNewCompany"
+                      render={({ field }) => (
+                        <FormItem className="flex items-center gap-2 space-y-0">
+                          <FormControl>
+                            <Checkbox checked={!!field.value} onCheckedChange={field.onChange} />
+                          </FormControl>
+                          <FormLabel className="text-xs text-muted-foreground font-normal cursor-pointer">Empresa de nueva creación</FormLabel>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  {watchIsNew && (
+                    <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-3 border border-amber-200">
+                      Al ser empresa nueva no se generará balance de apertura ni reparto de dividendos.
+                    </p>
+                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {societyOptions.map((opt) => {
+                      const isBalanceOpt = opt.name === "includeInitialBalance";
+                      const isDividendOpt = opt.name === "includeDividends";
+                      const disabled = watchIsNew && (isBalanceOpt || isDividendOpt);
+                      const Icon = opt.icon;
+                      return (
+                        <FormField
+                          key={opt.name}
+                          control={form.control}
+                          name={opt.name as any}
+                          render={({ field }) => (
+                            <FormItem className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
+                              disabled ? "opacity-40 bg-slate-50" : field.value ? "border-violet-300 bg-violet-50/50" : "border-border/50 bg-slate-50/50"
+                            }`}>
+                              <FormControl>
+                                <Checkbox
+                                  checked={!!field.value && !disabled}
+                                  onCheckedChange={field.onChange}
+                                  disabled={!!disabled}
+                                  className="mt-0.5"
+                                />
+                              </FormControl>
+                              <div className="space-y-0.5 flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                                  <FormLabel className="text-sm font-medium leading-tight cursor-pointer">{opt.label}</FormLabel>
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-tight">{opt.description}</p>
+                                {disabled && <p className="text-xs text-amber-600">No aplica a empresa nueva</p>}
                               </div>
                             </FormItem>
                           )}

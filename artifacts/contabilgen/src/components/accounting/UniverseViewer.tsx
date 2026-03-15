@@ -32,6 +32,10 @@ import {
   SocialSecurityView,
   MortgageView,
   FixedAssetsView,
+  ShareholdersView,
+  InitialBalanceSheetView,
+  ShareholderAccountsView,
+  DividendsView,
 } from "./UniverseViews";
 
 interface UniverseViewerProps {
@@ -53,6 +57,10 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
   const hasSS = universe.socialSecurityPayments && universe.socialSecurityPayments.length > 0;
   const hasMortgage = !!universe.mortgage;
   const hasFixedAssets = universe.fixedAssets && universe.fixedAssets.length > 0;
+  const hasShareholders = !!universe.shareholdersInfo;
+  const hasInitialBalanceSheet = !!universe.initialBalanceSheet;
+  const hasShareholderAccounts = !!universe.shareholderAccounts;
+  const hasDividends = !!universe.dividendDistribution;
 
   return (
     <div className="bg-white rounded-2xl shadow-xl border border-border/60 min-h-[600px] flex flex-col mt-8 animate-in fade-in duration-700">
@@ -128,6 +136,26 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
                 <BarChart3 className="w-4 h-4" /> Inmovilizado
               </TabsTrigger>
             )}
+            {hasShareholders && (
+              <TabsTrigger value="socios" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg gap-2">
+                <Users className="w-4 h-4" /> Socios
+              </TabsTrigger>
+            )}
+            {hasInitialBalanceSheet && (
+              <TabsTrigger value="balance_apertura" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg gap-2">
+                <BarChart3 className="w-4 h-4" /> Apertura
+              </TabsTrigger>
+            )}
+            {hasShareholderAccounts && (
+              <TabsTrigger value="cc_socios" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg gap-2">
+                <Calculator className="w-4 h-4" /> C/C Socios
+              </TabsTrigger>
+            )}
+            {hasDividends && (
+              <TabsTrigger value="dividendos" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg gap-2">
+                <Landmark className="w-4 h-4" /> Dividendos
+              </TabsTrigger>
+            )}
             <TabsTrigger value="bancos" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg gap-2">
               <Wallet className="w-4 h-4" /> Bancos
             </TabsTrigger>
@@ -185,6 +213,26 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
           {hasFixedAssets && (
             <TabsContent value="inmovilizado" className="mt-0 outline-none">
               <FixedAssetsView assets={universe.fixedAssets!} company={universe.companyProfile} />
+            </TabsContent>
+          )}
+          {hasShareholders && (
+            <TabsContent value="socios" className="mt-0 outline-none">
+              <ShareholdersView data={universe.shareholdersInfo} />
+            </TabsContent>
+          )}
+          {hasInitialBalanceSheet && (
+            <TabsContent value="balance_apertura" className="mt-0 outline-none">
+              <InitialBalanceSheetView data={universe.initialBalanceSheet} />
+            </TabsContent>
+          )}
+          {hasShareholderAccounts && (
+            <TabsContent value="cc_socios" className="mt-0 outline-none">
+              <ShareholderAccountsView data={universe.shareholderAccounts} />
+            </TabsContent>
+          )}
+          {hasDividends && (
+            <TabsContent value="dividendos" className="mt-0 outline-none">
+              <DividendsView data={universe.dividendDistribution} />
             </TabsContent>
           )}
           <TabsContent value="bancos" className="mt-0 outline-none">

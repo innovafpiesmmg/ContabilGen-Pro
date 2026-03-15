@@ -44,4 +44,14 @@ export interface GenerateUniverseRequest {
   includeCreditPolicy?: boolean;
   /** Include fixed assets with annual amortization */
   includeFixedAssets?: boolean;
+  /** Include shareholders/partners breakdown and capital structure */
+  includeShareholdersInfo?: boolean;
+  /** True if the company is newly created (no opening balance needed) */
+  isNewCompany?: boolean;
+  /** Include an opening balance sheet at the start of the fiscal year */
+  includeInitialBalance?: boolean;
+  /** Include current account transactions with shareholders and administrators (551/553) */
+  includeShareholderAccounts?: boolean;
+  /** Include dividend distribution approved at the shareholders meeting */
+  includeDividends?: boolean;
 }

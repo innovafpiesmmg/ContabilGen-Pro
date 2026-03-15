@@ -158,6 +158,16 @@ export interface GenerateUniverseRequest {
   includeCreditPolicy?: boolean;
   /** Include fixed assets with annual amortization */
   includeFixedAssets?: boolean;
+  /** Include shareholders/partners breakdown and capital structure */
+  includeShareholdersInfo?: boolean;
+  /** True if the company is newly created (no opening balance needed) */
+  isNewCompany?: boolean;
+  /** Include an opening balance sheet at the start of the fiscal year */
+  includeInitialBalance?: boolean;
+  /** Include current account transactions with shareholders and administrators (551/553) */
+  includeShareholderAccounts?: boolean;
+  /** Include dividend distribution approved at the shareholders meeting */
+  includeDividends?: boolean;
 }
 
 export interface CompanyProfile {
@@ -169,6 +179,10 @@ export interface CompanyProfile {
   taxRegime: string;
   fiscalYear: number;
   description: string;
+  /** Legal form: SL, SA, SLU, SCP, Autónomo, etc. */
+  companyType?: string;
+  /** Full legal form name in Spanish */
+  legalForm?: string;
 }
 
 export interface InventoryItem {
@@ -474,6 +488,149 @@ export interface FixedAsset {
   accountCredits: AccountEntry[];
 }
 
+/**
+ * Role in the company
+ */
+export type ShareholderRole =
+  (typeof ShareholderRole)[keyof typeof ShareholderRole];
+
+export const ShareholderRole = {
+  socio: "socio",
+  administrador: "administrador",
+  socio_administrador: "socio_administrador",
+} as const;
+
+export interface Shareholder {
+  name: string;
+  nif: string;
+  /** Role in the company */
+  role: ShareholderRole;
+  /** Ownership percentage (0-100) */
+  participationPercentage: number;
+  /** Nominal value per share/participation */
+  nominalValuePerShare: number;
+  /** Number of shares or participations held */
+  numberOfShares: number;
+  /** Total capital contributed (numberOfShares * nominalValuePerShare) */
+  totalCapitalAmount: number;
+}
+
+export interface ShareholdersInfo {
+  /** SL, SA, SLU, SCP, Autónomo, etc. */
+  companyType: string;
+  /** Full legal description: Sociedad de Responsabilidad Limitada, etc. */
+  legalForm: string;
+  /** Total registered share capital (capital social) */
+  shareCapital: number;
+  nominalValuePerShare: number;
+  totalShares: number;
+  /** Date of constitution */
+  constitutionDate: string;
+  /** Registro Mercantil entry reference */
+  registryEntry: string;
+  shareholders: Shareholder[];
+  /** Didactic note explaining the capital accounts (100, 118, etc.) */
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
+}
+
+export interface BalanceSheetLine {
+  accountCode: string;
+  accountName: string;
+  amount: number;
+  note?: string;
+}
+
+/**
+ * Opening balance sheet at the start of the fiscal year for an existing company
+ */
+export interface InitialBalanceSheet {
+  /** Opening date (typically Jan 1 of fiscal year) */
+  date: string;
+  description: string;
+  /** Activo no corriente */
+  nonCurrentAssets: BalanceSheetLine[];
+  /** Activo corriente */
+  currentAssets: BalanceSheetLine[];
+  /** Patrimonio neto */
+  equity: BalanceSheetLine[];
+  /** Pasivo no corriente */
+  nonCurrentLiabilities: BalanceSheetLine[];
+  /** Pasivo corriente */
+  currentLiabilities: BalanceSheetLine[];
+  totalAssets: number;
+  totalEquityAndLiabilities: number;
+  /** Didactic note for the opening entry (asiento de apertura) */
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
+}
+
+export interface ShareholderAccountTransaction {
+  date: string;
+  concept: string;
+  shareholderName: string;
+  /** 551 = Cuenta corriente con administradores, 553 = Cuenta corriente con socios */
+  accountCode: string;
+  accountName: string;
+  debit?: number | null;
+  credit?: number | null;
+  balance: number;
+}
+
+/**
+ * Current account operations with shareholders and administrators (551/553)
+ */
+export interface ShareholderAccounts {
+  description: string;
+  transactions: ShareholderAccountTransaction[];
+  /** Closing balance on account 551 (administrators) */
+  closingBalance551: number;
+  /** Closing balance on account 553 (shareholders) */
+  closingBalance553: number;
+  /** Didactic note about accounts 551 and 553, their nature and use */
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
+}
+
+export interface DividendPerShareholder {
+  shareholderName: string;
+  participationPercentage: number;
+  grossDividend: number;
+  irpfWithholdingRate: number;
+  irpfWithholdingAmount: number;
+  netDividend: number;
+}
+
+/**
+ * Dividend distribution approved at the annual general meeting
+ */
+export interface DividendDistribution {
+  /** Year to which these dividends correspond */
+  fiscalYear: number;
+  /** Date of the general meeting approving dividends */
+  approvalDate: string;
+  paymentDate: string;
+  /** Net profit after tax from the income statement */
+  totalNetProfit: number;
+  /** Mandatory legal reserve allocation (Reserva Legal cta 112) */
+  legalReserve: number;
+  /** Voluntary reserve allocation (Reserva Voluntaria cta 113) */
+  voluntaryReserve: number;
+  /** Total gross dividends declared */
+  totalDividends: number;
+  dividendPerShare: number;
+  /** IRPF withholding rate on dividends (typically 19%) */
+  irpfWithholdingRate: number;
+  perShareholder: DividendPerShareholder[];
+  /** Didactic note: result allocation entries, withholding (4751), payment (526) */
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
+}
+
 export interface BankTransaction {
   date: string;
   concept: string;
@@ -520,6 +677,10 @@ export interface AccountingUniverse {
   socialSecurityPayments?: SocialSecurityPayment[];
   taxLiquidations?: TaxLiquidation[];
   fixedAssets?: FixedAsset[];
+  shareholdersInfo?: ShareholdersInfo;
+  initialBalanceSheet?: InitialBalanceSheet;
+  shareholderAccounts?: ShareholderAccounts;
+  dividendDistribution?: DividendDistribution;
   bankStatements: BankStatement[];
   journalEntries: JournalEntry[];
 }

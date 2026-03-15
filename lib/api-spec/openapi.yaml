@@ -485,6 +485,21 @@ components:
         includeFixedAssets:
           type: boolean
           description: "Include fixed assets with annual amortization"
+        includeShareholdersInfo:
+          type: boolean
+          description: "Include shareholders/partners breakdown and capital structure"
+        isNewCompany:
+          type: boolean
+          description: "True if the company is newly created (no opening balance needed)"
+        includeInitialBalance:
+          type: boolean
+          description: "Include an opening balance sheet at the start of the fiscal year"
+        includeShareholderAccounts:
+          type: boolean
+          description: "Include current account transactions with shareholders and administrators (551/553)"
+        includeDividends:
+          type: boolean
+          description: "Include dividend distribution approved at the shareholders meeting"
       required:
         - taxRegime
         - sector
@@ -538,6 +553,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FixedAsset"
+        shareholdersInfo:
+          $ref: "#/components/schemas/ShareholdersInfo"
+        initialBalanceSheet:
+          $ref: "#/components/schemas/InitialBalanceSheet"
+        shareholderAccounts:
+          $ref: "#/components/schemas/ShareholderAccounts"
+        dividendDistribution:
+          $ref: "#/components/schemas/DividendDistribution"
         bankStatements:
           type: array
           items:
@@ -574,6 +597,12 @@ components:
           type: integer
         description:
           type: string
+        companyType:
+          type: string
+          description: "Legal form: SL, SA, SLU, SCP, Autónomo, etc."
+        legalForm:
+          type: string
+          description: "Full legal form name in Spanish"
       required:
         - name
         - nif
@@ -1312,6 +1341,315 @@ components:
         - assetAccountCode
         - accDepreciationCode
         - depExpenseCode
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    Shareholder:
+      type: object
+      properties:
+        name:
+          type: string
+        nif:
+          type: string
+        role:
+          type: string
+          enum: [socio, administrador, socio_administrador]
+          description: "Role in the company"
+        participationPercentage:
+          type: number
+          description: "Ownership percentage (0-100)"
+        nominalValuePerShare:
+          type: number
+          description: "Nominal value per share/participation"
+        numberOfShares:
+          type: integer
+          description: "Number of shares or participations held"
+        totalCapitalAmount:
+          type: number
+          description: "Total capital contributed (numberOfShares * nominalValuePerShare)"
+      required:
+        - name
+        - nif
+        - role
+        - participationPercentage
+        - nominalValuePerShare
+        - numberOfShares
+        - totalCapitalAmount
+
+    ShareholdersInfo:
+      type: object
+      properties:
+        companyType:
+          type: string
+          description: "SL, SA, SLU, SCP, Autónomo, etc."
+        legalForm:
+          type: string
+          description: "Full legal description: Sociedad de Responsabilidad Limitada, etc."
+        shareCapital:
+          type: number
+          description: "Total registered share capital (capital social)"
+        nominalValuePerShare:
+          type: number
+        totalShares:
+          type: integer
+        constitutionDate:
+          type: string
+          description: "Date of constitution"
+        registryEntry:
+          type: string
+          description: "Registro Mercantil entry reference"
+        shareholders:
+          type: array
+          items:
+            $ref: "#/components/schemas/Shareholder"
+        journalNote:
+          type: string
+          description: "Didactic note explaining the capital accounts (100, 118, etc.)"
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - companyType
+        - legalForm
+        - shareCapital
+        - nominalValuePerShare
+        - totalShares
+        - constitutionDate
+        - registryEntry
+        - shareholders
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    BalanceSheetLine:
+      type: object
+      properties:
+        accountCode:
+          type: string
+        accountName:
+          type: string
+        amount:
+          type: number
+        note:
+          type: string
+      required:
+        - accountCode
+        - accountName
+        - amount
+
+    InitialBalanceSheet:
+      type: object
+      description: "Opening balance sheet at the start of the fiscal year for an existing company"
+      properties:
+        date:
+          type: string
+          description: "Opening date (typically Jan 1 of fiscal year)"
+        description:
+          type: string
+        nonCurrentAssets:
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceSheetLine"
+          description: "Activo no corriente"
+        currentAssets:
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceSheetLine"
+          description: "Activo corriente"
+        equity:
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceSheetLine"
+          description: "Patrimonio neto"
+        nonCurrentLiabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceSheetLine"
+          description: "Pasivo no corriente"
+        currentLiabilities:
+          type: array
+          items:
+            $ref: "#/components/schemas/BalanceSheetLine"
+          description: "Pasivo corriente"
+        totalAssets:
+          type: number
+        totalEquityAndLiabilities:
+          type: number
+        journalNote:
+          type: string
+          description: "Didactic note for the opening entry (asiento de apertura)"
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - date
+        - description
+        - nonCurrentAssets
+        - currentAssets
+        - equity
+        - nonCurrentLiabilities
+        - currentLiabilities
+        - totalAssets
+        - totalEquityAndLiabilities
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    ShareholderAccountTransaction:
+      type: object
+      properties:
+        date:
+          type: string
+        concept:
+          type: string
+        shareholderName:
+          type: string
+        accountCode:
+          type: string
+          description: "551 = Cuenta corriente con administradores, 553 = Cuenta corriente con socios"
+        accountName:
+          type: string
+        debit:
+          type: number
+          nullable: true
+        credit:
+          type: number
+          nullable: true
+        balance:
+          type: number
+      required:
+        - date
+        - concept
+        - shareholderName
+        - accountCode
+        - accountName
+        - balance
+
+    ShareholderAccounts:
+      type: object
+      description: "Current account operations with shareholders and administrators (551/553)"
+      properties:
+        description:
+          type: string
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ShareholderAccountTransaction"
+        closingBalance551:
+          type: number
+          description: "Closing balance on account 551 (administrators)"
+        closingBalance553:
+          type: number
+          description: "Closing balance on account 553 (shareholders)"
+        journalNote:
+          type: string
+          description: "Didactic note about accounts 551 and 553, their nature and use"
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - description
+        - transactions
+        - closingBalance551
+        - closingBalance553
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    DividendPerShareholder:
+      type: object
+      properties:
+        shareholderName:
+          type: string
+        participationPercentage:
+          type: number
+        grossDividend:
+          type: number
+        irpfWithholdingRate:
+          type: number
+        irpfWithholdingAmount:
+          type: number
+        netDividend:
+          type: number
+      required:
+        - shareholderName
+        - participationPercentage
+        - grossDividend
+        - irpfWithholdingRate
+        - irpfWithholdingAmount
+        - netDividend
+
+    DividendDistribution:
+      type: object
+      description: "Dividend distribution approved at the annual general meeting"
+      properties:
+        fiscalYear:
+          type: integer
+          description: "Year to which these dividends correspond"
+        approvalDate:
+          type: string
+          description: "Date of the general meeting approving dividends"
+        paymentDate:
+          type: string
+        totalNetProfit:
+          type: number
+          description: "Net profit after tax from the income statement"
+        legalReserve:
+          type: number
+          description: "Mandatory legal reserve allocation (Reserva Legal cta 112)"
+        voluntaryReserve:
+          type: number
+          description: "Voluntary reserve allocation (Reserva Voluntaria cta 113)"
+        totalDividends:
+          type: number
+          description: "Total gross dividends declared"
+        dividendPerShare:
+          type: number
+        irpfWithholdingRate:
+          type: number
+          description: "IRPF withholding rate on dividends (typically 19%)"
+        perShareholder:
+          type: array
+          items:
+            $ref: "#/components/schemas/DividendPerShareholder"
+        journalNote:
+          type: string
+          description: "Didactic note: result allocation entries, withholding (4751), payment (526)"
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - fiscalYear
+        - approvalDate
+        - paymentDate
+        - totalNetProfit
+        - legalReserve
+        - voluntaryReserve
+        - totalDividends
+        - dividendPerShare
+        - irpfWithholdingRate
+        - perShareholder
         - journalNote
         - accountDebits
         - accountCredits

@@ -29,6 +29,8 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
     educationLevel, operationsPerMonth,
     includePayroll, includeSocialSecurity, includeTaxLiquidation,
     includeBankLoan, includeMortgage, includeCreditPolicy, includeFixedAssets,
+    includeShareholdersInfo, isNewCompany, includeInitialBalance,
+    includeShareholderAccounts, includeDividends,
   } = parsed.data;
 
   const settings = await getSettingsForUser(req.user.id);
@@ -70,6 +72,11 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
       includeMortgage: includeMortgage ?? null,
       includeCreditPolicy: includeCreditPolicy ?? null,
       includeFixedAssets: includeFixedAssets ?? null,
+      includeShareholdersInfo: includeShareholdersInfo ?? null,
+      isNewCompany: isNewCompany ?? null,
+      includeInitialBalance: includeInitialBalance ?? null,
+      includeShareholderAccounts: includeShareholderAccounts ?? null,
+      includeDividends: includeDividends ?? null,
     },
     aiConfig,
   );

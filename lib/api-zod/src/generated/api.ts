@@ -213,6 +213,34 @@ export const GenerateAccountingUniverseBody = zod.object({
     .boolean()
     .optional()
     .describe("Include fixed assets with annual amortization"),
+  includeShareholdersInfo: zod
+    .boolean()
+    .optional()
+    .describe("Include shareholders\/partners breakdown and capital structure"),
+  isNewCompany: zod
+    .boolean()
+    .optional()
+    .describe(
+      "True if the company is newly created (no opening balance needed)",
+    ),
+  includeInitialBalance: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Include an opening balance sheet at the start of the fiscal year",
+    ),
+  includeShareholderAccounts: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Include current account transactions with shareholders and administrators (551\/553)",
+    ),
+  includeDividends: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Include dividend distribution approved at the shareholders meeting",
+    ),
 });
 
 export const GenerateAccountingUniverseResponse = zod.object({
@@ -225,6 +253,14 @@ export const GenerateAccountingUniverseResponse = zod.object({
     taxRegime: zod.string(),
     fiscalYear: zod.number(),
     description: zod.string(),
+    companyType: zod
+      .string()
+      .optional()
+      .describe("Legal form: SL, SA, SLU, SCP, Autónomo, etc."),
+    legalForm: zod
+      .string()
+      .optional()
+      .describe("Full legal form name in Spanish"),
   }),
   inventory: zod.object({
     initialInventory: zod.array(
@@ -681,6 +717,259 @@ export const GenerateAccountingUniverseResponse = zod.object({
       }),
     )
     .optional(),
+  shareholdersInfo: zod
+    .object({
+      companyType: zod.string().describe("SL, SA, SLU, SCP, Autónomo, etc."),
+      legalForm: zod
+        .string()
+        .describe(
+          "Full legal description: Sociedad de Responsabilidad Limitada, etc.",
+        ),
+      shareCapital: zod
+        .number()
+        .describe("Total registered share capital (capital social)"),
+      nominalValuePerShare: zod.number(),
+      totalShares: zod.number(),
+      constitutionDate: zod.string().describe("Date of constitution"),
+      registryEntry: zod
+        .string()
+        .describe("Registro Mercantil entry reference"),
+      shareholders: zod.array(
+        zod.object({
+          name: zod.string(),
+          nif: zod.string(),
+          role: zod
+            .enum(["socio", "administrador", "socio_administrador"])
+            .describe("Role in the company"),
+          participationPercentage: zod
+            .number()
+            .describe("Ownership percentage (0-100)"),
+          nominalValuePerShare: zod
+            .number()
+            .describe("Nominal value per share\/participation"),
+          numberOfShares: zod
+            .number()
+            .describe("Number of shares or participations held"),
+          totalCapitalAmount: zod
+            .number()
+            .describe(
+              "Total capital contributed (numberOfShares \* nominalValuePerShare)",
+            ),
+        }),
+      ),
+      journalNote: zod
+        .string()
+        .describe(
+          "Didactic note explaining the capital accounts (100, 118, etc.)",
+        ),
+      accountDebits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+      accountCredits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+    })
+    .optional(),
+  initialBalanceSheet: zod
+    .object({
+      date: zod
+        .string()
+        .describe("Opening date (typically Jan 1 of fiscal year)"),
+      description: zod.string(),
+      nonCurrentAssets: zod
+        .array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            note: zod.string().optional(),
+          }),
+        )
+        .describe("Activo no corriente"),
+      currentAssets: zod
+        .array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            note: zod.string().optional(),
+          }),
+        )
+        .describe("Activo corriente"),
+      equity: zod
+        .array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            note: zod.string().optional(),
+          }),
+        )
+        .describe("Patrimonio neto"),
+      nonCurrentLiabilities: zod
+        .array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            note: zod.string().optional(),
+          }),
+        )
+        .describe("Pasivo no corriente"),
+      currentLiabilities: zod
+        .array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            note: zod.string().optional(),
+          }),
+        )
+        .describe("Pasivo corriente"),
+      totalAssets: zod.number(),
+      totalEquityAndLiabilities: zod.number(),
+      journalNote: zod
+        .string()
+        .describe("Didactic note for the opening entry (asiento de apertura)"),
+      accountDebits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+      accountCredits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+    })
+    .optional()
+    .describe(
+      "Opening balance sheet at the start of the fiscal year for an existing company",
+    ),
+  shareholderAccounts: zod
+    .object({
+      description: zod.string(),
+      transactions: zod.array(
+        zod.object({
+          date: zod.string(),
+          concept: zod.string(),
+          shareholderName: zod.string(),
+          accountCode: zod
+            .string()
+            .describe(
+              "551 = Cuenta corriente con administradores, 553 = Cuenta corriente con socios",
+            ),
+          accountName: zod.string(),
+          debit: zod.number().nullish(),
+          credit: zod.number().nullish(),
+          balance: zod.number(),
+        }),
+      ),
+      closingBalance551: zod
+        .number()
+        .describe("Closing balance on account 551 (administrators)"),
+      closingBalance553: zod
+        .number()
+        .describe("Closing balance on account 553 (shareholders)"),
+      journalNote: zod
+        .string()
+        .describe(
+          "Didactic note about accounts 551 and 553, their nature and use",
+        ),
+      accountDebits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+      accountCredits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+    })
+    .optional()
+    .describe(
+      "Current account operations with shareholders and administrators (551\/553)",
+    ),
+  dividendDistribution: zod
+    .object({
+      fiscalYear: zod
+        .number()
+        .describe("Year to which these dividends correspond"),
+      approvalDate: zod
+        .string()
+        .describe("Date of the general meeting approving dividends"),
+      paymentDate: zod.string(),
+      totalNetProfit: zod
+        .number()
+        .describe("Net profit after tax from the income statement"),
+      legalReserve: zod
+        .number()
+        .describe("Mandatory legal reserve allocation (Reserva Legal cta 112)"),
+      voluntaryReserve: zod
+        .number()
+        .describe("Voluntary reserve allocation (Reserva Voluntaria cta 113)"),
+      totalDividends: zod.number().describe("Total gross dividends declared"),
+      dividendPerShare: zod.number(),
+      irpfWithholdingRate: zod
+        .number()
+        .describe("IRPF withholding rate on dividends (typically 19%)"),
+      perShareholder: zod.array(
+        zod.object({
+          shareholderName: zod.string(),
+          participationPercentage: zod.number(),
+          grossDividend: zod.number(),
+          irpfWithholdingRate: zod.number(),
+          irpfWithholdingAmount: zod.number(),
+          netDividend: zod.number(),
+        }),
+      ),
+      journalNote: zod
+        .string()
+        .describe(
+          "Didactic note: result allocation entries, withholding (4751), payment (526)",
+        ),
+      accountDebits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+      accountCredits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+    })
+    .optional()
+    .describe("Dividend distribution approved at the annual general meeting"),
   bankStatements: zod.array(
     zod.object({
       bank: zod.string(),
@@ -759,6 +1048,14 @@ export const SaveGenerationBody = zod.object({
       taxRegime: zod.string(),
       fiscalYear: zod.number(),
       description: zod.string(),
+      companyType: zod
+        .string()
+        .optional()
+        .describe("Legal form: SL, SA, SLU, SCP, Autónomo, etc."),
+      legalForm: zod
+        .string()
+        .optional()
+        .describe("Full legal form name in Spanish"),
     }),
     inventory: zod.object({
       initialInventory: zod.array(
@@ -1219,6 +1516,265 @@ export const SaveGenerationBody = zod.object({
         }),
       )
       .optional(),
+    shareholdersInfo: zod
+      .object({
+        companyType: zod.string().describe("SL, SA, SLU, SCP, Autónomo, etc."),
+        legalForm: zod
+          .string()
+          .describe(
+            "Full legal description: Sociedad de Responsabilidad Limitada, etc.",
+          ),
+        shareCapital: zod
+          .number()
+          .describe("Total registered share capital (capital social)"),
+        nominalValuePerShare: zod.number(),
+        totalShares: zod.number(),
+        constitutionDate: zod.string().describe("Date of constitution"),
+        registryEntry: zod
+          .string()
+          .describe("Registro Mercantil entry reference"),
+        shareholders: zod.array(
+          zod.object({
+            name: zod.string(),
+            nif: zod.string(),
+            role: zod
+              .enum(["socio", "administrador", "socio_administrador"])
+              .describe("Role in the company"),
+            participationPercentage: zod
+              .number()
+              .describe("Ownership percentage (0-100)"),
+            nominalValuePerShare: zod
+              .number()
+              .describe("Nominal value per share\/participation"),
+            numberOfShares: zod
+              .number()
+              .describe("Number of shares or participations held"),
+            totalCapitalAmount: zod
+              .number()
+              .describe(
+                "Total capital contributed (numberOfShares \* nominalValuePerShare)",
+              ),
+          }),
+        ),
+        journalNote: zod
+          .string()
+          .describe(
+            "Didactic note explaining the capital accounts (100, 118, etc.)",
+          ),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    initialBalanceSheet: zod
+      .object({
+        date: zod
+          .string()
+          .describe("Opening date (typically Jan 1 of fiscal year)"),
+        description: zod.string(),
+        nonCurrentAssets: zod
+          .array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              note: zod.string().optional(),
+            }),
+          )
+          .describe("Activo no corriente"),
+        currentAssets: zod
+          .array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              note: zod.string().optional(),
+            }),
+          )
+          .describe("Activo corriente"),
+        equity: zod
+          .array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              note: zod.string().optional(),
+            }),
+          )
+          .describe("Patrimonio neto"),
+        nonCurrentLiabilities: zod
+          .array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              note: zod.string().optional(),
+            }),
+          )
+          .describe("Pasivo no corriente"),
+        currentLiabilities: zod
+          .array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              note: zod.string().optional(),
+            }),
+          )
+          .describe("Pasivo corriente"),
+        totalAssets: zod.number(),
+        totalEquityAndLiabilities: zod.number(),
+        journalNote: zod
+          .string()
+          .describe(
+            "Didactic note for the opening entry (asiento de apertura)",
+          ),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional()
+      .describe(
+        "Opening balance sheet at the start of the fiscal year for an existing company",
+      ),
+    shareholderAccounts: zod
+      .object({
+        description: zod.string(),
+        transactions: zod.array(
+          zod.object({
+            date: zod.string(),
+            concept: zod.string(),
+            shareholderName: zod.string(),
+            accountCode: zod
+              .string()
+              .describe(
+                "551 = Cuenta corriente con administradores, 553 = Cuenta corriente con socios",
+              ),
+            accountName: zod.string(),
+            debit: zod.number().nullish(),
+            credit: zod.number().nullish(),
+            balance: zod.number(),
+          }),
+        ),
+        closingBalance551: zod
+          .number()
+          .describe("Closing balance on account 551 (administrators)"),
+        closingBalance553: zod
+          .number()
+          .describe("Closing balance on account 553 (shareholders)"),
+        journalNote: zod
+          .string()
+          .describe(
+            "Didactic note about accounts 551 and 553, their nature and use",
+          ),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional()
+      .describe(
+        "Current account operations with shareholders and administrators (551\/553)",
+      ),
+    dividendDistribution: zod
+      .object({
+        fiscalYear: zod
+          .number()
+          .describe("Year to which these dividends correspond"),
+        approvalDate: zod
+          .string()
+          .describe("Date of the general meeting approving dividends"),
+        paymentDate: zod.string(),
+        totalNetProfit: zod
+          .number()
+          .describe("Net profit after tax from the income statement"),
+        legalReserve: zod
+          .number()
+          .describe(
+            "Mandatory legal reserve allocation (Reserva Legal cta 112)",
+          ),
+        voluntaryReserve: zod
+          .number()
+          .describe(
+            "Voluntary reserve allocation (Reserva Voluntaria cta 113)",
+          ),
+        totalDividends: zod.number().describe("Total gross dividends declared"),
+        dividendPerShare: zod.number(),
+        irpfWithholdingRate: zod
+          .number()
+          .describe("IRPF withholding rate on dividends (typically 19%)"),
+        perShareholder: zod.array(
+          zod.object({
+            shareholderName: zod.string(),
+            participationPercentage: zod.number(),
+            grossDividend: zod.number(),
+            irpfWithholdingRate: zod.number(),
+            irpfWithholdingAmount: zod.number(),
+            netDividend: zod.number(),
+          }),
+        ),
+        journalNote: zod
+          .string()
+          .describe(
+            "Didactic note: result allocation entries, withholding (4751), payment (526)",
+          ),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional()
+      .describe("Dividend distribution approved at the annual general meeting"),
     bankStatements: zod.array(
       zod.object({
         bank: zod.string(),
@@ -1291,6 +1847,14 @@ export const GetGenerationResponse = zod.object({
       taxRegime: zod.string(),
       fiscalYear: zod.number(),
       description: zod.string(),
+      companyType: zod
+        .string()
+        .optional()
+        .describe("Legal form: SL, SA, SLU, SCP, Autónomo, etc."),
+      legalForm: zod
+        .string()
+        .optional()
+        .describe("Full legal form name in Spanish"),
     }),
     inventory: zod.object({
       initialInventory: zod.array(
@@ -1751,6 +2315,265 @@ export const GetGenerationResponse = zod.object({
         }),
       )
       .optional(),
+    shareholdersInfo: zod
+      .object({
+        companyType: zod.string().describe("SL, SA, SLU, SCP, Autónomo, etc."),
+        legalForm: zod
+          .string()
+          .describe(
+            "Full legal description: Sociedad de Responsabilidad Limitada, etc.",
+          ),
+        shareCapital: zod
+          .number()
+          .describe("Total registered share capital (capital social)"),
+        nominalValuePerShare: zod.number(),
+        totalShares: zod.number(),
+        constitutionDate: zod.string().describe("Date of constitution"),
+        registryEntry: zod
+          .string()
+          .describe("Registro Mercantil entry reference"),
+        shareholders: zod.array(
+          zod.object({
+            name: zod.string(),
+            nif: zod.string(),
+            role: zod
+              .enum(["socio", "administrador", "socio_administrador"])
+              .describe("Role in the company"),
+            participationPercentage: zod
+              .number()
+              .describe("Ownership percentage (0-100)"),
+            nominalValuePerShare: zod
+              .number()
+              .describe("Nominal value per share\/participation"),
+            numberOfShares: zod
+              .number()
+              .describe("Number of shares or participations held"),
+            totalCapitalAmount: zod
+              .number()
+              .describe(
+                "Total capital contributed (numberOfShares \* nominalValuePerShare)",
+              ),
+          }),
+        ),
+        journalNote: zod
+          .string()
+          .describe(
+            "Didactic note explaining the capital accounts (100, 118, etc.)",
+          ),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    initialBalanceSheet: zod
+      .object({
+        date: zod
+          .string()
+          .describe("Opening date (typically Jan 1 of fiscal year)"),
+        description: zod.string(),
+        nonCurrentAssets: zod
+          .array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              note: zod.string().optional(),
+            }),
+          )
+          .describe("Activo no corriente"),
+        currentAssets: zod
+          .array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              note: zod.string().optional(),
+            }),
+          )
+          .describe("Activo corriente"),
+        equity: zod
+          .array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              note: zod.string().optional(),
+            }),
+          )
+          .describe("Patrimonio neto"),
+        nonCurrentLiabilities: zod
+          .array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              note: zod.string().optional(),
+            }),
+          )
+          .describe("Pasivo no corriente"),
+        currentLiabilities: zod
+          .array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              note: zod.string().optional(),
+            }),
+          )
+          .describe("Pasivo corriente"),
+        totalAssets: zod.number(),
+        totalEquityAndLiabilities: zod.number(),
+        journalNote: zod
+          .string()
+          .describe(
+            "Didactic note for the opening entry (asiento de apertura)",
+          ),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional()
+      .describe(
+        "Opening balance sheet at the start of the fiscal year for an existing company",
+      ),
+    shareholderAccounts: zod
+      .object({
+        description: zod.string(),
+        transactions: zod.array(
+          zod.object({
+            date: zod.string(),
+            concept: zod.string(),
+            shareholderName: zod.string(),
+            accountCode: zod
+              .string()
+              .describe(
+                "551 = Cuenta corriente con administradores, 553 = Cuenta corriente con socios",
+              ),
+            accountName: zod.string(),
+            debit: zod.number().nullish(),
+            credit: zod.number().nullish(),
+            balance: zod.number(),
+          }),
+        ),
+        closingBalance551: zod
+          .number()
+          .describe("Closing balance on account 551 (administrators)"),
+        closingBalance553: zod
+          .number()
+          .describe("Closing balance on account 553 (shareholders)"),
+        journalNote: zod
+          .string()
+          .describe(
+            "Didactic note about accounts 551 and 553, their nature and use",
+          ),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional()
+      .describe(
+        "Current account operations with shareholders and administrators (551\/553)",
+      ),
+    dividendDistribution: zod
+      .object({
+        fiscalYear: zod
+          .number()
+          .describe("Year to which these dividends correspond"),
+        approvalDate: zod
+          .string()
+          .describe("Date of the general meeting approving dividends"),
+        paymentDate: zod.string(),
+        totalNetProfit: zod
+          .number()
+          .describe("Net profit after tax from the income statement"),
+        legalReserve: zod
+          .number()
+          .describe(
+            "Mandatory legal reserve allocation (Reserva Legal cta 112)",
+          ),
+        voluntaryReserve: zod
+          .number()
+          .describe(
+            "Voluntary reserve allocation (Reserva Voluntaria cta 113)",
+          ),
+        totalDividends: zod.number().describe("Total gross dividends declared"),
+        dividendPerShare: zod.number(),
+        irpfWithholdingRate: zod
+          .number()
+          .describe("IRPF withholding rate on dividends (typically 19%)"),
+        perShareholder: zod.array(
+          zod.object({
+            shareholderName: zod.string(),
+            participationPercentage: zod.number(),
+            grossDividend: zod.number(),
+            irpfWithholdingRate: zod.number(),
+            irpfWithholdingAmount: zod.number(),
+            netDividend: zod.number(),
+          }),
+        ),
+        journalNote: zod
+          .string()
+          .describe(
+            "Didactic note: result allocation entries, withholding (4751), payment (526)",
+          ),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional()
+      .describe("Dividend distribution approved at the annual general meeting"),
     bankStatements: zod.array(
       zod.object({
         bank: zod.string(),

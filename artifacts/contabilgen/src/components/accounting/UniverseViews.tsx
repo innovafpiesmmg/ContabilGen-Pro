@@ -20,6 +20,11 @@ import {
   CasualtyEvent,
   Payroll,
   BankStatement,
+  ShareholdersInfo,
+  InitialBalanceSheet,
+  ShareholderAccounts,
+  DividendDistribution,
+  Shareholder,
 } from "@workspace/api-client-react";
 import { cn, formatEuro, formatDate, formatAccountCode } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -1205,6 +1210,349 @@ export const FixedAssetsView = ({ assets, company }: FixedAssetsViewProps) => {
           </CardContent>
         </Card>
       ))}
+    </div>
+  );
+};
+
+const roleLabel: Record<string, { label: string; color: string }> = {
+  socio: { label: "Socio", color: "bg-blue-100 text-blue-700 border-blue-200" },
+  administrador: { label: "Administrador", color: "bg-violet-100 text-violet-700 border-violet-200" },
+  socio_administrador: { label: "Socio-Administrador", color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
+};
+
+export const ShareholdersView = ({ data }: { data?: ShareholdersInfo | null }) => {
+  if (!data) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se ha incluido información de socios.</p>
+        <p className="text-sm mt-1">Activa la opción "Socios y capital social" en la configuración avanzada.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle title="Socios y Capital Social" description="Estructura societaria, participaciones y distribución del capital." />
+      <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
+        <CardHeader className="bg-slate-50 border-b">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <div>
+              <CardTitle>{data.legalForm}</CardTitle>
+              <CardDescription>Tipo: {data.companyType} · Inscrita: {data.registryEntry}</CardDescription>
+            </div>
+            <div className="flex gap-3 flex-wrap">
+              <div className="bg-white rounded-xl border px-4 py-2 text-center">
+                <p className="text-xs text-muted-foreground uppercase font-bold">Capital Social</p>
+                <p className="font-mono font-bold text-lg text-foreground">{formatEuro(data.shareCapital)}</p>
+              </div>
+              <div className="bg-white rounded-xl border px-4 py-2 text-center">
+                <p className="text-xs text-muted-foreground uppercase font-bold">Participaciones</p>
+                <p className="font-mono font-bold text-lg text-foreground">{data.totalShares}</p>
+              </div>
+              <div className="bg-white rounded-xl border px-4 py-2 text-center">
+                <p className="text-xs text-muted-foreground uppercase font-bold">Valor Nominal</p>
+                <p className="font-mono font-bold text-lg text-foreground">{formatEuro(data.nominalValuePerShare)}/ud</p>
+              </div>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          <p className="text-sm text-muted-foreground mb-4">Fecha constitución: <span className="font-medium text-foreground">{formatDate(data.constitutionDate)}</span></p>
+          <div className="rounded-xl border overflow-hidden mb-6">
+            <Table>
+              <TableHeader className="bg-slate-100">
+                <TableRow>
+                  <TableHead>Nombre / NIF</TableHead>
+                  <TableHead>Rol</TableHead>
+                  <TableHead className="text-right">Nº Participaciones</TableHead>
+                  <TableHead className="text-right">Valor Nominal/ud</TableHead>
+                  <TableHead className="text-right">Capital Aportado</TableHead>
+                  <TableHead className="text-right">% Participación</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.shareholders.map((s: Shareholder, i: number) => {
+                  const rolInfo = roleLabel[s.role] ?? { label: s.role, color: "bg-slate-100 text-slate-700 border-slate-200" };
+                  return (
+                    <TableRow key={i}>
+                      <TableCell>
+                        <p className="font-medium">{s.name}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{s.nif}</p>
+                      </TableCell>
+                      <TableCell>
+                        <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${rolInfo.color}`}>{rolInfo.label}</span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono font-medium">{s.numberOfShares}</TableCell>
+                      <TableCell className="text-right font-mono">{formatEuro(s.nominalValuePerShare)}</TableCell>
+                      <TableCell className="text-right font-mono font-bold">{formatEuro(s.totalCapitalAmount)}</TableCell>
+                      <TableCell className="text-right">
+                        <span className="font-bold text-primary">{s.participationPercentage}%</span>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+          <AsientoContable debits={data.accountDebits} credits={data.accountCredits} note={data.journalNote} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+const BalanceSheetSection = ({ title, lines, isCredit }: { title: string; lines: { accountCode: string; accountName: string; amount: number; note?: string }[]; isCredit: boolean }) => {
+  const total = lines.reduce((s, l) => s + l.amount, 0);
+  return (
+    <div>
+      <h4 className={`text-sm font-bold uppercase tracking-wide mb-2 ${isCredit ? "text-violet-700" : "text-blue-700"}`}>{title}</h4>
+      <div className="rounded-xl border overflow-hidden">
+        <Table>
+          <TableHeader className={`${isCredit ? "bg-violet-50" : "bg-blue-50"}`}>
+            <TableRow>
+              <TableHead className="w-20">Cuenta</TableHead>
+              <TableHead>Concepto</TableHead>
+              <TableHead className="text-right">Importe</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lines.map((l, i) => (
+              <TableRow key={i}>
+                <TableCell className="font-mono text-sm font-bold">{l.accountCode}</TableCell>
+                <TableCell>
+                  <p className="font-medium text-sm">{l.accountName}</p>
+                  {l.note && <p className="text-xs text-muted-foreground">{l.note}</p>}
+                </TableCell>
+                <TableCell className="text-right font-mono font-medium">{formatEuro(l.amount)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      <div className={`flex justify-end mt-1 mr-1 text-sm font-bold ${isCredit ? "text-violet-700" : "text-blue-700"}`}>
+        Total: {formatEuro(total)}
+      </div>
+    </div>
+  );
+};
+
+export const InitialBalanceSheetView = ({ data }: { data?: InitialBalanceSheet | null }) => {
+  if (!data) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se ha generado balance de apertura.</p>
+        <p className="text-sm mt-1">Activa la opción "Balance de apertura" para empresas ya constituidas.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle title="Balance de Apertura" description={data.description} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
+          <CardHeader className="bg-blue-50 border-b border-blue-100">
+            <CardTitle className="text-blue-800">ACTIVO</CardTitle>
+            <CardDescription className="text-blue-600">Total Activo: <span className="font-bold font-mono">{formatEuro(data.totalAssets)}</span></CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            <BalanceSheetSection title="Activo No Corriente (Inmovilizado)" lines={data.nonCurrentAssets} isCredit={false} />
+            <BalanceSheetSection title="Activo Corriente (Circulante)" lines={data.currentAssets} isCredit={false} />
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
+          <CardHeader className="bg-violet-50 border-b border-violet-100">
+            <CardTitle className="text-violet-800">PATRIMONIO NETO Y PASIVO</CardTitle>
+            <CardDescription className="text-violet-600">Total PN + Pasivo: <span className="font-bold font-mono">{formatEuro(data.totalEquityAndLiabilities)}</span></CardDescription>
+          </CardHeader>
+          <CardContent className="p-6 space-y-6">
+            <BalanceSheetSection title="Patrimonio Neto" lines={data.equity} isCredit={true} />
+            <BalanceSheetSection title="Pasivo No Corriente" lines={data.nonCurrentLiabilities} isCredit={true} />
+            <BalanceSheetSection title="Pasivo Corriente" lines={data.currentLiabilities} isCredit={true} />
+          </CardContent>
+        </Card>
+      </div>
+      <Card className="rounded-2xl shadow-md border-2 border-primary/20 print-break-inside-avoid">
+        <CardContent className="p-6">
+          <div className="flex justify-between items-center text-lg font-bold mb-4">
+            <span>TOTAL ACTIVO</span>
+            <span className="font-mono text-blue-700">{formatEuro(data.totalAssets)}</span>
+          </div>
+          <div className="flex justify-between items-center text-lg font-bold border-t pt-4">
+            <span>TOTAL PN + PASIVO</span>
+            <span className="font-mono text-violet-700">{formatEuro(data.totalEquityAndLiabilities)}</span>
+          </div>
+          <div className={cn(
+            "mt-3 p-3 rounded-xl text-sm font-medium text-center",
+            Math.abs(data.totalAssets - data.totalEquityAndLiabilities) < 0.01
+              ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+              : "bg-red-50 text-red-700 border border-red-200"
+          )}>
+            {Math.abs(data.totalAssets - data.totalEquityAndLiabilities) < 0.01
+              ? "✓ Balance CUADRADO — Activo = Patrimonio Neto + Pasivo"
+              : `⚠ Diferencia: ${formatEuro(Math.abs(data.totalAssets - data.totalEquityAndLiabilities))}`}
+          </div>
+        </CardContent>
+      </Card>
+      <Card className="rounded-2xl shadow-md print-break-inside-avoid">
+        <CardHeader className="bg-slate-50 border-b">
+          <CardTitle className="text-base">Asiento de Apertura</CardTitle>
+          <CardDescription>Fecha: {formatDate(data.date)}</CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
+          <AsientoContable debits={data.accountDebits} credits={data.accountCredits} note={data.journalNote} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export const ShareholderAccountsView = ({ data }: { data?: ShareholderAccounts | null }) => {
+  if (!data) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se han generado operaciones con socios/administradores.</p>
+        <p className="text-sm mt-1">Activa la opción "C/C socios y administradores" en la configuración.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle title="C/C Socios y Administradores" description="Operaciones en cuentas 551 (administradores) y 553 (socios)." />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Card className="rounded-2xl border-violet-200 shadow-md">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center text-violet-700 font-bold font-mono text-lg">551</div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase font-bold">Cta. Administradores</p>
+              <p className={cn("font-mono text-2xl font-bold", data.closingBalance551 < 0 ? "text-red-600" : "text-emerald-600")}>
+                {formatEuro(data.closingBalance551)}
+              </p>
+              <p className="text-xs text-muted-foreground">{data.closingBalance551 < 0 ? "Empresa debe a administrador" : "Administrador debe a empresa"}</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-blue-200 shadow-md">
+          <CardContent className="p-5 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center text-blue-700 font-bold font-mono text-lg">553</div>
+            <div>
+              <p className="text-xs text-muted-foreground uppercase font-bold">Cta. Socios</p>
+              <p className={cn("font-mono text-2xl font-bold", data.closingBalance553 < 0 ? "text-red-600" : "text-emerald-600")}>
+                {formatEuro(data.closingBalance553)}
+              </p>
+              <p className="text-xs text-muted-foreground">{data.closingBalance553 < 0 ? "Empresa debe al socio" : "Socio debe a empresa"}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
+        <CardHeader className="bg-slate-50 border-b">
+          <CardTitle>Movimientos</CardTitle>
+          <CardDescription>{data.description}</CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="rounded-xl border overflow-hidden mb-6">
+            <Table>
+              <TableHeader className="bg-slate-100">
+                <TableRow>
+                  <TableHead>Fecha</TableHead>
+                  <TableHead>Concepto</TableHead>
+                  <TableHead>Socio / Administrador</TableHead>
+                  <TableHead className="text-center">Cta.</TableHead>
+                  <TableHead className="text-right">Debe</TableHead>
+                  <TableHead className="text-right">Haber</TableHead>
+                  <TableHead className="text-right">Saldo</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.transactions.map((tx, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="text-sm">{formatDate(tx.date)}</TableCell>
+                    <TableCell className="text-sm font-medium">{tx.concept}</TableCell>
+                    <TableCell className="text-sm">{tx.shareholderName}</TableCell>
+                    <TableCell className="text-center font-mono font-bold text-xs">{tx.accountCode}</TableCell>
+                    <TableCell className="text-right font-mono text-red-600">{tx.debit != null ? formatEuro(tx.debit) : "—"}</TableCell>
+                    <TableCell className="text-right font-mono text-emerald-600">{tx.credit != null ? formatEuro(tx.credit) : "—"}</TableCell>
+                    <TableCell className={cn("text-right font-mono font-bold text-sm", tx.balance < 0 ? "text-red-600" : "text-emerald-600")}>
+                      {formatEuro(tx.balance)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <AsientoContable debits={data.accountDebits} credits={data.accountCredits} note={data.journalNote} />
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export const DividendsView = ({ data }: { data?: DividendDistribution | null }) => {
+  if (!data) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se ha generado reparto de dividendos.</p>
+        <p className="text-sm mt-1">Activa la opción "Reparto de dividendos" en la configuración.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle title="Reparto de Dividendos" description={`Distribución del resultado del ejercicio ${data.fiscalYear}. Junta aprobada el ${formatDate(data.approvalDate)}.`} />
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: "Beneficio Neto", value: data.totalNetProfit, color: "text-foreground" },
+          { label: "Reserva Legal (112)", value: data.legalReserve, color: "text-amber-600" },
+          { label: "Reserva Voluntaria (113)", value: data.voluntaryReserve, color: "text-blue-600" },
+          { label: "Total Dividendos", value: data.totalDividends, color: "text-emerald-600" },
+        ].map((item) => (
+          <Card key={item.label} className="rounded-2xl shadow-sm">
+            <CardContent className="p-4 text-center">
+              <p className="text-xs text-muted-foreground uppercase font-bold mb-1">{item.label}</p>
+              <p className={cn("font-mono text-xl font-bold", item.color)}>{formatEuro(item.value)}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
+        <CardHeader className="bg-slate-50 border-b">
+          <CardTitle>Reparto por Socio</CardTitle>
+          <CardDescription>Retención IRPF: {data.irpfWithholdingRate}% · Dividendo/participación: {formatEuro(data.dividendPerShare)} · Pago: {formatDate(data.paymentDate)}</CardDescription>
+        </CardHeader>
+        <CardContent className="p-6">
+          <div className="rounded-xl border overflow-hidden mb-6">
+            <Table>
+              <TableHeader className="bg-slate-100">
+                <TableRow>
+                  <TableHead>Socio</TableHead>
+                  <TableHead className="text-right">% Participación</TableHead>
+                  <TableHead className="text-right">Dividendo Bruto</TableHead>
+                  <TableHead className="text-right">Retención IRPF ({data.irpfWithholdingRate}%)</TableHead>
+                  <TableHead className="text-right bg-emerald-50">Dividendo Neto</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {data.perShareholder.map((s, i) => (
+                  <TableRow key={i}>
+                    <TableCell className="font-medium">{s.shareholderName}</TableCell>
+                    <TableCell className="text-right font-mono">{s.participationPercentage}%</TableCell>
+                    <TableCell className="text-right font-mono">{formatEuro(s.grossDividend)}</TableCell>
+                    <TableCell className="text-right font-mono text-red-600">- {formatEuro(s.irpfWithholdingAmount)}</TableCell>
+                    <TableCell className="text-right font-mono font-bold text-emerald-600 bg-emerald-50">{formatEuro(s.netDividend)}</TableCell>
+                  </TableRow>
+                ))}
+                <TableRow className="bg-slate-50 font-bold border-t-2">
+                  <TableCell>TOTAL</TableCell>
+                  <TableCell className="text-right font-mono">100%</TableCell>
+                  <TableCell className="text-right font-mono">{formatEuro(data.totalDividends)}</TableCell>
+                  <TableCell className="text-right font-mono text-red-600">- {formatEuro(data.perShareholder.reduce((s, p) => s + p.irpfWithholdingAmount, 0))}</TableCell>
+                  <TableCell className="text-right font-mono text-emerald-600 bg-emerald-50">{formatEuro(data.perShareholder.reduce((s, p) => s + p.netDividend, 0))}</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+          <AsientoContable debits={data.accountDebits} credits={data.accountCredits} note={data.journalNote} />
+        </CardContent>
+      </Card>
     </div>
   );
 };

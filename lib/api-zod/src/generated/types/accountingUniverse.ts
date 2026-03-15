@@ -12,13 +12,17 @@ import type { Client } from "./client";
 import type { CompanyProfile } from "./companyProfile";
 import type { CreditCardStatement } from "./creditCardStatement";
 import type { CreditPolicy } from "./creditPolicy";
+import type { DividendDistribution } from "./dividendDistribution";
 import type { FixedAsset } from "./fixedAsset";
+import type { InitialBalanceSheet } from "./initialBalanceSheet";
 import type { InsurancePolicy } from "./insurancePolicy";
 import type { Inventory } from "./inventory";
 import type { Invoice } from "./invoice";
 import type { JournalEntry } from "./journalEntry";
 import type { Mortgage } from "./mortgage";
 import type { Payroll } from "./payroll";
+import type { ShareholderAccounts } from "./shareholderAccounts";
+import type { ShareholdersInfo } from "./shareholdersInfo";
 import type { SocialSecurityPayment } from "./socialSecurityPayment";
 import type { Supplier } from "./supplier";
 import type { TaxLiquidation } from "./taxLiquidation";
@@ -39,6 +43,10 @@ export interface AccountingUniverse {
   socialSecurityPayments?: SocialSecurityPayment[];
   taxLiquidations?: TaxLiquidation[];
   fixedAssets?: FixedAsset[];
+  shareholdersInfo?: ShareholdersInfo;
+  initialBalanceSheet?: InitialBalanceSheet;
+  shareholderAccounts?: ShareholderAccounts;
+  dividendDistribution?: DividendDistribution;
   bankStatements: BankStatement[];
   journalEntries: JournalEntry[];
 }

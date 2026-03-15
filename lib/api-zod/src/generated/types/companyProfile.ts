@@ -15,4 +15,8 @@ export interface CompanyProfile {
   taxRegime: string;
   fiscalYear: number;
   description: string;
+  /** Legal form: SL, SA, SLU, SCP, Autónomo, etc. */
+  companyType?: string;
+  /** Full legal form name in Spanish */
+  legalForm?: string;
 }
