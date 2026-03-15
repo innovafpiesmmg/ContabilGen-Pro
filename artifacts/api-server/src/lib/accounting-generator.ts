@@ -515,21 +515,46 @@ async function generateOperationsBlock(
   }
 
   if (withTax) {
-    sections.push(`"taxLiquidations": [
-    {
-      "model": "${params.taxRegime === "IGIC" ? "420" : "303"}",
-      "period": "T1", "dueDate": "${params.year}-04-20",
+    // Build quarterly VAT/IGIC schedule based on the actual period
+    const taxModel = params.taxRegime === "IGIC" ? "420" : "303";
+    const taxName = params.taxRegime;
+    const yr = params.year;
+
+    // Quarters: [label, quarterStart YYYY-MM-DD, dueDate YYYY-MM-DD]
+    const allQuarters: Array<{ label: string; start: string; end: string; dueDate: string }> = [
+      // T4 of previous year — paid Jan 20 of current year (first liquidation)
+      { label: `T4/${yr - 1}`, start: `${yr - 1}-10-01`, end: `${yr - 1}-12-31`, dueDate: `${yr}-01-20` },
+      { label: `T1/${yr}`,     start: `${yr}-01-01`,     end: `${yr}-03-31`,     dueDate: `${yr}-04-20` },
+      { label: `T2/${yr}`,     start: `${yr}-04-01`,     end: `${yr}-06-30`,     dueDate: `${yr}-07-20` },
+      { label: `T3/${yr}`,     start: `${yr}-07-01`,     end: `${yr}-09-30`,     dueDate: `${yr}-10-20` },
+      { label: `T4/${yr}`,     start: `${yr}-10-01`,     end: `${yr}-12-31`,     dueDate: `${yr + 1}-01-20` },
+    ];
+
+    // Only include quarters that overlap with the period
+    const { periodStart, periodEnd } = getPeriodInfo(params);
+    // A quarter overlaps if its dueDate falls within or just after the period
+    // Rule: include T4 prev year (opens Jan 20 of year) + any quarter whose quarter.start <= periodEnd
+    const relevantQuarters = allQuarters.filter(q => q.dueDate >= periodStart && q.start <= periodEnd);
+
+    const quarterLines = relevantQuarters.map(q =>
+      `    {
+      "model": "${taxModel}", "period": "${q.label}",
+      "quarterStart": "${q.start}", "quarterEnd": "${q.end}", "dueDate": "${q.dueDate}",
       "taxableBase": X, "outputTax": X, "inputTax": X, "result": X, "paymentType": "ingreso",
-      "journalNote": "Liquidación Mod.${params.taxRegime === "IGIC" ? "420 IGIC" : "303 IVA"}: 477 (repercutido) menos 472 (soportado) = cuota 4750.",
-      "accountDebits": [{"accountCode":"477","accountName":"${params.taxRegime} repercutido","amount":X,"description":"${params.taxRegime} devengado 1T"}],
-      "accountCredits": [{"accountCode":"472","accountName":"${params.taxRegime} soportado","amount":X,"description":"${params.taxRegime} deducible"},{"accountCode":"4750","accountName":"HP acreedora por ${params.taxRegime}","amount":X,"description":"Cuota a pagar"}]
-    },
+      "journalNote": "Liquidación Mod.${taxModel} ${taxName} ${q.label}: 477 (repercutido) menos 472 (soportado) = cuota (4750).",
+      "accountDebits": [{"accountCode":"477","accountName":"${taxName} repercutido","amount":X,"description":"${taxName} devengado ${q.label}"}],
+      "accountCredits": [{"accountCode":"472","accountName":"${taxName} soportado","amount":X,"description":"${taxName} deducible"},{"accountCode":"4750","accountName":"HP acreedora por ${taxName}","amount":X,"description":"Cuota ${q.label}"}]
+    }`
+    ).join(",\n");
+
+    sections.push(`"taxLiquidations": [
+${quarterLines},
     {
-      "model": "IS", "period": "Annual", "dueDate": "${params.year + 1}-07-25",
+      "model": "IS", "period": "Annual", "dueDate": "${yr + 1}-07-25",
       "taxableBase": X, "outputTax": X, "inputTax": 0, "result": X, "paymentType": "ingreso",
-      "journalNote": "IS ejercicio ${params.year}: tipo 25%. Gasto (630) y deuda Hacienda (4752).",
-      "accountDebits": [{"accountCode":"630","accountName":"Impuesto sobre beneficios","amount":X,"description":"IS ejercicio ${params.year}"}],
-      "accountCredits": [{"accountCode":"4752","accountName":"HP acreedora IS","amount":X,"description":"Cuota IS"}]
+      "journalNote": "IS ejercicio ${yr}: tipo 25%. Gasto (630) y deuda Hacienda (4752).",
+      "accountDebits": [{"accountCode":"630","accountName":"Impuesto sobre beneficios","amount":X,"description":"IS ejercicio ${yr}"}],
+      "accountCredits": [{"accountCode":"4752","accountName":"HP acreedora IS","amount":X,"description":"Cuota IS ${yr}"}]
     }
   ]`);
   } else {
