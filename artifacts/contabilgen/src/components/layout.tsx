@@ -11,10 +11,13 @@ import {
   Trash2,
   Printer,
   ChevronRight,
-  Settings
+  Settings,
+  LogOut,
+  User
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useListGenerations, useDeleteGeneration } from "@workspace/api-client-react";
+import { useAuth } from "@workspace/replit-auth-web";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +32,7 @@ export default function Layout({ children }: LayoutProps) {
   const { data: generations, isLoading } = useListGenerations();
   const deleteMutation = useDeleteGeneration();
   const { toast } = useToast();
+  const { user, logout } = useAuth();
 
   const closeSidebar = () => setSidebarOpen(false);
 
@@ -47,6 +51,10 @@ export default function Layout({ children }: LayoutProps) {
       }
     }
   };
+
+  const displayName = user?.firstName
+    ? `${user.firstName}${user.lastName ? " " + user.lastName : ""}`
+    : user?.email ?? "Usuario";
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border shadow-lg">
@@ -133,13 +141,36 @@ export default function Layout({ children }: LayoutProps) {
         </div>
       </div>
 
-      <div className="p-4 border-t border-sidebar-border mt-auto shrink-0">
+      <div className="p-4 border-t border-sidebar-border mt-auto shrink-0 space-y-2">
         <Link href="/settings" onClick={closeSidebar} className="block w-full">
           <Button variant={location === "/settings" ? "secondary" : "ghost"} className="w-full justify-start gap-2 rounded-xl">
             <Settings className="w-5 h-5" />
             <span className="font-semibold text-sm">Configuración</span>
           </Button>
         </Link>
+
+        <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-muted/40 border border-border/50">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+            {user?.profileImageUrl ? (
+              <img src={user.profileImageUrl} alt={displayName} className="w-8 h-8 rounded-full object-cover" />
+            ) : (
+              <User className="w-4 h-4 text-primary" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold truncate text-foreground">{displayName}</p>
+            {user?.email && (
+              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+            )}
+          </div>
+          <button
+            onClick={logout}
+            title="Cerrar sesión"
+            className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

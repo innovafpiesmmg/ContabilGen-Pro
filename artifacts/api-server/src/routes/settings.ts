@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, settingsTable } from "@workspace/db";
 import { UpdateSettingsBody } from "@workspace/api-zod";
 
@@ -13,8 +13,8 @@ const DEFAULTS: Record<string, string> = {
   deepseekModel: "deepseek-chat",
 };
 
-async function getAllSettings(): Promise<Record<string, string>> {
-  const rows = await db.select().from(settingsTable);
+async function getSettingsForUser(userId: string): Promise<Record<string, string>> {
+  const rows = await db.select().from(settingsTable).where(eq(settingsTable.userId, userId));
   const map: Record<string, string> = { ...DEFAULTS };
   for (const row of rows) {
     map[row.key] = row.value;
@@ -22,8 +22,12 @@ async function getAllSettings(): Promise<Record<string, string>> {
   return map;
 }
 
-router.get("/settings", async (_req, res): Promise<void> => {
-  const settings = await getAllSettings();
+router.get("/settings", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+  const settings = await getSettingsForUser(req.user.id);
   res.json({
     provider: settings.provider as "openai" | "deepseek",
     deepseekApiKey: settings.deepseekApiKey || null,
@@ -33,12 +37,18 @@ router.get("/settings", async (_req, res): Promise<void> => {
 });
 
 router.put("/settings", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+
   const parsed = UpdateSettingsBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
 
+  const userId = req.user.id;
   const { provider, deepseekApiKey, deepseekBaseUrl, deepseekModel } = parsed.data;
 
   const updates: Array<{ key: string; value: string }> = [
@@ -49,11 +59,14 @@ router.put("/settings", async (req, res): Promise<void> => {
   ];
 
   for (const { key, value } of updates) {
-    const existing = await db.select().from(settingsTable).where(eq(settingsTable.key, key));
+    const existing = await db.select().from(settingsTable)
+      .where(and(eq(settingsTable.userId, userId), eq(settingsTable.key, key)));
     if (existing.length > 0) {
-      await db.update(settingsTable).set({ value, updatedAt: new Date() }).where(eq(settingsTable.key, key));
+      await db.update(settingsTable)
+        .set({ value, updatedAt: new Date() })
+        .where(and(eq(settingsTable.userId, userId), eq(settingsTable.key, key)));
     } else {
-      await db.insert(settingsTable).values({ key, value });
+      await db.insert(settingsTable).values({ userId, key, value });
     }
   }
 
@@ -65,5 +78,5 @@ router.put("/settings", async (req, res): Promise<void> => {
   });
 });
 
-export { getAllSettings };
+export { getSettingsForUser };
 export default router;

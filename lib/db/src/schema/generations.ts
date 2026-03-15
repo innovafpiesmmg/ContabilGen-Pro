@@ -4,6 +4,7 @@ import { z } from "zod/v4";
 
 export const generationsTable = pgTable("generations", {
   id: serial("id").primaryKey(),
+  userId: text("user_id").notNull(),
   companyName: text("company_name").notNull(),
   sector: text("sector").notNull(),
   taxRegime: text("tax_regime").notNull(),

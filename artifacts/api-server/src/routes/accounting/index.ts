@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc } from "drizzle-orm";
+import { and, eq, desc } from "drizzle-orm";
 import { db, generationsTable } from "@workspace/db";
 import {
   GenerateAccountingUniverseBody,
@@ -8,11 +8,16 @@ import {
   DeleteGenerationParams,
 } from "@workspace/api-zod";
 import { generateAccountingUniverse } from "../../lib/accounting-generator.js";
-import { getAllSettings } from "../settings.js";
+import { getSettingsForUser } from "../settings.js";
 
 const router: IRouter = Router();
 
 router.post("/accounting/generate", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+
   const parsed = GenerateAccountingUniverseBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -21,7 +26,7 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
 
   const { taxRegime, sector, complexity, year, companyName } = parsed.data;
 
-  const settings = await getAllSettings();
+  const settings = await getSettingsForUser(req.user.id);
   const aiConfig = {
     provider: settings.provider ?? "openai",
     deepseekApiKey: settings.deepseekApiKey ?? "",
@@ -37,7 +42,12 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
   res.json(universe);
 });
 
-router.get("/accounting/generations", async (_req, res): Promise<void> => {
+router.get("/accounting/generations", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+
   const rows = await db
     .select({
       id: generationsTable.id,
@@ -48,6 +58,7 @@ router.get("/accounting/generations", async (_req, res): Promise<void> => {
       createdAt: generationsTable.createdAt,
     })
     .from(generationsTable)
+    .where(eq(generationsTable.userId, req.user.id))
     .orderBy(desc(generationsTable.createdAt));
 
   res.json(
@@ -59,6 +70,11 @@ router.get("/accounting/generations", async (_req, res): Promise<void> => {
 });
 
 router.post("/accounting/generations", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+
   const parsed = SaveGenerationBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -68,6 +84,7 @@ router.post("/accounting/generations", async (req, res): Promise<void> => {
   const [row] = await db
     .insert(generationsTable)
     .values({
+      userId: req.user.id,
       companyName: parsed.data.companyName,
       sector: parsed.data.sector,
       taxRegime: parsed.data.taxRegime,
@@ -87,6 +104,11 @@ router.post("/accounting/generations", async (req, res): Promise<void> => {
 });
 
 router.get("/accounting/generations/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+
   const params = GetGenerationParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -96,10 +118,10 @@ router.get("/accounting/generations/:id", async (req, res): Promise<void> => {
   const [row] = await db
     .select()
     .from(generationsTable)
-    .where(eq(generationsTable.id, params.data.id));
+    .where(and(eq(generationsTable.id, params.data.id), eq(generationsTable.userId, req.user.id)));
 
   if (!row) {
-    res.status(404).json({ error: "Generation not found" });
+    res.status(404).json({ error: "Generación no encontrada" });
     return;
   }
 
@@ -115,6 +137,11 @@ router.get("/accounting/generations/:id", async (req, res): Promise<void> => {
 });
 
 router.delete("/accounting/generations/:id", async (req, res): Promise<void> => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "No autenticado" });
+    return;
+  }
+
   const params = DeleteGenerationParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -123,11 +150,11 @@ router.delete("/accounting/generations/:id", async (req, res): Promise<void> => 
 
   const [row] = await db
     .delete(generationsTable)
-    .where(eq(generationsTable.id, params.data.id))
+    .where(and(eq(generationsTable.id, params.data.id), eq(generationsTable.userId, req.user.id)))
     .returning();
 
   if (!row) {
-    res.status(404).json({ error: "Generation not found" });
+    res.status(404).json({ error: "Generación no encontrada" });
     return;
   }
 
