@@ -14,7 +14,7 @@ export interface CasualtyEvent {
   bookValue: number;
   insuranceCompensation: number;
   netLoss: number;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

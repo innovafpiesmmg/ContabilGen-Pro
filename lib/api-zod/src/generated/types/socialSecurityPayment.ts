@@ -18,7 +18,7 @@ export interface SocialSecurityPayment {
   ssEmployerAmount: number;
   /** Total TC1: ssEmployeeAmount + ssEmployerAmount */
   totalPayment: number;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

@@ -278,7 +278,7 @@ export interface Invoice {
   /** @nullable */
   dueDate: string | null;
   /** Explanation of accounting entries */
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -301,7 +301,7 @@ export interface BankLoan {
   startDate: string;
   monthlyInstallment: number;
   amortizationTable: AmortizationRow[];
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -317,7 +317,7 @@ export interface Mortgage {
   startDate: string;
   monthlyInstallment: number;
   amortizationTable: AmortizationRow[];
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -334,7 +334,7 @@ export interface CreditPolicy {
   endDate: string;
   interestAmount: number;
   totalSettlement: number;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -355,7 +355,7 @@ export interface CreditCardStatement {
   movements: CreditCardMovement[];
   totalCharges: number;
   settlementDate: string;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -369,7 +369,7 @@ export interface InsurancePolicy {
   endDate: string;
   /** Amount to defer to next period (cuenta 480) */
   prepaidExpense: number;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -381,7 +381,7 @@ export interface CasualtyEvent {
   bookValue: number;
   insuranceCompensation: number;
   netLoss: number;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -409,7 +409,7 @@ export interface Payroll {
   totalNetSalary: number;
   totalSsEmployer: number;
   totalLaborCost: number;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -425,7 +425,7 @@ export interface SocialSecurityPayment {
   ssEmployerAmount: number;
   /** Total TC1: ssEmployeeAmount + ssEmployerAmount */
   totalPayment: number;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -465,7 +465,7 @@ export interface TaxLiquidation {
   /** Positive = to pay, negative = refund */
   result: number;
   paymentType: TaxLiquidationPaymentType;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -487,7 +487,7 @@ export interface FixedAsset {
   accDepreciationCode: string;
   /** Depreciation expense account (e.g. 681) */
   depExpenseCode: string;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -534,7 +534,7 @@ export interface ShareholdersInfo {
   registryEntry: string;
   shareholders: Shareholder[];
   /** Didactic note explaining the capital accounts (100, 118, etc.) */
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -566,7 +566,7 @@ export interface InitialBalanceSheet {
   totalAssets: number;
   totalEquityAndLiabilities: number;
   /** Didactic note for the opening entry (asiento de apertura) */
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -594,7 +594,7 @@ export interface ShareholderAccounts {
   /** Closing balance on account 553 (shareholders) */
   closingBalance553: number;
   /** Didactic note about accounts 551 and 553, their nature and use */
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -630,7 +630,7 @@ export interface DividendDistribution {
   irpfWithholdingRate: number;
   perShareholder: DividendPerShareholder[];
   /** Didactic note: result allocation entries, withholding (4751), payment (526) */
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

@@ -19,7 +19,7 @@ export interface CreditPolicy {
   endDate: string;
   interestAmount: number;
   totalSettlement: number;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

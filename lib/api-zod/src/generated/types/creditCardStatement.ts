@@ -15,7 +15,7 @@ export interface CreditCardStatement {
   movements: CreditCardMovement[];
   totalCharges: number;
   settlementDate: string;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

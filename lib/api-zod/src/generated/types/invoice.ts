@@ -25,7 +25,7 @@ export interface Invoice {
   /** @nullable */
   dueDate: string | null;
   /** Explanation of accounting entries */
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

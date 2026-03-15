@@ -17,7 +17,7 @@ export interface BankLoan {
   startDate: string;
   monthlyInstallment: number;
   amortizationTable: AmortizationRow[];
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

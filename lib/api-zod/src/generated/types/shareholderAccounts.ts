@@ -19,7 +19,7 @@ export interface ShareholderAccounts {
   /** Closing balance on account 553 (shareholders) */
   closingBalance553: number;
   /** Didactic note about accounts 551 and 553, their nature and use */
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

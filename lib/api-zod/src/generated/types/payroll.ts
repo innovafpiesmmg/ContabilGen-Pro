@@ -17,7 +17,7 @@ export interface Payroll {
   totalNetSalary: number;
   totalSsEmployer: number;
   totalLaborCost: number;
-  journalNote: string;
+  journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
