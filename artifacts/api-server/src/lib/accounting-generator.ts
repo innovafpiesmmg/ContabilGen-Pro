@@ -222,7 +222,7 @@ function getSectorContext(sector: string, taxRegime: string) {
   }
 }
 
-// ─── CALL 2: COMMERCIAL BLOCK ─────────────────────────────────────────────────
+// ─── CALL 2A: COMMERCIAL INVOICES BLOCK ───────────────────────────────────────
 async function generateCommercialBlock(
   params: GenerateParams,
   scenario: Record<string, unknown>,
@@ -300,11 +300,50 @@ Genera exactamente este JSON con datos reales y coherentes con el escenario:
       "accountDebits": [{"accountCode": "${sectorCtx.purchaseAccount.code}", "accountName": "${sectorCtx.purchaseAccount.name}", "amount": 500.00, "description": "según tipo de factura"}],
       "accountCredits": [{"accountCode": "400", "accountName": "Proveedores / Clientes", "amount": ${500 + rates.standard * 5}, "description": "según tipo de factura"}]
     }
-  ],
+  ]
+}
+
+REGLAS CRÍTICAS:
+- SECTOR ${params.sector.toUpperCase()}: respeta ESTRICTAMENTE las cuentas PGC indicadas — ventas en ${sectorCtx.saleAccount.code} (${sectorCtx.saleAccount.name}), compras en ${sectorCtx.purchaseAccount.code} (${sectorCtx.purchaseAccount.name})
+- FACTURAS: genera exactamente ${invoiceCount} facturas (mezcla de compras y ventas, al menos 2 de cada tipo), DISTRIBUIDAS en todos los meses del período
+- Todas las fechas dentro del período ${periodStart}–${periodEnd}
+- Cálculos de ${params.taxRegime} exactos
+- Importes realistas para el sector ${params.sector}
+- Usa nombres/NIF exactos del escenario para proveedores y clientes`;
+
+  return await callAI(client, model, prompt, 4500) as Record<string, unknown>;
+}
+
+// ─── CALL 2B: BANKING & INSURANCE BLOCK ───────────────────────────────────────
+async function generateBankingBlock(
+  params: GenerateParams,
+  scenario: Record<string, unknown>,
+  client: OpenAI,
+  model: string,
+) {
+  const rates = TAX_RATES[params.taxRegime];
+  const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
+  const sc = JSON.stringify({
+    companyName: scenario.companyName,
+    sector: params.sector,
+    bankEntity: scenario.bankEntity,
+    bankAccount: scenario.bankAccount,
+    taxRegime: params.taxRegime,
+    year: params.year,
+  }, null, 0);
+
+  const prompt = `Genera el BLOQUE BANCARIO Y SEGUROS del universo contable.
+
+EMPRESA: ${sc}
+PERÍODO: ${periodStart} a ${periodEnd} (${numMonths} mes${numMonths > 1 ? "es" : ""})
+RÉGIMEN FISCAL: ${params.taxRegime} (IVA general ${rates.standard}%)
+
+Genera exactamente este JSON:
+{
   "creditCardStatement": {
     "cardNumber": "**** **** **** 1234",
     "entity": "(del escenario bankEntity)",
-    "statementPeriod": "... ${params.year}",
+    "statementPeriod": "Extracto ${params.year}",
     "movements": [
       {"date": "YYYY-MM-DD", "description": "...", "amount": 120.00, "category": "...", "accountCode": "629", "accountName": "Otros servicios"}
     ],
@@ -312,7 +351,7 @@ Genera exactamente este JSON con datos reales y coherentes con el escenario:
     "settlementDate": "YYYY-MM-DD",
     "journalNote": "Cada gasto con tarjeta: gasto (xxx) a deuda (5201). Al cargo bancario: 5201 a 572.",
     "accountDebits": [{"accountCode": "629", "accountName": "Otros servicios", "amount": 120.00, "description": "Gastos tarjeta"}],
-    "accountCredits": [{"accountCode": "5201", "accountName": "Deudas a corto plazo por tarjeta", "amount": 120.00, "description": "Total pendiente"}]
+    "accountCredits": [{"accountCode": "5201", "accountName": "Deudas tarjeta crédito", "amount": 120.00, "description": "Total pendiente"}]
   },
   "insurancePolicies": [
     {
@@ -343,7 +382,7 @@ Genera exactamente este JSON con datos reales y coherentes con el escenario:
     {
       "bank": "(del escenario bankEntity)",
       "accountNumber": "(del escenario bankAccount)",
-      "period": "... ${params.year}",
+      "period": "MMMM ${params.year}",
       "openingBalance": 25000.00,
       "closingBalance": 22500.00,
       "transactions": [
@@ -355,16 +394,12 @@ Genera exactamente este JSON con datos reales y coherentes con el escenario:
 }
 
 REGLAS CRÍTICAS:
-- SECTOR ${params.sector.toUpperCase()}: respeta ESTRICTAMENTE las cuentas PGC indicadas arriba — ventas en ${sectorCtx.saleAccount.code} (${sectorCtx.saleAccount.name}), compras en ${sectorCtx.purchaseAccount.code} (${sectorCtx.purchaseAccount.name})
-- FACTURAS: genera exactamente ${invoiceCount} facturas (mezcla de compras y ventas, al menos 2 de cada tipo), DISTRIBUIDAS en todos los meses del período — no acumules facturas en un solo mes
 - EXTRACTOS BANCARIOS: genera ${numMonths} extracto(s) mensuales con al menos 4 transacciones cada uno, cubriendo todos los meses de ${periodStart} a ${periodEnd}
 - TARJETA: mínimo ${Math.min(numMonths * 2, 12)} movimientos distribuidos en todos los meses del período
-- Todas las fechas estrictamente dentro del período ${periodStart}–${periodEnd}
-- Cálculos de ${params.taxRegime} exactos
-- Importes realistas para el sector ${params.sector}
-- Usa nombres/NIF exactos del escenario para proveedores y clientes`;
+- Todas las fechas dentro del período ${periodStart}–${periodEnd}
+- Importes coherentes con el sector ${params.sector}`;
 
-  return await callAI(client, model, prompt, 5000) as Record<string, unknown>;
+  return await callAI(client, model, prompt, 4500) as Record<string, unknown>;
 }
 
 // ─── CALL 3: OPERATIONS BLOCK ─────────────────────────────────────────────────
@@ -801,6 +836,7 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
 
   const blockPromises: Promise<Record<string, unknown>>[] = [
     generateCommercialBlock(params, scenario, client, model),
+    generateBankingBlock(params, scenario, client, model),
     generateOperationsBlock(params, scenario, client, model),
     generateJournalBlock(params, scenario, client, model),
   ];
