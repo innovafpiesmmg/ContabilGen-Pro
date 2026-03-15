@@ -609,7 +609,7 @@ async function generateJournalBlock(
 ) {
   const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
   const opsPerMonth = params.operationsPerMonth ?? 8;
-  const targetEntries = Math.min(opsPerMonth * numMonths, 40);
+  const targetEntries = Math.min(opsPerMonth * numMonths, 20);
   const level = params.educationLevel ?? "Medio";
 
   const sc = JSON.stringify({
@@ -667,9 +667,11 @@ REGLAS CRÍTICAS:
 - Fechas en orden cronológico, distribuidas por todos los meses del período
 - Cuentas PGC correctas (3 o 4 dígitos)
 - Conceptos claros y educativos
-- Importes coherentes con los datos del escenario`;
+- Importes coherentes con los datos del escenario
+- SÉ CONCISO: description de cada línea en máximo 4 palabras, concept en máximo 8 palabras
+- Máximo 3 líneas de débito y 3 de crédito por asiento`;
 
-  return await callAI(client, model, prompt, 5000) as Record<string, unknown>;
+  return await callAI(client, model, prompt, 4000) as Record<string, unknown>;
 }
 
 // ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
