@@ -9,6 +9,31 @@ export interface HealthStatus {
   status: string;
 }
 
+/**
+ * Which AI provider to use for generation
+ */
+export type AiSettingsProvider =
+  (typeof AiSettingsProvider)[keyof typeof AiSettingsProvider];
+
+export const AiSettingsProvider = {
+  openai: "openai",
+  deepseek: "deepseek",
+} as const;
+
+export interface AiSettings {
+  /** Which AI provider to use for generation */
+  provider: AiSettingsProvider;
+  /**
+   * DeepSeek API key
+   * @nullable
+   */
+  deepseekApiKey: string | null;
+  /** DeepSeek API base URL */
+  deepseekBaseUrl: string;
+  /** DeepSeek model to use (e.g. deepseek-chat) */
+  deepseekModel: string;
+}
+
 export interface ErrorResponse {
   error: string;
 }

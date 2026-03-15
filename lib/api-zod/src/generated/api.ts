@@ -16,6 +16,45 @@ export const HealthCheckResponse = zod.object({
 });
 
 /**
+ * @summary Get current AI provider settings
+ */
+export const GetSettingsResponse = zod.object({
+  provider: zod
+    .enum(["openai", "deepseek"])
+    .describe("Which AI provider to use for generation"),
+  deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
+  deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
+  deepseekModel: zod
+    .string()
+    .describe("DeepSeek model to use (e.g. deepseek-chat)"),
+});
+
+/**
+ * @summary Update AI provider settings
+ */
+export const UpdateSettingsBody = zod.object({
+  provider: zod
+    .enum(["openai", "deepseek"])
+    .describe("Which AI provider to use for generation"),
+  deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
+  deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
+  deepseekModel: zod
+    .string()
+    .describe("DeepSeek model to use (e.g. deepseek-chat)"),
+});
+
+export const UpdateSettingsResponse = zod.object({
+  provider: zod
+    .enum(["openai", "deepseek"])
+    .describe("Which AI provider to use for generation"),
+  deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
+  deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
+  deepseekModel: zod
+    .string()
+    .describe("DeepSeek model to use (e.g. deepseek-chat)"),
+});
+
+/**
  * Uses AI to generate a coherent accounting universe based on the given parameters
  * @summary Generate a new accounting universe
  */

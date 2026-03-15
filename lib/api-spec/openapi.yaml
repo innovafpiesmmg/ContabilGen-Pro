@@ -9,6 +9,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: settings
+    description: AI provider settings
   - name: accounting
     description: Accounting universe generation
   - name: generations
@@ -27,6 +29,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get current AI provider settings
+      responses:
+        "200":
+          description: Current settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettings"
+
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update AI provider settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AiSettings"
+      responses:
+        "200":
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AiSettings"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /accounting/generate:
     post:
@@ -151,6 +190,28 @@ components:
           type: string
       required:
         - status
+
+    AiSettings:
+      type: object
+      properties:
+        provider:
+          type: string
+          enum: [openai, deepseek]
+          description: "Which AI provider to use for generation"
+        deepseekApiKey:
+          type: ["string", "null"]
+          description: "DeepSeek API key"
+        deepseekBaseUrl:
+          type: string
+          description: "DeepSeek API base URL"
+        deepseekModel:
+          type: string
+          description: "DeepSeek model to use (e.g. deepseek-chat)"
+      required:
+        - provider
+        - deepseekApiKey
+        - deepseekBaseUrl
+        - deepseekModel
 
     ErrorResponse:
       type: object

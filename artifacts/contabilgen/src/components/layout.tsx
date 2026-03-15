@@ -10,7 +10,8 @@ import {
   X, 
   Trash2,
   Printer,
-  ChevronRight
+  ChevronRight,
+  Settings
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useListGenerations, useDeleteGeneration } from "@workspace/api-client-react";
@@ -131,6 +132,15 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </div>
       </div>
+
+      <div className="p-4 border-t border-sidebar-border mt-auto shrink-0">
+        <Link href="/settings" onClick={closeSidebar} className="block w-full">
+          <Button variant={location === "/settings" ? "secondary" : "ghost"} className="w-full justify-start gap-2 rounded-xl">
+            <Settings className="w-5 h-5" />
+            <span className="font-semibold text-sm">Configuración</span>
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 
@@ -184,7 +194,7 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center text-sm font-medium text-muted-foreground">
               <span className="hidden sm:inline">ContabilGen</span>
               <ChevronRight className="w-4 h-4 mx-1 hidden sm:inline opacity-50" />
-              <span className="text-foreground">{location === '/' ? 'Nuevo Universo' : 'Universo Guardado'}</span>
+              <span className="text-foreground">{location === '/' ? 'Nuevo Universo' : location === '/settings' ? 'Configuración' : 'Universo Guardado'}</span>
             </div>
           </div>
           <Button 

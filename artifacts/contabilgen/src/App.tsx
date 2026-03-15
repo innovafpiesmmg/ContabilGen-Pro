@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Layout from "@/components/layout";
 import Dashboard from "@/pages/dashboard";
 import SavedUniverse from "@/pages/saved-universe";
+import SettingsPage from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -23,6 +24,7 @@ function Router() {
       <Switch>
         <Route path="/" component={Dashboard} />
         <Route path="/generations/:id" component={SavedUniverse} />
+        <Route path="/settings" component={SettingsPage} />
         <Route component={NotFound} />
       </Switch>
     </Layout>

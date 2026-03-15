@@ -8,6 +8,7 @@ import {
   DeleteGenerationParams,
 } from "@workspace/api-zod";
 import { generateAccountingUniverse } from "../../lib/accounting-generator.js";
+import { getAllSettings } from "../settings.js";
 
 const router: IRouter = Router();
 
@@ -20,13 +21,18 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
 
   const { taxRegime, sector, complexity, year, companyName } = parsed.data;
 
-  const universe = await generateAccountingUniverse({
-    taxRegime,
-    sector,
-    complexity,
-    year,
-    companyName: companyName ?? null,
-  });
+  const settings = await getAllSettings();
+  const aiConfig = {
+    provider: settings.provider ?? "openai",
+    deepseekApiKey: settings.deepseekApiKey ?? "",
+    deepseekBaseUrl: settings.deepseekBaseUrl ?? "https://api.deepseek.com",
+    deepseekModel: settings.deepseekModel ?? "deepseek-chat",
+  };
+
+  const universe = await generateAccountingUniverse(
+    { taxRegime, sector, complexity, year, companyName: companyName ?? null },
+    aiConfig,
+  );
 
   res.json(universe);
 });

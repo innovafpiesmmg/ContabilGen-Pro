@@ -1,4 +1,5 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
+import OpenAI from "openai";
 
 interface GenerateParams {
   taxRegime: "IVA" | "IGIC";
@@ -6,6 +7,13 @@ interface GenerateParams {
   complexity: "Avanzado";
   year: number;
   companyName?: string | null;
+}
+
+interface AiConfig {
+  provider: string;
+  deepseekApiKey: string;
+  deepseekBaseUrl: string;
+  deepseekModel: string;
 }
 
 const TAX_RATES: Record<string, { standard: number; reduced: number; superreduced: number }> = {
@@ -62,7 +70,7 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
   ],
   "invoices": [
     {
-      "invoiceNumber": "F-2024/001",
+      "invoiceNumber": "F-${params.year}/001",
       "date": "${params.year}-03-15",
       "type": "purchase",
       "partyName": "Proveedor SA",
@@ -88,7 +96,7 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
   ],
   "bankLoan": {
     "entity": "Banco Ejemplo",
-    "loanNumber": "PRE-2024-001",
+    "loanNumber": "PRE-${params.year}-001",
     "principal": 50000.00,
     "annualRate": 4.5,
     "termMonths": 60,
@@ -109,7 +117,7 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
   },
   "creditPolicy": {
     "entity": "Banco Ejemplo",
-    "policyNumber": "POL-2024-001",
+    "policyNumber": "POL-${params.year}-001",
     "limit": 30000.00,
     "drawnAmount": 18000.00,
     "annualRate": 5.5,
@@ -152,14 +160,14 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
   },
   "insurancePolicies": [
     {
-      "policyNumber": "SEG-2024-001",
+      "policyNumber": "SEG-${params.year}-001",
       "insurer": "Mapfre Seguros",
       "type": "Seguro multirriesgo del local",
       "annualPremium": 1800.00,
       "startDate": "${params.year}-09-01",
       "endDate": "${params.year + 1}-08-31",
       "prepaidExpense": 1200.00,
-      "journalNote": "El seguro anual pagado en septiembre cubre hasta agosto del año siguiente. Los meses de ${params.year + 1} (enero-agosto = 8 meses) se periodifican como gasto anticipado (cuenta 480). Solo se imputa como gasto del ejercicio la parte correspondiente a los meses del año actual (septiembre-diciembre = 4 meses).",
+      "journalNote": "El seguro anual pagado en septiembre cubre hasta agosto del año siguiente. Los meses de ${params.year + 1} (enero-agosto = 8 meses) se periodifican como gasto anticipado (cuenta 480).",
       "accountDebits": [
         { "accountCode": "625", "accountName": "Primas de seguros", "amount": 600.00, "description": "Gasto del ejercicio (4 meses)" },
         { "accountCode": "480", "accountName": "Gastos anticipados", "amount": 1200.00, "description": "Periodificación (8 meses año siguiente)" }
@@ -176,7 +184,7 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
     "bookValue": 8500.00,
     "insuranceCompensation": 6000.00,
     "netLoss": 2500.00,
-    "journalNote": "El siniestro genera una pérdida extraordinaria (cuenta 678). La indemnización recibida del seguro se contabiliza como ingreso extraordinario (cuenta 778). La diferencia entre el valor contable del bien y la indemnización es la pérdida neta.",
+    "journalNote": "El siniestro genera una pérdida extraordinaria (cuenta 678). La indemnización recibida del seguro se contabiliza como ingreso extraordinario (cuenta 778).",
     "accountDebits": [
       { "accountCode": "678", "accountName": "Gastos excepcionales", "amount": 8500.00, "description": "Valor contable de bienes siniestrados" },
       { "accountCode": "430", "accountName": "Clientes (seguro)", "amount": 6000.00, "description": "Indemnización a cobrar del seguro" }
@@ -223,9 +231,9 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
     "totalNetSalary": 3200.00,
     "totalSsEmployer": 1216.00,
     "totalLaborCost": 5216.00,
-    "journalNote": "La nómina genera: (1) Gasto en sueldos (640) por el salario bruto total; (2) Gasto en Seguridad Social a cargo de la empresa (642); (3) Retenciones de IRPF a ingresar a Hacienda (4751); (4) Cuotas de SS a ingresar (476); (5) Salarios netos a pagar a empleados (465).",
+    "journalNote": "La nómina genera: (1) Gasto en sueldos (640); (2) Gasto SS empresa (642); (3) Retenciones IRPF (4751); (4) Cuotas SS (476); (5) Salarios netos (465).",
     "accountDebits": [
-      { "accountCode": "640", "accountName": "Sueldos y salarios", "amount": 4000.00, "description": "Salario bruto total empleados" },
+      { "accountCode": "640", "accountName": "Sueldos y salarios", "amount": 4000.00, "description": "Salario bruto total" },
       { "accountCode": "642", "accountName": "Seguridad Social a cargo de la empresa", "amount": 1216.00, "description": "Cuota patronal SS" }
     ],
     "accountCredits": [
@@ -245,11 +253,7 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
         { "date": "${params.year}-10-02", "concept": "Transferencia recibida - Cliente SL", "debit": null, "credit": 3500.00, "balance": 28500.00 },
         { "date": "${params.year}-10-05", "concept": "Pago nóminas octubre", "debit": 3200.00, "credit": null, "balance": 25300.00 },
         { "date": "${params.year}-10-10", "concept": "Cuota préstamo bancario", "debit": 929.27, "credit": null, "balance": 24370.73 },
-        { "date": "${params.year}-10-15", "concept": "Pago proveedor FA-2024/001", "debit": 2150.00, "credit": null, "balance": 22220.73 },
-        { "date": "${params.year}-10-20", "concept": "Transferencia a Hacienda - IRPF", "debit": 546.00, "credit": null, "balance": 21674.73 },
-        { "date": "${params.year}-10-25", "concept": "Ingreso venta efectivo", "debit": null, "credit": 1200.00, "balance": 22874.73 },
-        { "date": "${params.year}-10-31", "concept": "Cargo tarjeta crédito octubre", "debit": 505.49, "credit": null, "balance": 22369.24 },
-        { "date": "${params.year}-10-31", "concept": "Comisión mantenimiento cuenta", "debit": 15.00, "credit": null, "balance": 22354.24 }
+        { "date": "${params.year}-10-31", "concept": "Cargo tarjeta crédito octubre", "debit": 505.49, "credit": null, "balance": 22369.24 }
       ]
     }
   ],
@@ -258,9 +262,9 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
       "entryNumber": "1",
       "date": "${params.year}-01-01",
       "concept": "Apertura de ejercicio - Préstamo bancario",
-      "document": "PRE-2024-001",
+      "document": "PRE-${params.year}-001",
       "debits": [
-        { "accountCode": "572", "accountName": "Bancos c/c", "amount": 50000.00, "description": "Ingreso del préstamo en cuenta" }
+        { "accountCode": "572", "accountName": "Bancos c/c", "amount": 50000.00, "description": "Ingreso del préstamo" }
       ],
       "credits": [
         { "accountCode": "170", "accountName": "Deudas a largo plazo con entidades de crédito", "amount": 50000.00, "description": "Préstamo concedido" }
@@ -271,9 +275,9 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
       "entryNumber": "2",
       "date": "${params.year}-03-15",
       "concept": "Compra de mercaderías a Proveedor SA",
-      "document": "F-2024/001",
+      "document": "F-${params.year}/001",
       "debits": [
-        { "accountCode": "600", "accountName": "Compras de mercaderías", "amount": 1000.00, "description": "Mercaderías compradas" },
+        { "accountCode": "600", "accountName": "Compras de mercaderías", "amount": 1000.00, "description": "Mercaderías" },
         { "accountCode": "472", "accountName": "${params.taxRegime} soportado", "amount": ${rates.standard * 10}, "description": "${params.taxRegime} ${rates.standard}%" }
       ],
       "credits": [
@@ -286,20 +290,39 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
 
 IMPORTANTE:
 1. Genera datos REALISTAS y COHERENTES para el sector ${params.sector}. Adapta los productos, clientes, proveedores y gastos al sector.
-2. Usa importes realistas (ni muy pequeños ni exagerados) para una empresa mediana española.
-3. Asegúrate de que los cálculos matemáticos sean CORRECTOS (totales de facturas, amortizaciones, etc.).
+2. Usa importes realistas para una empresa mediana española.
+3. Asegúrate de que los cálculos matemáticos sean CORRECTOS.
 4. Las fechas deben ser del año ${params.year} (salvo periodificaciones).
 5. Los asientos deben cuadrar (total debe = total haber).
 6. Genera al menos 4-5 facturas (mix de compras y ventas), 2 pólizas de seguro, y 2 empleados en nómina.
 7. Responde ÚNICAMENTE con el JSON, sin texto adicional, sin markdown, sin explicaciones.`;
 }
 
-export async function generateAccountingUniverse(params: GenerateParams): Promise<unknown> {
-  const prompt = buildPrompt(params);
+function getClient(config: AiConfig): OpenAI {
+  if (config.provider === "deepseek" && config.deepseekApiKey) {
+    return new OpenAI({
+      apiKey: config.deepseekApiKey,
+      baseURL: config.deepseekBaseUrl || "https://api.deepseek.com",
+    });
+  }
+  return openai;
+}
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-5.2",
-    max_completion_tokens: 8192,
+function getModel(config: AiConfig): string {
+  if (config.provider === "deepseek" && config.deepseekApiKey) {
+    return config.deepseekModel || "deepseek-chat";
+  }
+  return "gpt-5.2";
+}
+
+export async function generateAccountingUniverse(params: GenerateParams, aiConfig: AiConfig): Promise<unknown> {
+  const prompt = buildPrompt(params);
+  const client = getClient(aiConfig);
+  const model = getModel(aiConfig);
+
+  const response = await client.chat.completions.create({
+    model,
+    max_tokens: 8192,
     messages: [
       {
         role: "system",

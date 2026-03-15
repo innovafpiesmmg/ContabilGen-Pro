@@ -8,6 +8,8 @@
 
 export * from "./accountEntry";
 export * from "./accountingUniverse";
+export * from "./aiSettings";
+export * from "./aiSettingsProvider";
 export * from "./amortizationRow";
 export * from "./bankLoan";
 export * from "./bankStatement";
