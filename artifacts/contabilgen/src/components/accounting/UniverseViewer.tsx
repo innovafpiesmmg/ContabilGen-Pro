@@ -41,6 +41,7 @@ import {
   CronologiaView,
 } from "./UniverseViews";
 import { usePdfExport, PdfTab } from "@/hooks/usePdfExport";
+import { useToast } from "@/hooks/use-toast";
 
 interface UniverseViewerProps {
   universe: AccountingUniverse;
@@ -53,6 +54,7 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
   const [activeTab, setActiveTab] = useState("empresa");
   const contentRef = useRef<HTMLDivElement>(null);
   const { exporting, exportTab, exportAllAsZip } = usePdfExport();
+  const { toast } = useToast();
 
   const hasTaxLiquidations = universe.taxLiquidations && universe.taxLiquidations.length > 0;
   const hasSS = universe.socialSecurityPayments && universe.socialSecurityPayments.length > 0;
@@ -124,11 +126,23 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
     };
     const label = labels[activeTab] ?? activeTab;
     const safeName = companyName.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 25);
-    await exportTab(contentRef.current, companyName, label, `ContabilGen_${safeName}_${activeTab}.pdf`);
+    try {
+      await exportTab(contentRef.current, companyName, label, `ContabilGen_${safeName}_${activeTab}.pdf`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[PDF export] error:", msg, err);
+      toast({ variant: "destructive", title: "Error al exportar PDF", description: msg });
+    }
   };
 
   const handleExportAll = async () => {
-    await exportAllAsZip(buildActiveTabs(), companyName);
+    try {
+      await exportAllAsZip(buildActiveTabs(), companyName);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[ZIP export] error:", msg, err);
+      toast({ variant: "destructive", title: "Error al generar ZIP", description: msg });
+    }
   };
 
   const isExporting = exporting !== null;

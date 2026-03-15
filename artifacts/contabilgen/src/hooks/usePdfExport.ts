@@ -31,11 +31,54 @@ function replaceCSSColorFunctions(css: string): string {
 }
 
 function patchClonedDocument(doc: Document): void {
+  // 1. Patch all <style> elements — replaces oklch/oklab in CSS source text
   doc.querySelectorAll("style").forEach((style) => {
     if (style.textContent) {
       style.textContent = replaceCSSColorFunctions(style.textContent);
     }
   });
+
+  // 2. Inject a safe override for all shadcn/ui CSS custom properties
+  //    This ensures any remaining unpatched oklch/oklab variables are overridden
+  const safeVars = doc.createElement("style");
+  safeVars.textContent = `
+    :root, .dark {
+      --background: #ffffff !important;
+      --foreground: #020817 !important;
+      --card: #ffffff !important;
+      --card-foreground: #020817 !important;
+      --popover: #ffffff !important;
+      --popover-foreground: #020817 !important;
+      --primary: #1e3a5f !important;
+      --primary-foreground: #ffffff !important;
+      --secondary: #f1f5f9 !important;
+      --secondary-foreground: #1e293b !important;
+      --muted: #f1f5f9 !important;
+      --muted-foreground: #64748b !important;
+      --accent: #f1f5f9 !important;
+      --accent-foreground: #1e293b !important;
+      --destructive: #ef4444 !important;
+      --destructive-foreground: #ffffff !important;
+      --border: #e2e8f0 !important;
+      --input: #e2e8f0 !important;
+      --ring: #94a3b8 !important;
+      --radius: 0.5rem !important;
+      --sidebar-background: #f8fafc !important;
+      --sidebar-foreground: #1e293b !important;
+      --sidebar-primary: #1e3a5f !important;
+      --sidebar-primary-foreground: #ffffff !important;
+      --sidebar-accent: #e2e8f0 !important;
+      --sidebar-accent-foreground: #1e293b !important;
+      --sidebar-border: #e2e8f0 !important;
+      --sidebar-ring: #94a3b8 !important;
+      --chart-1: #3b82f6 !important;
+      --chart-2: #10b981 !important;
+      --chart-3: #f59e0b !important;
+      --chart-4: #8b5cf6 !important;
+      --chart-5: #ef4444 !important;
+    }
+  `;
+  doc.head.appendChild(safeVars);
 }
 
 async function captureDivAsPdfBlob(
@@ -49,13 +92,13 @@ async function captureDivAsPdfBlob(
   const CONTENT_W_MM = A4_W_MM - MARGIN_MM * 2;
 
   const canvas = await html2canvas(el, {
-    scale: 2,
+    scale: 1.8,
     useCORS: true,
     backgroundColor: "#ffffff",
     logging: false,
     windowWidth: 1100,
-    onclone: (_clonedDoc, _element) => {
-      patchClonedDocument(_clonedDoc);
+    onclone: (clonedDoc: Document) => {
+      patchClonedDocument(clonedDoc);
     },
   });
 
@@ -158,23 +201,35 @@ export function usePdfExport() {
     companyName: string,
   ) {
     setExporting("zip");
+    const skipped: string[] = [];
     try {
       const zip = new JSZip();
       const folder = zip.folder(companyName.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g, "").trim()) || zip;
 
       for (const tab of tabs) {
-        if (!tab.ref.current) continue;
-        const blob = await captureDivAsPdfBlob(
-          tab.ref.current,
-          companyName,
-          tab.label,
-        );
-        folder.file(`${tab.id}_${tab.label.replace(/[/\\?%*:|"<>]/g, "-")}.pdf`, blob);
+        if (!tab.ref.current) {
+          skipped.push(tab.label);
+          continue;
+        }
+        try {
+          const blob = await captureDivAsPdfBlob(
+            tab.ref.current,
+            companyName,
+            tab.label,
+          );
+          folder.file(`${tab.id}_${tab.label.replace(/[/\\?%*:|"<>]/g, "-")}.pdf`, blob);
+        } catch (tabErr: unknown) {
+          console.error(`[ZIP] Error capturing tab "${tab.label}":`, tabErr);
+          skipped.push(tab.label);
+        }
       }
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const safeName = companyName.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
       saveAs(zipBlob, `ContabilGen_${safeName}.zip`);
+      if (skipped.length > 0) {
+        console.warn("[ZIP] Pestañas omitidas por error:", skipped.join(", "));
+      }
     } finally {
       setExporting(null);
     }
