@@ -90,7 +90,7 @@ sudo apt install -y git curl
 Ejecuta el instalador automático con un solo comando:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/innovafpiesmmg/ContabilGen-Pro/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/innovafpiesmmg/ContabilGen-Pro/master/install.sh | sudo bash
 ```
 
 El instalador se encarga de todo automáticamente:
@@ -107,7 +107,7 @@ El instalador se encarga de todo automáticamente:
 Si dispones de un token de Cloudflare Tunnel para acceso HTTPS:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/innovafpiesmmg/ContabilGen-Pro/main/install.sh | sudo CF_TOKEN="tu-token-aquí" bash
+curl -fsSL https://raw.githubusercontent.com/innovafpiesmmg/ContabilGen-Pro/master/install.sh | sudo CF_TOKEN="tu-token-aquí" bash
 ```
 
 ### Paso 3 — Configurar la aplicación
@@ -123,7 +123,7 @@ curl -fsSL https://raw.githubusercontent.com/innovafpiesmmg/ContabilGen-Pro/main
 Para actualizar a la última versión, ejecuta el mismo comando de instalación:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/innovafpiesmmg/ContabilGen-Pro/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/innovafpiesmmg/ContabilGen-Pro/master/install.sh | sudo bash
 ```
 
 El instalador detecta automáticamente que ya existe una instalación previa y:
