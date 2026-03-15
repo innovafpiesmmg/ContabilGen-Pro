@@ -287,7 +287,7 @@ ${sc}
 
 PERÍODO: ${periodStart} a ${periodEnd} (${numMonths} mes${numMonths > 1 ? "es" : ""})
 RÉGIMEN FISCAL: ${params.taxRegime} (general ${rates.standard}%, reducido ${rates.reduced}%)
-SECTOR: ${params.sector}
+SECTOR: ${getActivityLabel(params)}
 
 ══ REGLAS SECTORIALES ══
 ${sectorCtx.inventoryNote}
@@ -843,7 +843,7 @@ ${quarterLines},
     sections.push(`"mortgage": {
     "entity": "${String(scenario.bankEntity ?? "CaixaBank")}",
     "loanNumber": "HIP-${params.year}-001",
-    "propertyDescription": "Local comercial sector ${params.sector}",
+    "propertyDescription": "Local comercial ${getActivityLabel(params)}",
     "propertyValue": ${Math.round(mp * 1.4)},
     "principal": ${mp}, "annualRate": ${mr}, "termMonths": ${mt},
     "startDate": "${fin.mortgageStartDate ?? periodStart}",
@@ -930,7 +930,7 @@ ${quarterLines},
 ESCENARIO (usa estos datos para coherencia):
 ${sc}
 
-PERÍODO: ${periodStart} a ${periodEnd} | SECTOR: ${params.sector} | ${params.taxRegime} general ${rates.standard}%
+PERÍODO: ${periodStart} a ${periodEnd} | SECTOR: ${getActivityLabel(params)} | ${params.taxRegime} general ${rates.standard}%
 ${levelNote}
 
 Genera exactamente este JSON (todas las fechas dentro de ${periodStart}–${periodEnd}):
@@ -1067,7 +1067,7 @@ async function generateEquityBlock(
 ESCENARIO:
 ${sc}
 
-PERÍODO: ${periodStart} a ${periodEnd} | RÉGIMEN: ${params.taxRegime} | SECTOR: ${params.sector}
+PERÍODO: ${periodStart} a ${periodEnd} | RÉGIMEN: ${params.taxRegime} | SECTOR: ${getActivityLabel(params)}
 
 Genera exactamente este JSON con datos coherentes con el escenario:
 {
@@ -1125,7 +1125,7 @@ EMPRESA: ${sc}
 PERÍODO: ${periodStart} a ${periodEnd}
 NIVEL: ${level === "Superior" ? "FP Grado Superior (incluye periodificaciones, ajustes de ejercicio)" : "FP Grado Medio"}
 
-SECTOR ${params.sector.toUpperCase()} — CUENTAS OBLIGATORIAS:
+SECTOR ${getActivityLabel(params).toUpperCase()} — CUENTAS OBLIGATORIAS:
 - Ventas: cuenta ${sectorCtxJ.saleAccount.code} (${sectorCtxJ.saleAccount.name}) — NO usar 700 si el sector es Servicios o Hostelería
 - Compras: cuenta ${sectorCtxJ.purchaseAccount.code} (${sectorCtxJ.purchaseAccount.name})
 ${params.sector === "Servicios" ? "- Esta empresa NO vende bienes físicos — los asientos de ventas deben reflejar servicios prestados (705)" : ""}
