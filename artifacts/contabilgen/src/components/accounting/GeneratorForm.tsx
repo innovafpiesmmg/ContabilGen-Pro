@@ -122,7 +122,7 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      taxRegime: "IVA",
+      taxRegime: "IGIC",
       sector: "Comercio",
       complexity: "Avanzado",
       year: currentYear,
@@ -133,7 +133,7 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
       includeSocialSecurity: true,
       includeTaxLiquidation: true,
       includeBankLoan: true,
-      includeMortgage: false,
+      includeMortgage: true,
       includeCreditPolicy: true,
       includeFixedAssets: true,
       includeShareholdersInfo: true,
