@@ -17,6 +17,7 @@ import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 import AdminUsersPage from "@/pages/admin/users";
 import AdminEmailConfigPage from "@/pages/admin/email-config";
+import LandingPage from "@/pages/landing";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -84,9 +85,12 @@ function AppContent() {
             </Route>
           </Switch>
         ) : (
-          <Route>
-            <LoginPage />
-          </Route>
+          <Switch>
+            <Route path="/" component={LandingPage} />
+            <Route>
+              <LandingPage />
+            </Route>
+          </Switch>
         )}
       </Switch>
     </WouterRouter>
