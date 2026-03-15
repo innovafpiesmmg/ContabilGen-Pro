@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "JHAfQU__sAPCaE6zlsPr1"
+uri = "file://README.md"
+type = "text"
+title = "README.md — ContabilGen Pro"
