@@ -752,7 +752,7 @@ async function generateJournalBlock(
 ) {
   const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
   const opsPerMonth = params.operationsPerMonth ?? 8;
-  const targetEntries = Math.min(opsPerMonth * numMonths, 20);
+  const targetEntries = Math.min(opsPerMonth * numMonths, 60);
   const level = params.educationLevel ?? "Medio";
 
   const sc = JSON.stringify({
@@ -822,7 +822,7 @@ REGLAS CRÍTICAS:
 - SÉ CONCISO: description de cada línea en máximo 4 palabras
 - Máximo 3 líneas de débito y 3 de crédito por asiento`;
 
-  return await callAI(client, model, prompt, 4000) as Record<string, unknown>;
+  return await callAI(client, model, prompt, 7000) as Record<string, unknown>;
 }
 
 // ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
