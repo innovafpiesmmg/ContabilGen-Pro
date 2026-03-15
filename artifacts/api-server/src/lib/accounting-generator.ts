@@ -233,23 +233,21 @@ async function generateCommercialBlock(
   const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
   const sc = JSON.stringify(scenario, null, 0);
   const sectorCtx = getSectorContext(params.sector, params.taxRegime);
-  const invoiceCount = Math.min(Math.max(Math.ceil((params.operationsPerMonth ?? 8) * numMonths * 0.3), numMonths * 2), 12);
 
-  const prompt = `Genera el BLOQUE COMERCIAL del universo contable usando este escenario:
+  const prompt = `Genera el PERFIL COMERCIAL del universo contable usando este escenario:
 ${sc}
 
 PERÍODO: ${periodStart} a ${periodEnd} (${numMonths} mes${numMonths > 1 ? "es" : ""})
 RÉGIMEN FISCAL: ${params.taxRegime} (general ${rates.standard}%, reducido ${rates.reduced}%)
 SECTOR: ${params.sector}
 
-══ REGLAS SECTORIALES OBLIGATORIAS ══
+══ REGLAS SECTORIALES ══
 ${sectorCtx.inventoryNote}
-${sectorCtx.invoiceNote}
 Proveedores: ${sectorCtx.purchaseSuppliersLabel}
 Clientes: ${sectorCtx.clientsLabel}
-══════════════════════════════════════
+══════════════════════
 
-Genera exactamente este JSON con datos reales y coherentes con el escenario:
+Genera exactamente este JSON (SIN facturas — se generan aparte):
 {
   "companyProfile": {
     "name": "(del escenario)",
@@ -265,53 +263,117 @@ Genera exactamente este JSON con datos reales y coherentes con el escenario:
   },
   "inventory": {
     "initialInventory": [
-      {"code": "P001", "description": "producto/material/consumible apropiado al sector", "quantity": 100, "unitCost": 12.50, "totalCost": 1250.00, "accountCode": "(según sector)"},
-      {"code": "P002", "description": "...", "quantity": 50, "unitCost": 25.00, "totalCost": 1250.00, "accountCode": "(según sector)"}
+      {"code": "P001", "description": "apropiado al sector", "quantity": 100, "unitCost": 12.50, "totalCost": 1250.00, "accountCode": "300"},
+      {"code": "P002", "description": "...", "quantity": 50, "unitCost": 25.00, "totalCost": 1250.00, "accountCode": "300"}
     ],
     "finalInventory": [
-      {"code": "P001", "description": "...", "quantity": 70, "unitCost": 12.50, "totalCost": 875.00, "accountCode": "(según sector)"},
-      {"code": "P002", "description": "...", "quantity": 30, "unitCost": 25.00, "totalCost": 750.00, "accountCode": "(según sector)"}
+      {"code": "P001", "description": "...", "quantity": 70, "unitCost": 12.50, "totalCost": 875.00, "accountCode": "300"},
+      {"code": "P002", "description": "...", "quantity": 30, "unitCost": 25.00, "totalCost": 750.00, "accountCode": "300"}
     ],
     "initialTotal": 2500.00,
     "finalTotal": 1625.00,
     "stockVariation": -875.00
   },
   "suppliers": [
+    {"name": "...", "nif": "...", "address": "...", "city": "...", "accountCode": "400"},
     {"name": "...", "nif": "...", "address": "...", "city": "...", "accountCode": "400"}
   ],
   "clients": [
+    {"name": "...", "nif": "...", "address": "...", "city": "...", "accountCode": "430"},
     {"name": "...", "nif": "...", "address": "...", "city": "...", "accountCode": "430"}
-  ],
-  "invoices": [
-    {
-      "invoiceNumber": "F-${params.year}/001",
-      "date": "YYYY-MM-DD (dentro del período)",
-      "type": "purchase o sale según corresponda",
-      "partyName": "nombre real del proveedor o cliente del escenario",
-      "partyNif": "...",
-      "lines": [{"description": "descripción del servicio/producto apropiado al sector", "quantity": 1, "unitPrice": 500.00, "discount": 0, "subtotal": 500.00, "taxRate": ${rates.standard}, "taxAmount": ${rates.standard * 5}, "total": ${500 + rates.standard * 5}}],
-      "subtotal": 500.00,
-      "taxBase": 500.00,
-      "taxAmount": ${rates.standard * 5},
-      "total": ${500 + rates.standard * 5},
-      "paymentMethod": "transfer",
-      "dueDate": "YYYY-MM-DD",
-      "journalNote": "Explicación contable con cuentas PGC correctas para ${params.sector}",
-      "accountDebits": [{"accountCode": "${sectorCtx.purchaseAccount.code}", "accountName": "${sectorCtx.purchaseAccount.name}", "amount": 500.00, "description": "según tipo de factura"}],
-      "accountCredits": [{"accountCode": "400", "accountName": "Proveedores / Clientes", "amount": ${500 + rates.standard * 5}, "description": "según tipo de factura"}]
-    }
   ]
 }
 
-REGLAS CRÍTICAS:
-- SECTOR ${params.sector.toUpperCase()}: respeta ESTRICTAMENTE las cuentas PGC indicadas — ventas en ${sectorCtx.saleAccount.code} (${sectorCtx.saleAccount.name}), compras en ${sectorCtx.purchaseAccount.code} (${sectorCtx.purchaseAccount.name})
-- FACTURAS: genera exactamente ${invoiceCount} facturas (mezcla de compras y ventas, al menos 2 de cada tipo), DISTRIBUIDAS en todos los meses del período
-- Todas las fechas dentro del período ${periodStart}–${periodEnd}
-- Cálculos de ${params.taxRegime} exactos
-- Importes realistas para el sector ${params.sector}
-- Usa nombres/NIF exactos del escenario para proveedores y clientes`;
+Importes realistas para sector ${params.sector}. Usa datos del escenario.`;
 
-  return await callAI(client, model, prompt, 6000) as Record<string, unknown>;
+  return await callAI(client, model, prompt, 2500) as Record<string, unknown>;
+}
+
+// ─── CALL 2A-MONTHLY: INVOICES PER MONTH ──────────────────────────────────────
+function getMonthsInPeriod(params: GenerateParams) {
+  const { periodStart, periodEnd } = getPeriodInfo(params);
+  const [sy, sm] = periodStart.split("-").map(Number);
+  const [ey, em] = periodEnd.split("-").map(Number);
+  const months: Array<{ start: string; end: string; label: string; numStr: string }> = [];
+  let cy = sy, cm = sm;
+  while (cy < ey || (cy === ey && cm <= em)) {
+    const mm = String(cm).padStart(2, "0");
+    const lastDay = new Date(cy, cm, 0).getDate();
+    months.push({
+      start: `${cy}-${mm}-01`,
+      end: `${cy}-${mm}-${lastDay}`,
+      label: `${MONTHS_ES[cm - 1].charAt(0).toUpperCase() + MONTHS_ES[cm - 1].slice(1)} ${cy}`,
+      numStr: `${cy}${mm}`,
+    });
+    cm++;
+    if (cm > 12) { cm = 1; cy++; }
+  }
+  return months;
+}
+
+async function generateMonthlyInvoices(
+  params: GenerateParams,
+  scenario: Record<string, unknown>,
+  client: OpenAI,
+  model: string,
+  monthStart: string,
+  monthEnd: string,
+  monthLabel: string,
+  monthNumStr: string,
+  invoicesPerMonth: number,
+  invoiceStartNum: number,
+): Promise<{ invoices: unknown[] }> {
+  const rates = TAX_RATES[params.taxRegime];
+  const sectorCtx = getSectorContext(params.sector, params.taxRegime);
+  const sc = JSON.stringify({
+    companyName: scenario.companyName,
+    nif: scenario.nif,
+    suppliers: scenario.suppliers,
+    clients: scenario.clients,
+    sector: params.sector,
+  }, null, 0);
+
+  const nums = Array.from({ length: invoicesPerMonth }, (_, i) =>
+    `F-${params.year}/${String(invoiceStartNum + i).padStart(3, "0")}`
+  ).join(", ");
+
+  const prompt = `Genera ${invoicesPerMonth} facturas del mes de ${monthLabel} para una empresa del sector ${params.sector}.
+
+EMPRESA: ${sc}
+MES: ${monthLabel} (fechas entre ${monthStart} y ${monthEnd})
+RÉGIMEN: ${params.taxRegime} (IVA general ${rates.standard}%, reducido ${rates.reduced}%)
+NÚMEROS DE FACTURA: ${nums}
+
+${sectorCtx.invoiceNote}
+
+Genera exactamente este JSON:
+{"invoices": [
+  {
+    "invoiceNumber": "${`F-${params.year}/${String(invoiceStartNum).padStart(3, "0")}`}",
+    "date": "YYYY-MM-DD (en ${monthLabel})",
+    "type": "purchase o sale",
+    "partyName": "nombre proveedor/cliente",
+    "partyNif": "...",
+    "lines": [{"description": "descripción apropiada al sector", "quantity": 1, "unitPrice": 500.00, "discount": 0, "subtotal": 500.00, "taxRate": ${rates.standard}, "taxAmount": ${rates.standard * 5}, "total": ${500 + rates.standard * 5}}],
+    "subtotal": 500.00,
+    "taxBase": 500.00,
+    "taxAmount": ${rates.standard * 5},
+    "total": ${500 + rates.standard * 5},
+    "paymentMethod": "transfer",
+    "dueDate": "YYYY-MM-DD",
+    "journalNote": "Asiento: ${sectorCtx.saleAccount.code}/${sectorCtx.purchaseAccount.code} con IVA",
+    "accountDebits": [{"accountCode": "${sectorCtx.purchaseAccount.code}", "accountName": "${sectorCtx.purchaseAccount.name}", "amount": 500.00, "description": "..."}],
+    "accountCredits": [{"accountCode": "400", "accountName": "Proveedores", "amount": ${500 + rates.standard * 5}, "description": "..."}]
+  }
+]}
+
+REGLAS:
+- Genera exactamente ${invoicesPerMonth} facturas, mezcla compras y ventas (al menos 1 de cada tipo si ${invoicesPerMonth} >= 2)
+- Sector ${params.sector.toUpperCase()}: ventas → cta ${sectorCtx.saleAccount.code}, compras → cta ${sectorCtx.purchaseAccount.code}
+- Usa los números de factura asignados: ${nums}
+- Importes variados y realistas para el sector`;
+
+  return await callAI(client, model, prompt, 2000) as { invoices: unknown[] };
 }
 
 // ─── CALL 2B: BANKING & INSURANCE BLOCK ───────────────────────────────────────
@@ -834,6 +896,23 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     params.includeShareholderAccounts !== false ||
     (params.includeDividends !== false && params.isNewCompany !== true);
 
+  // Compute per-month invoice count (2–5 based on operationsPerMonth)
+  const opsPerMonth = params.operationsPerMonth ?? 8;
+  const invoicesPerMonth = Math.max(2, Math.min(Math.ceil(opsPerMonth * 0.35), 5));
+
+  // Build monthly invoice promises (one small AI call per month, all in parallel)
+  const months = getMonthsInPeriod(params);
+  let invoiceNum = 1;
+  const monthlyInvoicePromises = months.map((m) => {
+    const startNum = invoiceNum;
+    invoiceNum += invoicesPerMonth;
+    return generateMonthlyInvoices(
+      params, scenario, client, model,
+      m.start, m.end, m.label, m.numStr,
+      invoicesPerMonth, startNum,
+    );
+  });
+
   const blockPromises: Promise<Record<string, unknown>>[] = [
     generateCommercialBlock(params, scenario, client, model),
     generateBankingBlock(params, scenario, client, model),
@@ -844,7 +923,11 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     blockPromises.push(generateEquityBlock(params, scenario, client, model));
   }
 
-  const blocks = await Promise.all(blockPromises);
+  // Run all blocks + monthly invoice calls in parallel
+  const [blocks, monthlyResults] = await Promise.all([
+    Promise.all(blockPromises),
+    Promise.all(monthlyInvoicePromises),
+  ]);
 
   // Phase 3: Merge all blocks into one universe object
   const universe: Record<string, unknown> = {};
@@ -853,6 +936,15 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
       Object.assign(universe, block);
     }
   }
+
+  // Merge all monthly invoices into a single sorted array
+  const allInvoices: unknown[] = [];
+  for (const result of monthlyResults) {
+    if (result?.invoices && Array.isArray(result.invoices)) {
+      allInvoices.push(...result.invoices);
+    }
+  }
+  universe.invoices = allInvoices;
 
   return universe;
 }
