@@ -1,12 +1,39 @@
 import { Resend } from "resend";
+import { db, appSettingsTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 let resend: Resend | null = null;
+let cachedApiKey: string | null = null;
 
-function getResend(): Resend | null {
-  const apiKey = process.env.RESEND_API_KEY;
+async function getResend(): Promise<{ client: Resend; from: string } | null> {
+  // Check DB first, fall back to env var
+  let apiKey = process.env.RESEND_API_KEY ?? null;
+  let emailFrom = process.env.EMAIL_FROM ?? null;
+
+  try {
+    const rows = await db.select().from(appSettingsTable).where(
+      eq(appSettingsTable.key, "resend_api_key"),
+    );
+    const fromRows = await db.select().from(appSettingsTable).where(
+      eq(appSettingsTable.key, "email_from"),
+    );
+    if (rows[0]?.value) apiKey = rows[0].value;
+    if (fromRows[0]?.value) emailFrom = fromRows[0].value;
+  } catch {
+    // DB read failed, use env var
+  }
+
   if (!apiKey) return null;
-  if (!resend) resend = new Resend(apiKey);
-  return resend;
+
+  if (apiKey !== cachedApiKey) {
+    resend = new Resend(apiKey);
+    cachedApiKey = apiKey;
+  }
+
+  return {
+    client: resend!,
+    from: emailFrom ?? "ContabilGen Pro <noreply@contabilgen.app>",
+  };
 }
 
 function getAppUrl(req: { headers: Record<string, string | string[] | undefined> }): string {
@@ -23,16 +50,16 @@ export async function sendPasswordResetEmail(
   const appUrl = getAppUrl({ headers: reqHeaders });
   const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
 
-  const client = getResend();
+  const resendConfig = await getResend();
 
-  if (!client) {
+  if (!resendConfig) {
     console.warn("[email] RESEND_API_KEY not set — logging reset link to console:");
     console.warn(`[email] Reset link for ${to}: ${resetUrl}`);
     return;
   }
 
-  await client.emails.send({
-    from: process.env.EMAIL_FROM ?? "ContabilGen Pro <noreply@contabilgen.app>",
+  await resendConfig.client.emails.send({
+    from: resendConfig.from,
     to,
     subject: "Restablece tu contraseña — ContabilGen Pro",
     html: `

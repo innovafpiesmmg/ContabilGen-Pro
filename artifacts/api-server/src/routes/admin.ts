@@ -1,0 +1,137 @@
+import { Router, type IRouter, type Request, type Response } from "express";
+import { db, usersTable, appSettingsTable } from "@workspace/db";
+import { eq, ne } from "drizzle-orm";
+import { adminMiddleware } from "../middlewares/adminMiddleware";
+import { hashPassword } from "../lib/auth";
+
+const router: IRouter = Router();
+
+router.use(adminMiddleware);
+
+// ─── Users ───────────────────────────────────────────────────────────────────
+
+router.get("/admin/users", async (_req: Request, res: Response): Promise<void> => {
+  const users = await db
+    .select({
+      id: usersTable.id,
+      email: usersTable.email,
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      isAdmin: usersTable.isAdmin,
+      createdAt: usersTable.createdAt,
+    })
+    .from(usersTable)
+    .orderBy(usersTable.createdAt);
+  res.json({ users });
+});
+
+router.patch("/admin/users/:id", async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+  const { isAdmin, firstName, lastName, newPassword } = req.body ?? {};
+
+  if (id === req.user!.id) {
+    res.status(400).json({ error: "No puedes modificar tu propio rol desde el panel de administración." });
+    return;
+  }
+
+  const updates: Record<string, unknown> = {};
+  if (typeof isAdmin === "boolean") updates.isAdmin = isAdmin;
+  if (typeof firstName === "string") updates.firstName = firstName;
+  if (typeof lastName === "string") updates.lastName = lastName;
+  if (typeof newPassword === "string" && newPassword.length >= 8) {
+    updates.passwordHash = await hashPassword(newPassword);
+  }
+
+  if (Object.keys(updates).length === 0) {
+    res.status(400).json({ error: "No se proporcionaron campos para actualizar." });
+    return;
+  }
+
+  const [updated] = await db
+    .update(usersTable)
+    .set(updates)
+    .where(eq(usersTable.id, id))
+    .returning({
+      id: usersTable.id,
+      email: usersTable.email,
+      firstName: usersTable.firstName,
+      lastName: usersTable.lastName,
+      isAdmin: usersTable.isAdmin,
+      createdAt: usersTable.createdAt,
+    });
+
+  if (!updated) {
+    res.status(404).json({ error: "Usuario no encontrado." });
+    return;
+  }
+
+  res.json({ user: updated });
+});
+
+router.delete("/admin/users/:id", async (req: Request, res: Response): Promise<void> => {
+  const { id } = req.params;
+
+  if (id === req.user!.id) {
+    res.status(400).json({ error: "No puedes eliminar tu propia cuenta desde el panel de administración." });
+    return;
+  }
+
+  const deleted = await db.delete(usersTable).where(eq(usersTable.id, id)).returning({ id: usersTable.id });
+  if (!deleted.length) {
+    res.status(404).json({ error: "Usuario no encontrado." });
+    return;
+  }
+
+  res.json({ success: true });
+});
+
+// ─── Email Config ─────────────────────────────────────────────────────────────
+
+const EMAIL_KEYS = ["resend_api_key", "email_from"] as const;
+
+router.get("/admin/email-config", async (_req: Request, res: Response): Promise<void> => {
+  const rows = await db.select().from(appSettingsTable);
+  const config: Record<string, string> = {};
+  for (const row of rows) {
+    if ((EMAIL_KEYS as readonly string[]).includes(row.key)) {
+      config[row.key] = row.value;
+    }
+  }
+  // Mask the API key
+  if (config.resend_api_key) {
+    const key = config.resend_api_key;
+    config.resend_api_key_masked = key.length > 8
+      ? `${key.slice(0, 4)}${"•".repeat(key.length - 8)}${key.slice(-4)}`
+      : "•".repeat(key.length);
+    config.resend_api_key_set = "true";
+    delete config.resend_api_key;
+  }
+  res.json({ config });
+});
+
+router.put("/admin/email-config", async (req: Request, res: Response): Promise<void> => {
+  const { resend_api_key, email_from } = req.body ?? {};
+
+  if (resend_api_key && typeof resend_api_key === "string") {
+    await db
+      .insert(appSettingsTable)
+      .values({ key: "resend_api_key", value: resend_api_key })
+      .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: resend_api_key } });
+  }
+
+  if (email_from && typeof email_from === "string") {
+    await db
+      .insert(appSettingsTable)
+      .values({ key: "email_from", value: email_from })
+      .onConflictDoUpdate({ target: appSettingsTable.key, set: { value: email_from } });
+  }
+
+  res.json({ success: true });
+});
+
+router.delete("/admin/email-config/key", async (_req: Request, res: Response): Promise<void> => {
+  await db.delete(appSettingsTable).where(eq(appSettingsTable.key, "resend_api_key"));
+  res.json({ success: true });
+});
+
+export default router;

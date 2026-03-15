@@ -5,6 +5,7 @@ export interface AuthUser {
   email: string;
   firstName: string | null;
   lastName: string | null;
+  isAdmin: boolean;
 }
 
 interface AuthContextValue {

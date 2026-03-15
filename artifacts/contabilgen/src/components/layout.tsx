@@ -12,7 +12,8 @@ import {
   ChevronRight,
   Settings,
   LogOut,
-  User
+  User,
+  Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useListGenerations, useDeleteGeneration } from "@workspace/api-client-react";
@@ -145,6 +146,14 @@ export default function Layout({ children }: LayoutProps) {
             <span className="font-semibold text-sm">Configuración</span>
           </Button>
         </Link>
+        {user?.isAdmin && (
+          <Link href="/admin/users" onClick={closeSidebar} className="block w-full">
+            <Button variant="ghost" className="w-full justify-start gap-2 rounded-xl text-primary hover:bg-primary/5 hover:text-primary">
+              <Shield className="w-5 h-5" />
+              <span className="font-semibold text-sm">Panel de administración</span>
+            </Button>
+          </Link>
+        )}
 
         <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-muted/40 border border-border/50">
           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">

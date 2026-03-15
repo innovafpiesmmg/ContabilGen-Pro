@@ -20,3 +20,4 @@
 export * from "./auth";
 export * from "./generations";
 export * from "./settings";
+export * from "./app-settings";

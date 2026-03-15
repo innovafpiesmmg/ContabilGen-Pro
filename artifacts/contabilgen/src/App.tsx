@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { Loader2 } from "lucide-react";
 
 import Layout from "@/components/layout";
+import AdminLayout from "@/components/admin-layout";
 import Dashboard from "@/pages/dashboard";
 import SavedUniverse from "@/pages/saved-universe";
 import SettingsPage from "@/pages/settings";
@@ -14,6 +15,8 @@ import LoginPage from "@/pages/login";
 import RegisterPage from "@/pages/register";
 import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
+import AdminUsersPage from "@/pages/admin/users";
+import AdminEmailConfigPage from "@/pages/admin/email-config";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,6 +38,22 @@ function LoadingScreen() {
   );
 }
 
+function AdminSection() {
+  const { user } = useAuth();
+  if (!user?.isAdmin) return <LoginPage />;
+  return (
+    <AdminLayout>
+      <Switch>
+        <Route path="/admin/users" component={AdminUsersPage} />
+        <Route path="/admin/email" component={AdminEmailConfigPage} />
+        <Route>
+          <AdminUsersPage />
+        </Route>
+      </Switch>
+    </AdminLayout>
+  );
+}
+
 const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
 
 function AppContent() {
@@ -51,14 +70,19 @@ function AppContent() {
         <Route path="/reset-password" component={ResetPasswordPage} />
 
         {isAuthenticated ? (
-          <Layout>
-            <Switch>
-              <Route path="/" component={Dashboard} />
-              <Route path="/generations/:id" component={SavedUniverse} />
-              <Route path="/settings" component={SettingsPage} />
-              <Route component={NotFound} />
-            </Switch>
-          </Layout>
+          <Switch>
+            <Route path="/admin/:rest*" component={AdminSection} />
+            <Route>
+              <Layout>
+                <Switch>
+                  <Route path="/" component={Dashboard} />
+                  <Route path="/generations/:id" component={SavedUniverse} />
+                  <Route path="/settings" component={SettingsPage} />
+                  <Route component={NotFound} />
+                </Switch>
+              </Layout>
+            </Route>
+          </Switch>
         ) : (
           <Route>
             <LoginPage />

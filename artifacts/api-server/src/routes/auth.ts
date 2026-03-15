@@ -1,6 +1,6 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { db, usersTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import {
   hashPassword,
   verifyPassword,
@@ -54,19 +54,23 @@ router.post("/auth/register", async (req: Request, res: Response): Promise<void>
     return;
   }
 
+  const [{ total }] = await db.select({ total: count() }).from(usersTable);
+  const isFirstUser = total === 0;
+
   const passwordHash = await hashPassword(password);
   const [user] = await db.insert(usersTable).values({
     email: normalizedEmail,
     passwordHash,
     firstName: firstName?.trim() || null,
     lastName: lastName?.trim() || null,
+    isAdmin: isFirstUser,
   }).returning();
 
-  const sid = await createSession({ user: { id: user.id, email: user.email, firstName: user.firstName ?? null, lastName: user.lastName ?? null } });
+  const sid = await createSession({ user: { id: user.id, email: user.email, firstName: user.firstName ?? null, lastName: user.lastName ?? null, isAdmin: user.isAdmin } });
   setSessionCookie(res, sid);
 
   res.status(201).json({
-    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName },
+    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, isAdmin: user.isAdmin },
   });
 });
 
@@ -90,11 +94,11 @@ router.post("/auth/login", async (req: Request, res: Response): Promise<void> =>
     return;
   }
 
-  const sid = await createSession({ user: { id: user.id, email: user.email, firstName: user.firstName ?? null, lastName: user.lastName ?? null } });
+  const sid = await createSession({ user: { id: user.id, email: user.email, firstName: user.firstName ?? null, lastName: user.lastName ?? null, isAdmin: user.isAdmin } });
   setSessionCookie(res, sid);
 
   res.json({
-    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName },
+    user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName, isAdmin: user.isAdmin },
   });
 });
 

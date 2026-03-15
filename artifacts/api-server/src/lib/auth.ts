@@ -14,6 +14,7 @@ export interface SessionUser {
   email: string;
   firstName: string | null;
   lastName: string | null;
+  isAdmin: boolean;
 }
 
 export interface SessionData {
