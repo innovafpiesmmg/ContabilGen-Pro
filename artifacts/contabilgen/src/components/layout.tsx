@@ -16,7 +16,8 @@ import {
   Shield
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useListGenerations, useDeleteGeneration } from "@workspace/api-client-react";
+import { useListGenerations, useDeleteGeneration, getListGenerationsQueryKey } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth-context";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +32,7 @@ export default function Layout({ children }: LayoutProps) {
   const [location, setLocation] = useLocation();
   const { data: generations, isLoading } = useListGenerations();
   const deleteMutation = useDeleteGeneration();
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user, logout } = useAuth();
 
@@ -42,6 +44,7 @@ export default function Layout({ children }: LayoutProps) {
     if (confirm("¿Estás seguro de que deseas eliminar este universo contable?")) {
       try {
         await deleteMutation.mutateAsync({ id });
+        queryClient.invalidateQueries({ queryKey: getListGenerationsQueryKey() });
         toast({ title: "Universo eliminado", description: "El universo se ha eliminado correctamente." });
         if (location === `/generations/${id}`) {
           setLocation("/");
