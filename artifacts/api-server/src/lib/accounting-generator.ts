@@ -412,12 +412,34 @@ async function generateInsuranceCasualty(
 ) {
   const { periodStart, periodEnd } = getPeriodInfo(params);
 
+  // Insurance: policy paid at period start, covers 12 months. The part beyond periodEnd goes to cta 480 (prepaid).
+  // Example: policy Jan 2025 paid Jan 2025, covers Jan 2025–Dec 2025 → no prepaid if period is full year.
+  // But typical multi-risk policy often starts in first month and covers 12 months straddling two fiscal years.
+  // For FP exercises: policy startDate = 2 months into period, endDate = start + 12 months → generates 480.
+  const [pInsY, pInsM] = periodStart.split("-").map(Number);
+  const insStartM = ((pInsM - 1 + 1) % 12) + 1; // start 1 month into period
+  const insStartY = pInsY + Math.floor((pInsM - 1 + 1) / 12);
+  const insEndM = ((insStartM - 1 + 11) % 12) + 1; // end 11 months later (12-month policy)
+  const insEndY = insStartY + Math.floor((insStartM - 1 + 11) / 12);
+  const insStartStr = `${insStartY}-${String(insStartM).padStart(2,"0")}-01`;
+  const insEndLastDay = new Date(insEndY, insEndM, 0).getDate();
+  const insEndStr = `${insEndY}-${String(insEndM).padStart(2,"0")}-${insEndLastDay}`;
+  // Months of policy within current period vs next
+  const periodEndDate = new Date(periodEnd);
+  const insEndDate = new Date(insEndStr);
+  const insStartDate = new Date(insStartStr);
+  const totalPolicyDays = (insEndDate.getTime() - insStartDate.getTime()) / 86400000 + 1;
+  const daysInPeriod = Math.max(0, (Math.min(periodEndDate.getTime(), insEndDate.getTime()) - insStartDate.getTime()) / 86400000 + 1);
+  const annualPremium = 1800;
+  const expenseCurrentPeriod = Math.round(annualPremium * daysInPeriod / totalPolicyDays);
+  const prepaidNextPeriod = annualPremium - expenseCurrentPeriod;
+
   const prompt = `Genera seguros y siniestro para "${scenario.companyName}" (${params.sector}), período ${periodStart}–${periodEnd}.
 
 JSON exacto:
-{"insurancePolicies":[{"policyNumber":"SEG-${params.year}-001","insurer":"Mapfre Seguros","type":"Seguro multirriesgo","annualPremium":1800.00,"startDate":"${periodStart}","endDate":"${periodEnd}","prepaidExpense":900.00,"journalNote":"Prima anual; parte siguiente ejercicio en cta 480.","accountDebits":[{"accountCode":"625","accountName":"Primas de seguros","amount":900.00,"description":"Parte ${params.year}"},{"accountCode":"480","accountName":"Gastos anticipados","amount":900.00,"description":"Parte ${params.year + 1}"}],"accountCredits":[{"accountCode":"572","accountName":"Bancos","amount":1800.00,"description":"Pago prima"}]}],"casualtyEvent":{"date":"${periodStart.slice(0,7)}-15","description":"Incendio en almacén","assetAffected":"Equipo informático","bookValue":5000.00,"insuranceCompensation":3500.00,"netLoss":1500.00,"journalNote":"678 (pérdida) y 430 (indemnización a cobrar) contra 300/202 (baja bien) y 778 (ingreso excepcional).","accountDebits":[{"accountCode":"678","accountName":"Gastos excepcionales","amount":5000.00,"description":"Baja bien siniestrado"},{"accountCode":"430","accountName":"Clientes (seguro)","amount":3500.00,"description":"Indemnización a cobrar"}],"accountCredits":[{"accountCode":"216","accountName":"Mobiliario","amount":5000.00,"description":"Baja por siniestro"},{"accountCode":"778","accountName":"Ingresos excepcionales","amount":3500.00,"description":"Indemnización seguro"}]}}
+{"insurancePolicies":[{"policyNumber":"SEG-${params.year}-001","insurer":"Mapfre Seguros","type":"Seguro multirriesgo","annualPremium":${annualPremium}.00,"startDate":"${insStartStr}","endDate":"${insEndStr}","expenseCurrentPeriod":${expenseCurrentPeriod}.00,"prepaidNextPeriod":${prepaidNextPeriod}.00,"journalNote":"Póliza ${insStartStr}–${insEndStr}. Prima total ${annualPremium}€ pagada al contado. Parte corriente (${expenseCurrentPeriod}€) → cta 625 (Primas de seguros). Parte anticipada del próximo ejercicio (${prepaidNextPeriod}€) → cta 480 (Gastos anticipados). Ajuste de periodificación obligatorio por PGC.","accountDebits":[{"accountCode":"625","accountName":"Primas de seguros","amount":${expenseCurrentPeriod}.00,"description":"Prima seguro multirriesgo ${params.year}"},{"accountCode":"480","accountName":"Gastos anticipados","amount":${prepaidNextPeriod}.00,"description":"Parte prima ${params.year + 1} (periodificación)"}],"accountCredits":[{"accountCode":"572","accountName":"Bancos","amount":${annualPremium}.00,"description":"Pago prima seguro"}]}],"casualtyEvent":{"date":"${periodStart.slice(0,7)}-15","description":"Incendio parcial en almacén — daños en equipos informáticos","assetAffected":"Equipos para procesos de información","bookValue":5000.00,"insuranceCompensation":3500.00,"netLoss":1500.00,"journalNote":"Siniestro: baja del bien (cta 217 Equipos informáticos) y su amortización acumulada (2817). Pérdida neta → 678 (Pérdidas por siniestros). Indemnización aseguradora → 430 (Clientes, cobro pendiente) y 778 (Ingresos excepcionales) al haber.","accountDebits":[{"accountCode":"678","accountName":"Pérdidas procedentes del inmovilizado material","amount":1500.00,"description":"Pérdida neta siniestro"},{"accountCode":"2817","accountName":"Amort. acum. equipos informáticos","amount":3500.00,"description":"Amortización acumulada baja"},{"accountCode":"430","accountName":"Clientes — aseguradora","amount":3500.00,"description":"Indemnización a cobrar Mapfre"}],"accountCredits":[{"accountCode":"217","accountName":"Equipos para procesos de información","amount":5000.00,"description":"Baja por siniestro — valor contable bruto"},{"accountCode":"778","accountName":"Ingresos excepcionales","amount":3500.00,"description":"Indemnización seguro reconocida"}]}}
 
-Adapta datos al sector ${params.sector} y al período. 1-2 pólizas de seguro realistas.`;
+Adapta descripción y sector ${params.sector}. 1-2 pólizas de seguro realistas con periodificación (cta 480).`;
 
   return await callAI(client, model, prompt, 2000) as Record<string, unknown>;
 }
@@ -457,8 +479,14 @@ async function generateOperationsBlock(
   const sections: string[] = [];
 
   if (withPayroll) {
+    // Nómina: devengada último día del mes, pagada ese mismo día (o primero del siguiente)
+    const { periodStart: ps } = getPeriodInfo(params);
+    const [psy, psm] = ps.split("-").map(Number);
+    const payLastDay = new Date(psy, psm, 0).getDate();
+    const payDate = `${psy}-${String(psm).padStart(2,"0")}-${payLastDay}`;
     sections.push(`"payroll": {
     "month": "${midMonthLabel}",
+    "paymentDate": "${payDate}",
     "employees": [
       {
         "name": "(nombre del empleado del escenario)",
@@ -475,9 +503,9 @@ async function generateOperationsBlock(
       }
     ],
     "totalGross": X, "totalIrpf": X, "totalSsEmployee": X, "totalNetSalary": X, "totalSsEmployer": X, "totalLaborCost": X,
-    "journalNote": "Nómina: 640 (sueldos) y 642 (SS empresa) al debe; 465 (salarios netos), 4751 (IRPF retenido), 476 (SS total) al haber.",
-    "accountDebits": [{"accountCode":"640","accountName":"Sueldos y salarios","amount":X,"description":"Nómina mes"},{"accountCode":"642","accountName":"SS a cargo empresa","amount":X,"description":"Cuota patronal"}],
-    "accountCredits": [{"accountCode":"465","accountName":"Remuneraciones pendientes","amount":X,"description":"Salario neto"},{"accountCode":"4751","accountName":"HP acreedora IRPF","amount":X,"description":"Retención IRPF"},{"accountCode":"476","accountName":"Organismos SS acreedores","amount":X,"description":"SS total mes"}]
+    "journalNote": "Nómina devengada y pagada el ${payDate}. 640 (sueldos) y 642 (SS empresa) al debe; 465 cancelada con 572 (pago neto), 4751 (IRPF pendiente Mod.111), 476 (SS pendiente TC1) al haber.",
+    "accountDebits": [{"accountCode":"640","accountName":"Sueldos y salarios","amount":X,"description":"Nómina ${midMonthLabel}"},{"accountCode":"642","accountName":"SS a cargo empresa","amount":X,"description":"Cuota patronal ${midMonthLabel}"}],
+    "accountCredits": [{"accountCode":"465","accountName":"Remuneraciones pendientes","amount":X,"description":"Salario neto a pagar"},{"accountCode":"4751","accountName":"HP acreedora IRPF retenciones","amount":X,"description":"Retención IRPF Mod.111"},{"accountCode":"476","accountName":"Organismos SS acreedores","amount":X,"description":"SS total cuota ${midMonthLabel}"}]
   }`);
   }
 
@@ -541,9 +569,17 @@ async function generateOperationsBlock(
       "model": "${taxModel}", "period": "${q.label}",
       "quarterStart": "${q.start}", "quarterEnd": "${q.end}", "dueDate": "${q.dueDate}",
       "taxableBase": X, "outputTax": X, "inputTax": X, "result": X, "paymentType": "ingreso",
-      "journalNote": "Liquidación Mod.${taxModel} ${taxName} ${q.label}: 477 (repercutido) menos 472 (soportado) = cuota (4750).",
-      "accountDebits": [{"accountCode":"477","accountName":"${taxName} repercutido","amount":X,"description":"${taxName} devengado ${q.label}"}],
-      "accountCredits": [{"accountCode":"472","accountName":"${taxName} soportado","amount":X,"description":"${taxName} deducible"},{"accountCode":"4750","accountName":"HP acreedora por ${taxName}","amount":X,"description":"Cuota ${q.label}"}]
+      "journalNote": "Liquidación Mod.${taxModel} ${taxName} ${q.label} (vencimiento ${q.dueDate}): 477 (repercutido) menos 472 (soportado) = cuota (4750). Pago domiciliado en Bancos (572).",
+      "accountDebits": [{"accountCode":"477","accountName":"${taxName} repercutido","amount":X,"description":"${taxName} devengado ${q.label}"},{"accountCode":"472","accountName":"${taxName} soportado","amount":X,"description":"${taxName} deducible ${q.label}"}],
+      "accountCredits": [{"accountCode":"4750","accountName":"HP acreedora por ${taxName}","amount":X,"description":"Cuota neta ${q.label}"},{"accountCode":"572","accountName":"Bancos c/c","amount":X,"description":"Pago Mod.${taxModel} ${q.label}"}]
+    },
+    {
+      "model": "111", "period": "${q.label}",
+      "quarterStart": "${q.start}", "quarterEnd": "${q.end}", "dueDate": "${q.dueDate}",
+      "taxableBase": X, "outputTax": X, "inputTax": 0, "result": X, "paymentType": "ingreso",
+      "journalNote": "Mod.111 IRPF retenciones ${q.label} (vencimiento ${q.dueDate}): liquidación de retenciones sobre rendimientos del trabajo (nóminas) e IRPF de administradores. 4751 al debe, 572 al haber.",
+      "accountDebits": [{"accountCode":"4751","accountName":"HP acreedora IRPF retenciones","amount":X,"description":"Retenciones nóminas + admin ${q.label}"}],
+      "accountCredits": [{"accountCode":"572","accountName":"Bancos c/c","amount":X,"description":"Pago Mod.111 ${q.label}"}]
     }`
     ).join(",\n");
 
@@ -552,7 +588,7 @@ ${quarterLines},
     {
       "model": "IS", "period": "Annual", "dueDate": "${yr + 1}-07-25",
       "taxableBase": X, "outputTax": X, "inputTax": 0, "result": X, "paymentType": "ingreso",
-      "journalNote": "IS ejercicio ${yr}: tipo 25%. Gasto (630) y deuda Hacienda (4752).",
+      "journalNote": "IS ejercicio ${yr} (vencimiento ${yr + 1}-07-25, 6 meses tras cierre dic): tipo general 25%. Gasto (630) al debe, HP acreedora IS (4752) al haber.",
       "accountDebits": [{"accountCode":"630","accountName":"Impuesto sobre beneficios","amount":X,"description":"IS ejercicio ${yr}"}],
       "accountCredits": [{"accountCode":"4752","accountName":"HP acreedora IS","amount":X,"description":"Cuota IS ${yr}"}]
     }
@@ -602,41 +638,67 @@ ${quarterLines},
   if (withPolicy) {
     const limit = fin.creditPolicyLimit ?? 30000;
     const drawn = fin.creditPolicyDrawn ?? 15000;
+    // Póliza: empieza en Q2 del período y dura 6 meses (dentro siempre del período)
+    const { periodStart: ps2 } = getPeriodInfo(params);
+    const [psy2, psm2] = ps2.split("-").map(Number);
+    // Start: 2 months into the period; End: 5 months after start (6-month policy)
+    const polStartM = ((psm2 - 1 + 2) % 12) + 1;
+    const polStartY = psy2 + Math.floor((psm2 - 1 + 2) / 12);
+    const polEndM = ((polStartM - 1 + 5) % 12) + 1;
+    const polEndY = polStartY + Math.floor((polStartM - 1 + 5) / 12);
+    const polEndLastDay = new Date(polEndY, polEndM, 0).getDate();
+    const polStartStr = `${polStartY}-${String(polStartM).padStart(2,"0")}-01`;
+    const polEndStr = `${polEndY}-${String(polEndM).padStart(2,"0")}-${polEndLastDay}`;
+    const polMonths = 6;
     sections.push(`"creditPolicy": {
     "entity": "${String(scenario.bankEntity ?? "Banco Ejemplo")}",
     "policyNumber": "POL-${params.year}-001",
     "limit": ${limit}, "drawnAmount": ${drawn}, "annualRate": 5.5,
     "openingCommission": 150.00, "unusedCommission": ${Math.round((limit - drawn) * 0.005)},
-    "startDate": "${params.year}-06-01", "endDate": "${params.year}-11-30",
-    "interestAmount": ${Math.round(drawn * 0.055 / 2)},
-    "totalSettlement": ${Math.round(drawn * 0.055 / 2 + 150 + (limit - drawn) * 0.005)},
-    "journalNote": "Disposición póliza: 5201 al haber, 572 al debe. Liquidación: 663 (intereses) y 626 (comisiones).",
-    "accountDebits": [{"accountCode":"663","accountName":"Intereses de deudas","amount":${Math.round(drawn * 0.055 / 2)},"description":"Intereses saldo dispuesto"},{"accountCode":"626","accountName":"Servicios bancarios","amount":${Math.round(150 + (limit - drawn) * 0.005)},"description":"Comisiones apertura y no disposición"}],
-    "accountCredits": [{"accountCode":"5201","accountName":"Deudas CP póliza de crédito","amount":${Math.round(drawn * 0.055 / 2 + 150 + (limit - drawn) * 0.005)},"description":"Total liquidación"}]
+    "startDate": "${polStartStr}", "endDate": "${polEndStr}",
+    "durationMonths": ${polMonths},
+    "interestAmount": ${Math.round(drawn * 0.055 * polMonths / 12)},
+    "totalSettlement": ${Math.round(drawn * 0.055 * polMonths / 12 + 150 + (limit - drawn) * 0.005)},
+    "journalNote": "Póliza de crédito ${polStartStr}–${polEndStr}. Apertura: 5201 al haber (límite dispuesto), 572 al debe. Liquidación al vencimiento: 663 (intereses sobre saldo medio dispuesto) y 626 (comisión apertura + no disposición) al debe; 572 al haber.",
+    "accountDebits": [{"accountCode":"663","accountName":"Intereses de deudas","amount":${Math.round(drawn * 0.055 * polMonths / 12)},"description":"Intereses saldo dispuesto ${polStartStr}–${polEndStr}"},{"accountCode":"626","accountName":"Servicios bancarios y similares","amount":${Math.round(150 + (limit - drawn) * 0.005)},"description":"Comisión apertura + no disposición"}],
+    "accountCredits": [{"accountCode":"5201","accountName":"Deudas CP póliza de crédito","amount":${Math.round(drawn * 0.055 * polMonths / 12 + 150 + (limit - drawn) * 0.005)},"description":"Liquidación total póliza"}]
   }`);
   }
 
   if (withFixedAssets) {
+    // Depreciation prorated to actual period length (not always 12 months)
+    const mobCost = 8500, mobLife = 10;
+    const eqCost = 4200, eqLife = 4;
+    const mobAnnual = mobCost / mobLife;
+    const eqAnnual = eqCost / eqLife;
+    // Prorate by months in period
+    const mobPeriod = Math.round(mobAnnual * numMonths / 12 * 100) / 100;
+    const eqPeriod = Math.round(eqAnnual * numMonths / 12 * 100) / 100;
+    const mobNBV = Math.round((mobCost - mobPeriod) * 100) / 100;
+    const eqNBV = Math.round((eqCost - eqPeriod) * 100) / 100;
+    const periodLabel2 = numMonths === 12 ? "ejercicio completo" : `${numMonths} meses`;
     sections.push(`"fixedAssets": [
     {
       "code": "AE-001", "description": "Mobiliario de oficina",
-      "purchaseDate": "${periodStart}", "purchaseCost": 8500.00, "usefulLifeYears": 10,
-      "annualDepreciation": 850.00, "accumulatedDepreciation": 850.00, "netBookValue": 7650.00,
+      "purchaseDate": "${periodStart}", "purchaseCost": ${mobCost}.00, "usefulLifeYears": ${mobLife},
+      "annualDepreciation": ${mobAnnual.toFixed(2)}, "periodDepreciation": ${mobPeriod.toFixed(2)}, "periodMonths": ${numMonths},
+      "accumulatedDepreciation": ${mobPeriod.toFixed(2)}, "netBookValue": ${mobNBV.toFixed(2)},
       "depreciationMethod": "Lineal",
       "assetAccountCode": "216", "accDepreciationCode": "2816", "depExpenseCode": "681",
-      "journalNote": "Amortización lineal: coste/vida útil. 681 al debe, 2816 al haber.",
-      "accountDebits": [{"accountCode":"681","accountName":"Amortización inmovilizado material","amount":850.00,"description":"Dotación amortización mobiliario"}],
-      "accountCredits": [{"accountCode":"2816","accountName":"Amort. acum. mobiliario","amount":850.00,"description":"Amortización acumulada"}]
+      "journalNote": "Amortización lineal mobiliario: ${mobCost}€ / ${mobLife} años = ${mobAnnual.toFixed(2)}€/año × ${numMonths}/12 meses = ${mobPeriod.toFixed(2)}€ (${periodLabel2}). 681 al debe, 2816 al haber.",
+      "accountDebits": [{"accountCode":"681","accountName":"Amortización inmovilizado material","amount":${mobPeriod.toFixed(2)},"description":"Dotación amortización mobiliario ${periodLabel2}"}],
+      "accountCredits": [{"accountCode":"2816","accountName":"Amort. acum. mobiliario","amount":${mobPeriod.toFixed(2)},"description":"Amortización acumulada"}]
     },
     {
-      "code": "AE-002", "description": "Equipos informáticos",
-      "purchaseDate": "${periodStart}", "purchaseCost": 4200.00, "usefulLifeYears": 4,
-      "annualDepreciation": 1050.00, "accumulatedDepreciation": 1050.00, "netBookValue": 3150.00,
+      "code": "AE-002", "description": "Equipos para procesos de información",
+      "purchaseDate": "${periodStart}", "purchaseCost": ${eqCost}.00, "usefulLifeYears": ${eqLife},
+      "annualDepreciation": ${eqAnnual.toFixed(2)}, "periodDepreciation": ${eqPeriod.toFixed(2)}, "periodMonths": ${numMonths},
+      "accumulatedDepreciation": ${eqPeriod.toFixed(2)}, "netBookValue": ${eqNBV.toFixed(2)},
       "depreciationMethod": "Lineal",
       "assetAccountCode": "217", "accDepreciationCode": "2817", "depExpenseCode": "681",
-      "journalNote": "Equipos informáticos: vida útil fiscal 4 años. 681 al debe, 2817 al haber.",
-      "accountDebits": [{"accountCode":"681","accountName":"Amortización inmovilizado material","amount":1050.00,"description":"Dotación amortización equipos"}],
-      "accountCredits": [{"accountCode":"2817","accountName":"Amort. acum. equipos informáticos","amount":1050.00,"description":"Amortización acumulada"}]
+      "journalNote": "Amortización lineal equipos informáticos: ${eqCost}€ / ${eqLife} años = ${eqAnnual.toFixed(2)}€/año × ${numMonths}/12 meses = ${eqPeriod.toFixed(2)}€ (${periodLabel2}). Vida útil fiscal máx. 4 años (tabla amortización TRLIS). 681 al debe, 2817 al haber.",
+      "accountDebits": [{"accountCode":"681","accountName":"Amortización inmovilizado material","amount":${eqPeriod.toFixed(2)},"description":"Dotación amortización equipos ${periodLabel2}"}],
+      "accountCredits": [{"accountCode":"2817","accountName":"Amort. acum. equipos informáticos","amount":${eqPeriod.toFixed(2)},"description":"Amortización acumulada"}]
     }
   ]`);
   } else {
@@ -747,21 +809,34 @@ async function generateEquityBlock(
     const legalReserve = Math.round(netProfit * 0.1);
     const voluntaryReserve = Math.round(netProfit * 0.15);
     const totalDividends = netProfit - legalReserve - voluntaryReserve;
+    const irpfOnDividends = Math.round(totalDividends * 0.19);
+    const netDividendsAfterIrpf = totalDividends - irpfOnDividends;
     const perShare = fin.totalShares ? (totalDividends / fin.totalShares) : 0;
+    // Junta General: hasta 6 meses tras cierre ejercicio. Cierre dic → máximo 30 junio.
+    // Pago dividendos: 15 julio. Mod.123 (retención dividendos): trimestre Q3 → vence 20 octubre.
     sections.push(`"dividendDistribution": {
     "fiscalYear": ${params.year - 1},
     "approvalDate": "${params.year}-06-30",
     "paymentDate": "${params.year}-07-15",
+    "mod123DueDate": "${params.year}-10-20",
     "totalNetProfit": ${netProfit},
     "legalReserve": ${legalReserve},
     "voluntaryReserve": ${voluntaryReserve},
     "totalDividends": ${totalDividends},
-    "dividendPerShare": ${perShare.toFixed(2)},
     "irpfWithholdingRate": 19,
+    "irpfWithholdingAmount": ${irpfOnDividends},
+    "netDividendPaid": ${netDividendsAfterIrpf},
+    "dividendPerShare": ${perShare.toFixed(2)},
     "perShareholder": [GENERA para cada socio del escenario: name, percentage, grossDividend, irpfWithholdingRate(19), irpfWithholdingAmount, netDividend],
-    "journalNote": "Distribución resultado: (1) Reserva Legal mín. 10% hasta 20% capital (112); (2) Reservas voluntarias (113); (3) Dividendos aprobados en Junta (526). Al pagar: 526 a 572 + retención IRPF 19% en 4751. Mod.123.",
+    "journalNote": "Distribución resultado ejercicio ${params.year - 1}: (1) Reserva Legal mín. 10% hasta alcanzar 20% capital social → cta 112; (2) Reservas voluntarias → cta 113; (3) Dividendos acordados en Junta General Ordinaria (${params.year}-06-30, plazo máx. 6 meses tras cierre) → cta 526 (Dividendo activo a pagar). PAGO ${params.year}-07-15: 526 al debe; 572 (neto pagado) y 4751 (retención IRPF 19%) al haber. Mod.123 retenciones dividendos → presentar antes del ${params.year}-10-20 (T3).",
     "accountDebits": [{"accountCode":"129","accountName":"Resultado del ejercicio","amount":${netProfit},"description":"Aplicación resultado ${params.year - 1}"}],
-    "accountCredits": [{"accountCode":"112","accountName":"Reserva legal","amount":${legalReserve},"description":"Dotación 10%"},{"accountCode":"113","accountName":"Reservas voluntarias","amount":${voluntaryReserve},"description":"Reserva voluntaria"},{"accountCode":"526","accountName":"Dividendo activo a pagar","amount":${totalDividends},"description":"Dividendos aprobados en Junta"}]
+    "accountCredits": [{"accountCode":"112","accountName":"Reserva legal","amount":${legalReserve},"description":"Dotación reserva legal 10%"},{"accountCode":"113","accountName":"Reservas voluntarias","amount":${voluntaryReserve},"description":"Reserva voluntaria"},{"accountCode":"526","accountName":"Dividendo activo a pagar","amount":${totalDividends},"description":"Dividendos brutos aprobados Junta"}],
+    "paymentEntry": {
+      "date": "${params.year}-07-15",
+      "journalNote": "Pago dividendos: 526 al debe; 572 (neto) y 4751 (retención 19% IRPF, Mod.123 T3) al haber.",
+      "accountDebits": [{"accountCode":"526","accountName":"Dividendo activo a pagar","amount":${totalDividends},"description":"Dividendos brutos"}],
+      "accountCredits": [{"accountCode":"572","accountName":"Bancos c/c","amount":${netDividendsAfterIrpf},"description":"Dividendo neto pagado"},{"accountCode":"4751","accountName":"HP acreedora IRPF retenciones","amount":${irpfOnDividends},"description":"Retención IRPF 19% Mod.123 T3"}]
+    }
   }`);
   }
 
