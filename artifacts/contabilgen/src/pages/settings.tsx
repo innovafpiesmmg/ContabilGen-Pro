@@ -201,9 +201,6 @@ export default function SettingsPage() {
                         htmlFor="shared_deepseek"
                         className="flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all relative"
                       >
-                        <div className="absolute -top-2 -right-2">
-                          <Badge className="text-[10px] px-1.5 py-0.5 bg-green-500 hover:bg-green-500">Gratis</Badge>
-                        </div>
                         <Share2 className="mb-3 h-8 w-8 text-green-600" />
                         <div className="text-center">
                           <div className="font-semibold">DeepSeek compartido</div>
