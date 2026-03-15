@@ -163,13 +163,14 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
       data.includeInitialBalance = false;
       data.includeDividends = false;
     }
+    const payload: Record<string, unknown> = { ...data };
     if (useCustomPeriod && data.startDate) {
-      data.year = parseInt(data.startDate.split("-")[0], 10);
+      payload.year = parseInt(data.startDate.split("-")[0], 10);
     } else {
-      data.startDate = null;
-      data.endDate = null;
+      delete payload.startDate;
+      delete payload.endDate;
     }
-    onSubmit(data as GenerateUniverseRequest);
+    onSubmit(payload as GenerateUniverseRequest);
   };
 
   const enabledCount = checkOptions.filter(opt => {
