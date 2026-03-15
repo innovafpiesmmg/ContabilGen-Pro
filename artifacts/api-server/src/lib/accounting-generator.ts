@@ -161,6 +161,67 @@ Devuelve SOLO este JSON con datos realistas para el sector indicado:
   return await callAI(client, model, prompt, 1200) as Record<string, unknown>;
 }
 
+// ─── SECTOR CONTEXT ───────────────────────────────────────────────────────────
+function getSectorContext(sector: string, taxRegime: string) {
+  const tax = taxRegime === "IGIC" ? "IGIC" : "IVA";
+
+  switch (sector) {
+    case "Servicios":
+      return {
+        inventoryNote: `INVENTARIO: empresa de SERVICIOS. Sin mercaderías para reventa. El inventario puede incluir únicamente consumibles de oficina (cta. 328) o material de trabajo (602). Si los importes son insignificantes genera inventario con initialTotal=0 y finalTotal=0 y arrays vacíos.`,
+        invoiceNote: `FACTURAS: empresa de SERVICIOS — vende SERVICIOS, NO bienes físicos.
+  - Facturas de VENTA (type:"sale"): servicios prestados (consultoría, asesoría, diseño, formación, mantenimiento, limpieza, software, transporte, etc.).
+    Líneas: "Horas de servicio" o "Servicio de X" × tarifa/hora o precio fijo. Cuenta venta: 705 (Prestaciones de servicios), NO 700.
+    journalNote: "705 → 477 (${tax} repercutido) + 430 (Clientes)"; accountDebits: [430]; accountCredits: [705, 477]
+  - Facturas de COMPRA (type:"purchase"): gastos necesarios para prestar el servicio — subcontratación de profesionales (621), software/licencias (626), telefonía (629), material de oficina (602), servicios de limpieza (629), publicidad (627), asesoría jurídica/fiscal (623), seguros profesionales (625), etc. Cuenta compra: 62x (gastos), NO 600.
+    journalNote: "62x → 472 (${tax} soportado) + 400 (Acreedores/Proveedores)"; accountDebits: [62x, 472]; accountCredits: [400]`,
+        saleAccount: { code: "705", name: "Prestaciones de servicios" },
+        purchaseAccount: { code: "629", name: "Otros servicios" },
+        purchaseSuppliersLabel: "proveedores de servicios y profesionales externos",
+        clientsLabel: "empresas y particulares que contratan servicios",
+      };
+    case "Industria":
+      return {
+        inventoryNote: `INVENTARIO: empresa INDUSTRIAL. Tiene materias primas (310), productos en curso (330) y productos terminados (350). Usa accountCode "310" para materias primas, "300" para productos terminados.`,
+        invoiceNote: `FACTURAS: empresa INDUSTRIAL — fabrica y vende productos elaborados propios.
+  - Facturas de VENTA (type:"sale"): venta de productos fabricados. Cuenta: 701 (Ventas de productos terminados).
+    journalNote: "701 → 477 + 430"; accountDebits: [430]; accountCredits: [701, 477]
+  - Facturas de COMPRA (type:"purchase"): compra de materias primas y componentes. Cuenta: 601 (Compras de materias primas).
+    journalNote: "601 → 472 + 400"; accountDebits: [601, 472]; accountCredits: [400]`,
+        saleAccount: { code: "701", name: "Ventas de productos terminados" },
+        purchaseAccount: { code: "601", name: "Compras de materias primas" },
+        purchaseSuppliersLabel: "proveedores de materias primas e insumos industriales",
+        clientsLabel: "distribuidores, mayoristas e industrias compradoras",
+      };
+    case "Hostelería":
+      return {
+        inventoryNote: `INVENTARIO: empresa de HOSTELERÍA. Tiene existencias perecederas: alimentos y bebidas (cta. 300). Rotación alta y cantidades variables. Incluye 2-3 productos representativos (vinos, bebidas, alimentos).`,
+        invoiceNote: `FACTURAS: empresa de HOSTELERÍA — vende servicios de alojamiento y/o restauración.
+  - Facturas de VENTA (type:"sale"): servicios de restaurante (menús, eventos), alojamiento, catering. Cuenta: 705 (Prestaciones de servicios hosteleros).
+    journalNote: "705 → 477 + 430/570 (efectivo o cliente)"; accountDebits: [430]; accountCredits: [705, 477]
+  - Facturas de COMPRA (type:"purchase"): compra de alimentos, bebidas y suministros. Cuenta: 600 (Compras de mercaderías — alimentación), con ${tax} al tipo reducido donde aplique.
+    journalNote: "600 → 472 + 400"; accountDebits: [600, 472]; accountCredits: [400]`,
+        saleAccount: { code: "705", name: "Prestaciones de servicios hosteleros" },
+        purchaseAccount: { code: "600", name: "Compras de mercaderías (alimentación)" },
+        purchaseSuppliersLabel: "proveedores de alimentos, bebidas y suministros",
+        clientsLabel: "clientes individuales, empresas para eventos y agencias",
+      };
+    default: // Comercio
+      return {
+        inventoryNote: `INVENTARIO: empresa COMERCIAL. Compra y revende mercaderías (cta. 300). Incluye 2-3 líneas de productos representativos del sector.`,
+        invoiceNote: `FACTURAS: empresa COMERCIAL — compra bienes para revenderlos.
+  - Facturas de VENTA (type:"sale"): venta de mercaderías a clientes. Cuenta: 700 (Ventas de mercaderías).
+    journalNote: "700 → 477 + 430"; accountDebits: [430]; accountCredits: [700, 477]
+  - Facturas de COMPRA (type:"purchase"): compra de mercaderías a proveedores. Cuenta: 600 (Compras de mercaderías).
+    journalNote: "600 → 472 + 400"; accountDebits: [600, 472]; accountCredits: [400]`,
+        saleAccount: { code: "700", name: "Ventas de mercaderías" },
+        purchaseAccount: { code: "600", name: "Compras de mercaderías" },
+        purchaseSuppliersLabel: "proveedores mayoristas o fabricantes",
+        clientsLabel: "clientes minoristas o empresas compradoras",
+      };
+  }
+}
+
 // ─── CALL 2: COMMERCIAL BLOCK ─────────────────────────────────────────────────
 async function generateCommercialBlock(
   params: GenerateParams,
@@ -171,6 +232,8 @@ async function generateCommercialBlock(
   const rates = TAX_RATES[params.taxRegime];
   const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
   const sc = JSON.stringify(scenario, null, 0);
+  const sectorCtx = getSectorContext(params.sector, params.taxRegime);
+  const invoiceCount = Math.min(Math.max(Math.ceil((params.operationsPerMonth ?? 8) * numMonths * 0.45), numMonths * 2), 20);
 
   const prompt = `Genera el BLOQUE COMERCIAL del universo contable usando este escenario:
 ${sc}
@@ -178,6 +241,13 @@ ${sc}
 PERÍODO: ${periodStart} a ${periodEnd} (${numMonths} mes${numMonths > 1 ? "es" : ""})
 RÉGIMEN FISCAL: ${params.taxRegime} (general ${rates.standard}%, reducido ${rates.reduced}%)
 SECTOR: ${params.sector}
+
+══ REGLAS SECTORIALES OBLIGATORIAS ══
+${sectorCtx.inventoryNote}
+${sectorCtx.invoiceNote}
+Proveedores: ${sectorCtx.purchaseSuppliersLabel}
+Clientes: ${sectorCtx.clientsLabel}
+══════════════════════════════════════
 
 Genera exactamente este JSON con datos reales y coherentes con el escenario:
 {
@@ -195,12 +265,12 @@ Genera exactamente este JSON con datos reales y coherentes con el escenario:
   },
   "inventory": {
     "initialInventory": [
-      {"code": "P001", "description": "...", "quantity": 100, "unitCost": 12.50, "totalCost": 1250.00, "accountCode": "300"},
-      {"code": "P002", "description": "...", "quantity": 50, "unitCost": 25.00, "totalCost": 1250.00, "accountCode": "300"}
+      {"code": "P001", "description": "producto/material/consumible apropiado al sector", "quantity": 100, "unitCost": 12.50, "totalCost": 1250.00, "accountCode": "(según sector)"},
+      {"code": "P002", "description": "...", "quantity": 50, "unitCost": 25.00, "totalCost": 1250.00, "accountCode": "(según sector)"}
     ],
     "finalInventory": [
-      {"code": "P001", "description": "...", "quantity": 70, "unitCost": 12.50, "totalCost": 875.00, "accountCode": "300"},
-      {"code": "P002", "description": "...", "quantity": 30, "unitCost": 25.00, "totalCost": 750.00, "accountCode": "300"}
+      {"code": "P001", "description": "...", "quantity": 70, "unitCost": 12.50, "totalCost": 875.00, "accountCode": "(según sector)"},
+      {"code": "P002", "description": "...", "quantity": 30, "unitCost": 25.00, "totalCost": 750.00, "accountCode": "(según sector)"}
     ],
     "initialTotal": 2500.00,
     "finalTotal": 1625.00,
@@ -216,19 +286,19 @@ Genera exactamente este JSON con datos reales y coherentes con el escenario:
     {
       "invoiceNumber": "F-${params.year}/001",
       "date": "YYYY-MM-DD (dentro del período)",
-      "type": "purchase",
-      "partyName": "...",
+      "type": "purchase o sale según corresponda",
+      "partyName": "nombre real del proveedor o cliente del escenario",
       "partyNif": "...",
-      "lines": [{"description": "...", "quantity": 10, "unitPrice": 50.00, "discount": 0, "subtotal": 500.00, "taxRate": ${rates.standard}, "taxAmount": ${rates.standard * 5}, "total": ${500 + rates.standard * 5}}],
+      "lines": [{"description": "descripción del servicio/producto apropiado al sector", "quantity": 1, "unitPrice": 500.00, "discount": 0, "subtotal": 500.00, "taxRate": ${rates.standard}, "taxAmount": ${rates.standard * 5}, "total": ${500 + rates.standard * 5}}],
       "subtotal": 500.00,
       "taxBase": 500.00,
       "taxAmount": ${rates.standard * 5},
       "total": ${500 + rates.standard * 5},
       "paymentMethod": "transfer",
       "dueDate": "YYYY-MM-DD",
-      "journalNote": "Explicación contable...",
-      "accountDebits": [{"accountCode": "600", "accountName": "Compras de mercaderías", "amount": 500.00, "description": "..."}],
-      "accountCredits": [{"accountCode": "400", "accountName": "Proveedores", "amount": ${500 + rates.standard * 5}, "description": "..."}]
+      "journalNote": "Explicación contable con cuentas PGC correctas para ${params.sector}",
+      "accountDebits": [{"accountCode": "${sectorCtx.purchaseAccount.code}", "accountName": "${sectorCtx.purchaseAccount.name}", "amount": 500.00, "description": "según tipo de factura"}],
+      "accountCredits": [{"accountCode": "400", "accountName": "Proveedores / Clientes", "amount": ${500 + rates.standard * 5}, "description": "según tipo de factura"}]
     }
   ],
   "creditCardStatement": {
@@ -285,12 +355,13 @@ Genera exactamente este JSON con datos reales y coherentes con el escenario:
 }
 
 REGLAS CRÍTICAS:
-- FACTURAS: genera exactamente ${Math.min(Math.max(Math.ceil((params.operationsPerMonth ?? 8) * numMonths * 0.45), numMonths * 2), 20)} facturas (mezcla de compras y ventas, al menos 2 de cada tipo), DISTRIBUIDAS en todos los meses del período — no acumules facturas en un solo mes
+- SECTOR ${params.sector.toUpperCase()}: respeta ESTRICTAMENTE las cuentas PGC indicadas arriba — ventas en ${sectorCtx.saleAccount.code} (${sectorCtx.saleAccount.name}), compras en ${sectorCtx.purchaseAccount.code} (${sectorCtx.purchaseAccount.name})
+- FACTURAS: genera exactamente ${invoiceCount} facturas (mezcla de compras y ventas, al menos 2 de cada tipo), DISTRIBUIDAS en todos los meses del período — no acumules facturas en un solo mes
 - EXTRACTOS BANCARIOS: genera ${numMonths} extracto(s) mensuales con al menos 4 transacciones cada uno, cubriendo todos los meses de ${periodStart} a ${periodEnd}
 - TARJETA: mínimo ${Math.min(numMonths * 2, 12)} movimientos distribuidos en todos los meses del período
 - Todas las fechas estrictamente dentro del período ${periodStart}–${periodEnd}
 - Cálculos de ${params.taxRegime} exactos
-- Importes realistas para sector ${params.sector}
+- Importes realistas para el sector ${params.sector}
 - Usa nombres/NIF exactos del escenario para proveedores y clientes`;
 
   return await callAI(client, model, prompt, 5000) as Record<string, unknown>;
@@ -638,6 +709,7 @@ async function generateJournalBlock(
     bankAccount: scenario.bankAccount,
   }, null, 0);
 
+  const sectorCtxJ = getSectorContext(params.sector, params.taxRegime);
   const enabledOps: string[] = [
     "facturas de compra y venta",
     "cobros y pagos a clientes/proveedores",
@@ -648,13 +720,19 @@ async function generateJournalBlock(
   if (params.includeMortgage) enabledOps.push("cuotas de hipoteca");
   if (params.includeCreditPolicy !== false) enabledOps.push("disposición y liquidación de póliza de crédito");
   if (params.includeFixedAssets !== false) enabledOps.push("amortizaciones de inmovilizado");
-  enabledOps.push("gastos generales (suministros, seguros, servicios bancarios)", "variación de existencias");
+  enabledOps.push("gastos generales (suministros, seguros, servicios bancarios)");
+  if (params.sector !== "Servicios") enabledOps.push("variación de existencias");
 
   const prompt = `Genera el LIBRO DIARIO (journalEntries) del universo contable.
 
 EMPRESA: ${sc}
 PERÍODO: ${periodStart} a ${periodEnd}
 NIVEL: ${level === "Superior" ? "FP Grado Superior (incluye periodificaciones, ajustes de ejercicio)" : "FP Grado Medio"}
+
+SECTOR ${params.sector.toUpperCase()} — CUENTAS OBLIGATORIAS:
+- Ventas: cuenta ${sectorCtxJ.saleAccount.code} (${sectorCtxJ.saleAccount.name}) — NO usar 700 si el sector es Servicios o Hostelería
+- Compras: cuenta ${sectorCtxJ.purchaseAccount.code} (${sectorCtxJ.purchaseAccount.name})
+${params.sector === "Servicios" ? "- Esta empresa NO vende bienes físicos — los asientos de ventas deben reflejar servicios prestados (705)" : ""}
 
 OPERACIONES A INCLUIR: ${enabledOps.join(", ")}
 
