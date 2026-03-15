@@ -129,3 +129,13 @@ Custom email/password auth (no Replit Auth):
 
 - Development: `pnpm --filter @workspace/db run push`
 - Tables: `users`, `sessions`, `password_reset_tokens`, `settings`, `generations`
+
+## Self-Hosted Deployment (Ubuntu)
+
+- **Installer**: `install.sh` in repo root — unattended installer for Ubuntu 22.04/24.04/25.04
+- **GitHub**: https://github.com/innovafpiesmmg/ContabilGen-Pro
+- **Services**: `contabilgen-api` (systemd), Nginx (reverse proxy serving frontend static + API proxy)
+- **Config**: `/etc/contabilgen/env` — persisted across updates; credentials auto-generated on first install
+- **Cookies**: `SECURE_COOKIES` env var controls `secure` flag on session cookies (default: `false` for HTTP, `true` when Cloudflare Tunnel is configured)
+- **Ports**: API on 5001 (internal), Nginx on 80 (public)
+- **Update**: Re-run `sudo bash /var/www/contabilgen/install.sh` — detects existing install, preserves DB + credentials

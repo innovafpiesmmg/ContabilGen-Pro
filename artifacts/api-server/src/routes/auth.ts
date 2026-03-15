@@ -20,7 +20,7 @@ const router: IRouter = Router();
 function setSessionCookie(res: Response, sid: string) {
   res.cookie(SESSION_COOKIE, sid, {
     httpOnly: true,
-    secure: true,
+    secure: process.env.SECURE_COOKIES !== "false",
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_TTL,
