@@ -105,7 +105,25 @@ OpenAPI 3.1 spec. Run codegen: `pnpm --filter @workspace/api-spec run codegen`
 OpenAI integration via Replit AI Integrations. Uses gpt-5.2 model.
 Environment variables: `AI_INTEGRATIONS_OPENAI_BASE_URL`, `AI_INTEGRATIONS_OPENAI_API_KEY`
 
+## Authentication
+
+Custom email/password auth (no Replit Auth):
+- Registration, login, logout, forgot-password, reset-password
+- Sessions: `sessions` table, cookie `sid`, 7-day TTL
+- Password reset tokens: sha256 hash, 1-hour TTL, table `password_reset_tokens`
+- Auth lib: `artifacts/api-server/src/lib/auth.ts`
+- Email lib: `artifacts/api-server/src/lib/email.ts` — uses Resend SDK
+  - **NOTE:** User dismissed the Resend integration. To enable real password-reset emails,
+    provide a `RESEND_API_KEY` secret (from resend.com) and set `EMAIL_FROM` env var.
+    Without it, the reset link is logged to the API server console only.
+
+## Logo & Favicon
+
+- Logo file: `artifacts/contabilgen/public/logo.png` (CG blue logo)
+- Used in: login, register, forgot-password, reset-password pages; sidebar; loading screen
+- Favicon: `<link rel="icon" type="image/png" href="/logo.png" />` in index.html
+
 ## Database
 
 - Development: `pnpm --filter @workspace/db run push`
-- Table: `generations` (id, company_name, sector, tax_regime, fiscal_year, universe_json JSONB, created_at)
+- Tables: `users`, `sessions`, `password_reset_tokens`, `settings`, `generations`

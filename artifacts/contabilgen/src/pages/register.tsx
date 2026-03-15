@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
-import { Calculator, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,9 +43,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50/40 p-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-inner mb-4">
-            <Calculator className="w-8 h-8 text-primary-foreground" />
-          </div>
+          <img src="/logo.png" alt="ContabilGen Pro" className="w-20 h-20 mb-4 drop-shadow-md" />
           <h1 className="font-bold text-2xl text-foreground">ContabilGen Pro</h1>
           <p className="text-sm text-muted-foreground mt-1">Crea tu cuenta gratuita</p>
         </div>

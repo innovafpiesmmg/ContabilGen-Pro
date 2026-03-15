@@ -2,7 +2,6 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
-  Calculator, 
   History, 
   Menu, 
   Plus, 
@@ -59,9 +58,7 @@ export default function Layout({ children }: LayoutProps) {
   const SidebarContent = () => (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border shadow-lg">
       <div className="p-6 flex items-center gap-3 border-b border-sidebar-border">
-        <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-inner">
-          <Calculator className="w-6 h-6 text-primary-foreground" />
-        </div>
+        <img src="/logo.png" alt="ContabilGen Pro" className="w-10 h-10 shrink-0" />
         <div>
           <h1 className="font-display font-bold text-xl leading-tight text-sidebar-foreground">ContabilGen</h1>
           <p className="text-xs text-muted-foreground font-medium tracking-wide uppercase">Pro Edition</p>

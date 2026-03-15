@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
-import { Calculator, ArrowLeft, Loader2, CheckCircle } from "lucide-react";
+import { ArrowLeft, Loader2, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,9 +38,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50/40 p-4">
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center mb-8">
-          <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-inner mb-4">
-            <Calculator className="w-8 h-8 text-primary-foreground" />
-          </div>
+          <img src="/logo.png" alt="ContabilGen Pro" className="w-20 h-20 mb-4 drop-shadow-md" />
           <h1 className="font-bold text-2xl text-foreground">Recuperar contraseña</h1>
           <p className="text-sm text-muted-foreground mt-1">Te enviaremos un enlace de restablecimiento</p>
         </div>

@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { Calculator, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 
 import Layout from "@/components/layout";
 import Dashboard from "@/pages/dashboard";
@@ -28,9 +28,7 @@ function LoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50/40">
       <div className="flex flex-col items-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-primary flex items-center justify-center shadow-inner">
-          <Calculator className="w-8 h-8 text-primary-foreground" />
-        </div>
+        <img src="/logo.png" alt="ContabilGen Pro" className="w-16 h-16 drop-shadow-md" />
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     </div>
