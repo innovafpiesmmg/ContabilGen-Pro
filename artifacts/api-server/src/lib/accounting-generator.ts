@@ -331,10 +331,25 @@ async function generateOperationsBlock(
   if (withPayroll) {
     sections.push(`"payroll": {
     "month": "${midMonthLabel}",
-    "employees": [GENERA empleados del escenario con naf, categoría, salarioBruto, IRPF%, cuotaIRPF, cuotaSSObreros(6.35%), cuotaSSEmpresa(30.40%), salarioNeto],
+    "employees": [
+      {
+        "name": "(nombre del empleado del escenario)",
+        "naf": "XXXXXXXX/XX",
+        "category": "Oficial 1ª / Auxiliar / etc.",
+        "grossSalary": X,
+        "irpfRate": X,
+        "irpfAmount": X,
+        "ssEmployeeRate": 6.35,
+        "ssEmployeeAmount": X,
+        "netSalary": X,
+        "ssEmployerRate": 30.40,
+        "ssEmployerAmount": X
+      }
+    ],
     "totalGross": X, "totalIrpf": X, "totalSsEmployee": X, "totalNetSalary": X, "totalSsEmployer": X, "totalLaborCost": X,
     "journalNote": "Nómina: 640 (sueldos) y 642 (SS empresa) al debe; 465 (salarios netos), 4751 (IRPF retenido), 476 (SS total) al haber.",
-    "accountDebits": [...], "accountCredits": [...]
+    "accountDebits": [{"accountCode":"640","accountName":"Sueldos y salarios","amount":X,"description":"Nómina mes"},{"accountCode":"642","accountName":"SS a cargo empresa","amount":X,"description":"Cuota patronal"}],
+    "accountCredits": [{"accountCode":"465","accountName":"Remuneraciones pendientes","amount":X,"description":"Salario neto"},{"accountCode":"4751","accountName":"HP acreedora IRPF","amount":X,"description":"Retención IRPF"},{"accountCode":"476","accountName":"Organismos SS acreedores","amount":X,"description":"SS total mes"}]
   }`);
   }
 
@@ -524,16 +539,16 @@ async function generateEquityBlock(
     sections.push(`"initialBalanceSheet": {
     "date": "${periodStart}",
     "description": "Balance de apertura a ${periodStart} — Asiento de apertura del ejercicio",
-    "nonCurrentAssets": [GENERA 2-3 elementos de inmovilizado coherentes con el escenario],
-    "currentAssets": [GENERA: existencias (300), clientes (430), ${params.taxRegime} soportado (472), bancos (572)],
-    "equity": [GENERA: capital (100), reserva legal (112), reservas voluntarias (113), resultado anterior (129)],
-    "nonCurrentLiabilities": [GENERA si hay préstamo: deudas LP (170)],
-    "currentLiabilities": [GENERA: proveedores (400), ${params.taxRegime} repercutido (477)],
+    "nonCurrentAssets": [{"accountCode":"XXX","accountName":"...","amount":X}],
+    "currentAssets": [{"accountCode":"300","accountName":"Mercaderías","amount":X},{"accountCode":"430","accountName":"Clientes","amount":X},{"accountCode":"572","accountName":"Bancos c/c","amount":X}],
+    "equity": [{"accountCode":"100","accountName":"Capital social","amount":X},{"accountCode":"112","accountName":"Reserva legal","amount":X},{"accountCode":"129","accountName":"Resultado del ejercicio","amount":X}],
+    "nonCurrentLiabilities": [{"accountCode":"170","accountName":"Deudas LP entidades crédito","amount":X}],
+    "currentLiabilities": [{"accountCode":"400","accountName":"Proveedores","amount":X},{"accountCode":"477","accountName":"${params.taxRegime} repercutido","amount":X}],
     "totalAssets": X,
     "totalEquityAndLiabilities": X,
     "journalNote": "Asiento de apertura: se cargan todos los activos y se abonan pasivos y patrimonio neto. Total Activo = Total Pasivo + PN.",
-    "accountDebits": [LISTA de todos los activos con código, nombre, importe],
-    "accountCredits": [LISTA de todos los pasivos y patrimonio neto]
+    "accountDebits": [{"accountCode":"XXX","accountName":"Nombre activo","amount":X,"description":"Activo en apertura"}],
+    "accountCredits": [{"accountCode":"XXX","accountName":"Nombre pasivo/PN","amount":X,"description":"Pasivo/PN en apertura"}]
   }`);
   }
 
