@@ -64,6 +64,36 @@ function cleanJson(raw: string): string {
     .trim();
 }
 
+function repairTruncatedJson(raw: string): unknown | null {
+  const cleaned = cleanJson(raw);
+  // Try parsing as-is first
+  try { return JSON.parse(cleaned); } catch { /* continue to repair */ }
+
+  // Remove trailing partial token/string and repair brackets
+  let s = cleaned.trimEnd();
+  // Drop trailing incomplete string if any (ends mid-quote)
+  s = s.replace(/,\s*"[^"]*$/, "").replace(/,\s*\{[^{}]*$/, "");
+  s = s.replace(/,\s*$/, "");
+
+  // Count open/close to add missing closers
+  let braces = 0, brackets = 0;
+  let inStr = false, escape = false;
+  for (const ch of s) {
+    if (escape) { escape = false; continue; }
+    if (ch === "\\" && inStr) { escape = true; continue; }
+    if (ch === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (ch === "{") braces++;
+    else if (ch === "}") braces--;
+    else if (ch === "[") brackets++;
+    else if (ch === "]") brackets--;
+  }
+  for (let i = 0; i < brackets; i++) s += "]";
+  for (let i = 0; i < braces; i++) s += "}";
+
+  try { return JSON.parse(s); } catch { return null; }
+}
+
 async function callAI(client: OpenAI, model: string, prompt: string, maxTokens: number): Promise<unknown> {
   const response = await client.chat.completions.create({
     model,
@@ -80,8 +110,17 @@ async function callAI(client: OpenAI, model: string, prompt: string, maxTokens: 
   const finishReason = response.choices[0]?.finish_reason;
   const content = response.choices[0]?.message?.content;
   if (!content) throw new Error("La IA no devolvió contenido.");
+
   if (finishReason === "length") {
-    throw new Error("La respuesta de la IA fue demasiado larga y se cortó. Reduce el número de módulos activados o las operaciones por mes.");
+    // Attempt to repair and parse truncated JSON instead of hard-failing
+    console.warn(`[callAI] finish_reason=length, content length=${content.length} chars, maxTokens=${maxTokens}`);
+    const repaired = repairTruncatedJson(content);
+    if (repaired !== null) {
+      console.warn("[callAI] Respuesta truncada — JSON reparado automáticamente.");
+      return repaired;
+    }
+    console.error("[callAI] No se pudo reparar. Primeros 500 chars:", content.slice(0, 500));
+    throw new Error("La respuesta de la IA fue demasiado larga y no se pudo recuperar. Reduce el número de módulos o las operaciones por mes.");
   }
 
   const cleaned = cleanJson(content);
@@ -354,7 +393,7 @@ JSON exacto (sin texto extra):
 
 Genera exactamente ${invoicesPerMonth} objetos en el array. Importes variados y realistas.`;
 
-  return await callAI(client, model, prompt, 2500) as { invoices: unknown[] };
+  return await callAI(client, model, prompt, 4000) as { invoices: unknown[] };
 }
 
 // ─── CALL 2B: BANKING & INSURANCE BLOCK ───────────────────────────────────────
