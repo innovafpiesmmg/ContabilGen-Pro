@@ -6,6 +6,15 @@ interface GenerateParams {
   complexity: "Avanzado";
   year: number;
   companyName?: string | null;
+  educationLevel?: "Medio" | "Superior" | null;
+  operationsPerMonth?: number | null;
+  includePayroll?: boolean | null;
+  includeSocialSecurity?: boolean | null;
+  includeTaxLiquidation?: boolean | null;
+  includeBankLoan?: boolean | null;
+  includeMortgage?: boolean | null;
+  includeCreditPolicy?: boolean | null;
+  includeFixedAssets?: boolean | null;
 }
 
 interface AiConfig {
@@ -23,19 +32,287 @@ const TAX_RATES: Record<string, { standard: number; reduced: number; superreduce
 function buildPrompt(params: GenerateParams): string {
   const rates = TAX_RATES[params.taxRegime];
   const companyHint = params.companyName ? `La empresa se llama "${params.companyName}".` : "Inventa un nombre de empresa realista para el sector.";
+  const level = params.educationLevel ?? "Medio";
+  const opsPerMonth = params.operationsPerMonth ?? 8;
+  const withPayroll = params.includePayroll !== false;
+  const withSS = params.includeSocialSecurity !== false && withPayroll;
+  const withTax = params.includeTaxLiquidation !== false;
+  const withLoan = params.includeBankLoan !== false;
+  const withMortgage = params.includeMortgage === true;
+  const withPolicy = params.includeCreditPolicy !== false;
+  const withFixedAssets = params.includeFixedAssets !== false;
 
-  return `Eres un experto contable español y debes generar un universo contable completo para prácticas de contabilidad de Grado Medio.
+  const levelNote = level === "Superior"
+    ? "Nivel Superior (FP Grado Superior): incluye operaciones complejas como periodificaciones contables, ajustes de ejercicio, operaciones con efectos comerciales, factoring, leasing, y mayor detalle en impuestos."
+    : "Nivel Medio (FP Grado Medio): operaciones claras y bien comentadas, enfocadas en facturas, nóminas, IVA trimestral y préstamos básicos.";
+
+  const conditionalSections: string[] = [];
+
+  if (withPayroll) {
+    conditionalSections.push(`  "payroll": {
+    "month": "Octubre ${params.year}",
+    "employees": [
+      {
+        "name": "María García López",
+        "naf": "281234567890",
+        "category": "Oficial de 1ª",
+        "grossSalary": 2200.00,
+        "irpfRate": 15,
+        "irpfAmount": 330.00,
+        "ssEmployeeRate": 6.35,
+        "ssEmployeeAmount": 139.70,
+        "netSalary": 1730.30,
+        "ssEmployerRate": 30.40,
+        "ssEmployerAmount": 668.80
+      }
+    ],
+    "totalGross": 2200.00,
+    "totalIrpf": 330.00,
+    "totalSsEmployee": 139.70,
+    "totalNetSalary": 1730.30,
+    "totalSsEmployer": 668.80,
+    "totalLaborCost": 2868.80,
+    "journalNote": "La nómina genera: (1) Gasto en sueldos (640); (2) Gasto SS empresa (642); (3) Retenciones IRPF (4751); (4) Cuotas SS (476); (5) Salarios netos (465).",
+    "accountDebits": [
+      { "accountCode": "640", "accountName": "Sueldos y salarios", "amount": 2200.00, "description": "Salario bruto" },
+      { "accountCode": "642", "accountName": "Seguridad Social a cargo de la empresa", "amount": 668.80, "description": "Cuota patronal SS" }
+    ],
+    "accountCredits": [
+      { "accountCode": "465", "accountName": "Remuneraciones pendientes de pago", "amount": 1730.30, "description": "Salario neto a pagar" },
+      { "accountCode": "4751", "accountName": "H.P. acreedora por retenciones practicadas", "amount": 330.00, "description": "IRPF retenido" },
+      { "accountCode": "476", "accountName": "Organismos de la Seguridad Social acreedores", "amount": 808.50, "description": "SS empleado + SS empresa" }
+    ]
+  },`);
+  }
+
+  if (withSS) {
+    conditionalSections.push(`  "socialSecurityPayments": [
+    {
+      "month": "Octubre ${params.year}",
+      "dueDate": "${params.year}-11-30",
+      "employeeCount": 2,
+      "totalGross": 4000.00,
+      "ssEmployeeAmount": 254.00,
+      "ssEmployerAmount": 1216.00,
+      "totalPayment": 1470.00,
+      "journalNote": "Pago TC1 a la Seguridad Social. Se cancela la deuda con la SS (476) y se carga a bancos (572). Cubre las cuotas obrera y patronal del mes.",
+      "accountDebits": [
+        { "accountCode": "476", "accountName": "Organismos de la Seguridad Social acreedores", "amount": 1470.00, "description": "Cuota SS mes octubre" }
+      ],
+      "accountCredits": [
+        { "accountCode": "572", "accountName": "Bancos e instituciones de crédito c/c", "amount": 1470.00, "description": "Pago domiciliado TC1" }
+      ]
+    }
+  ],`);
+  } else {
+    conditionalSections.push(`  "socialSecurityPayments": [],`);
+  }
+
+  if (withTax) {
+    conditionalSections.push(`  "taxLiquidations": [
+    {
+      "model": "${params.taxRegime === "IGIC" ? "420" : "303"}",
+      "period": "T1",
+      "dueDate": "${params.year}-04-20",
+      "taxableBase": 25000.00,
+      "outputTax": ${params.taxRegime === "IGIC" ? 1750 : 5250},
+      "inputTax": ${params.taxRegime === "IGIC" ? 700 : 2100},
+      "result": ${params.taxRegime === "IGIC" ? 1050 : 3150},
+      "paymentType": "ingreso",
+      "journalNote": "Liquidación trimestral Modelo ${params.taxRegime === "IGIC" ? "420 (IGIC)" : "303 (IVA)"}. La diferencia entre ${params.taxRegime} repercutido (477) y ${params.taxRegime} soportado (472) determina la cuota a ingresar en Hacienda (4750).",
+      "accountDebits": [
+        { "accountCode": "477", "accountName": "${params.taxRegime} repercutido", "amount": ${params.taxRegime === "IGIC" ? 1750 : 5250}, "description": "${params.taxRegime} devengado 1T" }
+      ],
+      "accountCredits": [
+        { "accountCode": "472", "accountName": "${params.taxRegime} soportado", "amount": ${params.taxRegime === "IGIC" ? 700 : 2100}, "description": "${params.taxRegime} deducible 1T" },
+        { "accountCode": "4750", "accountName": "H.P. acreedora por ${params.taxRegime}", "amount": ${params.taxRegime === "IGIC" ? 1050 : 3150}, "description": "Cuota a ingresar Mod.${params.taxRegime === "IGIC" ? "420" : "303"} 1T" }
+      ]
+    },
+    {
+      "model": "IS",
+      "period": "Annual",
+      "dueDate": "${params.year + 1}-07-25",
+      "taxableBase": 45000.00,
+      "outputTax": 10800.00,
+      "inputTax": 0,
+      "result": 10800.00,
+      "paymentType": "ingreso",
+      "journalNote": "Impuesto sobre Sociedades (IS) del ejercicio ${params.year}. Tipo general del 25% sobre el resultado contable ajustado. Se registra el gasto (630) y la deuda con Hacienda (4752).",
+      "accountDebits": [
+        { "accountCode": "630", "accountName": "Impuesto sobre beneficios", "amount": 10800.00, "description": "IS ejercicio ${params.year}" }
+      ],
+      "accountCredits": [
+        { "accountCode": "4752", "accountName": "H.P. acreedora por Impuesto sobre Sociedades", "amount": 10800.00, "description": "Cuota IS a pagar" }
+      ]
+    }
+  ],`);
+  } else {
+    conditionalSections.push(`  "taxLiquidations": [],`);
+  }
+
+  if (withLoan) {
+    conditionalSections.push(`  "bankLoan": {
+    "entity": "Banco Ejemplo",
+    "loanNumber": "PRE-${params.year}-001",
+    "principal": 50000.00,
+    "annualRate": 4.5,
+    "termMonths": 60,
+    "startDate": "${params.year}-01-01",
+    "monthlyInstallment": 929.27,
+    "amortizationTable": [
+      { "period": 1, "date": "${params.year}-02-01", "installment": 929.27, "interest": 187.50, "principal": 741.77, "balance": 49258.23 },
+      { "period": 2, "date": "${params.year}-03-01", "installment": 929.27, "interest": 184.72, "principal": 744.55, "balance": 48513.68 },
+      { "period": 3, "date": "${params.year}-04-01", "installment": 929.27, "interest": 181.93, "principal": 747.34, "balance": 47766.34 }
+    ],
+    "journalNote": "Contabilización del préstamo bancario. Al recibir el préstamo se abona la cuenta 170 (largo plazo). Cada cuota mensual se desglosa en amortización de capital (170/520) e intereses (662).",
+    "accountDebits": [
+      { "accountCode": "572", "accountName": "Bancos e instituciones de crédito c/c vista", "amount": 50000.00, "description": "Recepción del préstamo" }
+    ],
+    "accountCredits": [
+      { "accountCode": "170", "accountName": "Deudas a largo plazo con entidades de crédito", "amount": 50000.00, "description": "Préstamo bancario concedido" }
+    ]
+  },`);
+  }
+
+  if (withMortgage) {
+    conditionalSections.push(`  "mortgage": {
+    "entity": "CaixaBank",
+    "loanNumber": "HIP-${params.year}-001",
+    "propertyDescription": "Local comercial en Calle Principal, 15 - ${params.year === 2024 ? "Madrid" : "Barcelona"}",
+    "propertyValue": 250000.00,
+    "principal": 180000.00,
+    "annualRate": 3.2,
+    "termMonths": 240,
+    "startDate": "${params.year}-03-01",
+    "monthlyInstallment": 1021.50,
+    "amortizationTable": [
+      { "period": 1, "date": "${params.year}-04-01", "installment": 1021.50, "interest": 480.00, "principal": 541.50, "balance": 179458.50 },
+      { "period": 2, "date": "${params.year}-05-01", "installment": 1021.50, "interest": 478.56, "principal": 542.94, "balance": 178915.56 },
+      { "period": 3, "date": "${params.year}-06-01", "installment": 1021.50, "interest": 477.10, "principal": 544.40, "balance": 178371.16 }
+    ],
+    "journalNote": "Hipoteca sobre local comercial. El inmueble se activa en el balance (cuenta 221/222). La hipoteca se divide en corto (521) y largo plazo (170). Cada cuota: intereses (662) + amortización de capital.",
+    "accountDebits": [
+      { "accountCode": "221", "accountName": "Construcciones", "amount": 250000.00, "description": "Valor de adquisición del local" }
+    ],
+    "accountCredits": [
+      { "accountCode": "170", "accountName": "Deudas a largo plazo con entidades de crédito", "amount": 168000.00, "description": "Hipoteca a largo plazo" },
+      { "accountCode": "521", "accountName": "Deudas a corto plazo con entidades de crédito", "amount": 12000.00, "description": "Vencimiento a corto plazo" },
+      { "accountCode": "572", "accountName": "Bancos", "amount": 70000.00, "description": "Entrada pagada en efectivo" }
+    ]
+  },`);
+  }
+
+  if (withPolicy) {
+    conditionalSections.push(`  "creditPolicy": {
+    "entity": "Banco Ejemplo",
+    "policyNumber": "POL-${params.year}-001",
+    "limit": 30000.00,
+    "drawnAmount": 18000.00,
+    "annualRate": 5.5,
+    "openingCommission": 150.00,
+    "unusedCommission": 60.00,
+    "startDate": "${params.year}-06-01",
+    "endDate": "${params.year}-11-30",
+    "interestAmount": 495.00,
+    "totalSettlement": 705.00,
+    "journalNote": "Liquidación de póliza de crédito. Intereses sobre el saldo dispuesto (663) y comisiones (626). Al cancelar, se carga la cuenta 5201.",
+    "accountDebits": [
+      { "accountCode": "663", "accountName": "Intereses de deudas", "amount": 495.00, "description": "Intereses sobre saldo dispuesto" },
+      { "accountCode": "626", "accountName": "Servicios bancarios y similares", "amount": 210.00, "description": "Comisiones apertura y no disposición" }
+    ],
+    "accountCredits": [
+      { "accountCode": "5201", "accountName": "Deudas a corto plazo por póliza de crédito", "amount": 705.00, "description": "Total a pagar en liquidación" }
+    ]
+  },`);
+  }
+
+  if (withFixedAssets) {
+    conditionalSections.push(`  "fixedAssets": [
+    {
+      "code": "AE-001",
+      "description": "Mobiliario de oficina",
+      "purchaseDate": "${params.year}-01-15",
+      "purchaseCost": 8500.00,
+      "usefulLifeYears": 10,
+      "annualDepreciation": 850.00,
+      "accumulatedDepreciation": 850.00,
+      "netBookValue": 7650.00,
+      "depreciationMethod": "Lineal",
+      "assetAccountCode": "216",
+      "accDepreciationCode": "2816",
+      "depExpenseCode": "681",
+      "journalNote": "Amortización anual del mobiliario de oficina. Método lineal: coste/vida útil. Se carga la cuenta de gasto (681) y se abona la amortización acumulada (2816).",
+      "accountDebits": [
+        { "accountCode": "681", "accountName": "Amortización del inmovilizado material", "amount": 850.00, "description": "Dotación amortización mobiliario" }
+      ],
+      "accountCredits": [
+        { "accountCode": "2816", "accountName": "Amortización acumulada del mobiliario", "amount": 850.00, "description": "Amortización acumulada año ${params.year}" }
+      ]
+    },
+    {
+      "code": "AE-002",
+      "description": "Equipos informáticos",
+      "purchaseDate": "${params.year}-03-01",
+      "purchaseCost": 4200.00,
+      "usefulLifeYears": 4,
+      "annualDepreciation": 1050.00,
+      "accumulatedDepreciation": 1050.00,
+      "netBookValue": 3150.00,
+      "depreciationMethod": "Lineal",
+      "assetAccountCode": "217",
+      "accDepreciationCode": "2817",
+      "depExpenseCode": "681",
+      "journalNote": "Amortización anual equipos informáticos. Vida útil fiscal máxima 4 años según tablas oficiales de amortización.",
+      "accountDebits": [
+        { "accountCode": "681", "accountName": "Amortización del inmovilizado material", "amount": 1050.00, "description": "Dotación amortización equipos" }
+      ],
+      "accountCredits": [
+        { "accountCode": "2817", "accountName": "Amortización acumulada de equipos para procesos de información", "amount": 1050.00, "description": "Amortización acumulada año ${params.year}" }
+      ]
+    }
+  ],`);
+  } else {
+    conditionalSections.push(`  "fixedAssets": [],`);
+  }
+
+  const optionalSectionsText = conditionalSections.join("\n");
+
+  return `Eres un experto contable español y debes generar un universo contable completo para prácticas de contabilidad.
 
 PARÁMETROS:
 - Sector económico: ${params.sector}
 - Régimen fiscal: ${params.taxRegime} (Tipo general: ${rates.standard}%, Reducido: ${rates.reduced}%, Superreducido: ${rates.superreduced}%)
 - Año fiscal: ${params.year}
+- Nivel educativo: ${levelNote}
+- Operaciones en el libro diario: mínimo ${opsPerMonth} asientos por mes (total año: mínimo ${opsPerMonth * 12})
 - ${companyHint}
 
-INSTRUCCIONES:
-Genera un universo contable coherente y realista que incluya TODOS los elementos siguientes. Todos los importes deben ser coherentes entre sí y con el sector económico. Usa el Plan General Contable (PGC) español para los códigos de cuentas.
+SECCIONES A INCLUIR:
+- Facturas: SÍ (mínimo 6, mix compras y ventas)
+- Nóminas: ${withPayroll ? "SÍ" : "NO"}
+- Seguridad Social (TC1): ${withSS ? "SÍ (pagos mensuales de SS)" : "NO"}
+- Liquidaciones fiscales (${params.taxRegime} trimestral + IS anual): ${withTax ? "SÍ" : "NO"}
+- Préstamo bancario: ${withLoan ? "SÍ" : "NO"}
+- Hipoteca: ${withMortgage ? "SÍ" : "NO"}
+- Póliza de crédito: ${withPolicy ? "SÍ" : "NO"}
+- Inmovilizado y amortizaciones: ${withFixedAssets ? "SÍ" : "NO"}
+- Seguros: SÍ (2 pólizas)
+- Siniestro/extraordinario: SÍ
+- Extractos bancarios: SÍ
+- Tarjeta de crédito: SÍ
 
-El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra. No incluyas texto fuera del JSON.
+INSTRUCCIONES CRÍTICAS:
+1. Genera datos REALISTAS y COHERENTES para el sector ${params.sector}. Adapta productos, clientes, proveedores al sector.
+2. Usa importes realistas para una empresa mediana española.
+3. Los cálculos matemáticos deben ser CORRECTOS (cuadre de asientos, totales de facturas).
+4. Fechas del año ${params.year} (salvo periodificaciones y vencimientos futuros).
+5. Los asientos del libro diario deben CUADRAR (total debe = total haber).
+6. El libro diario debe reflejar TODAS las operaciones anteriores (facturas, nóminas, SS, impuestos, préstamo, etc.).
+7. GENERA AL MENOS ${opsPerMonth * 12} asientos en journalEntries distribuidos por todos los meses del año.
+8. Incluye notas didácticas (journalNote) en TODOS los documentos explicando qué cuentas se usan y por qué.
+9. Responde ÚNICAMENTE con JSON válido, sin texto adicional, sin markdown, sin explicaciones.
+
+El objeto JSON debe seguir EXACTAMENTE esta estructura:
 
 {
   "companyProfile": {
@@ -60,12 +337,10 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
     "stockVariation": -210.00
   },
   "suppliers": [
-    { "name": "Proveedor SA", "nif": "A11111111", "address": "Calle Proveedor, 5", "city": "Madrid", "accountCode": "400" },
-    { "name": "Suministros SL", "nif": "B22222222", "address": "Av. Industria, 20", "city": "Barcelona", "accountCode": "400" }
+    { "name": "Proveedor SA", "nif": "A11111111", "address": "Calle Proveedor, 5", "city": "Madrid", "accountCode": "400" }
   ],
   "clients": [
-    { "name": "Cliente SL", "nif": "B33333333", "address": "Calle Cliente, 8", "city": "Valencia", "accountCode": "430" },
-    { "name": "Empresa Compradora SA", "nif": "A44444444", "address": "Paseo Principal, 15", "city": "Sevilla", "accountCode": "430" }
+    { "name": "Cliente SL", "nif": "B33333333", "address": "Calle Cliente, 8", "city": "Valencia", "accountCode": "430" }
   ],
   "invoices": [
     {
@@ -83,78 +358,32 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
       "total": ${1000 + rates.standard * 10},
       "paymentMethod": "transfer",
       "dueDate": "${params.year}-04-15",
-      "journalNote": "Registro de compra de mercaderías a proveedor. Se reconoce la deuda con el proveedor (cuenta 400) y el ${params.taxRegime} soportado deducible (cuenta 472).",
+      "journalNote": "Compra de mercaderías. Se registra la deuda con el proveedor (400) y el ${params.taxRegime} soportado (472).",
       "accountDebits": [
-        { "accountCode": "600", "accountName": "Compras de mercaderías", "amount": 1000.00, "description": "Compra de mercaderías" },
-        { "accountCode": "472", "accountName": "${params.taxRegime} soportado", "amount": ${rates.standard * 10}, "description": "${params.taxRegime} al ${rates.standard}%" }
+        { "accountCode": "600", "accountName": "Compras de mercaderías", "amount": 1000.00, "description": "Mercaderías" },
+        { "accountCode": "472", "accountName": "${params.taxRegime} soportado", "amount": ${rates.standard * 10}, "description": "${params.taxRegime} ${rates.standard}%" }
       ],
       "accountCredits": [
-        { "accountCode": "400", "accountName": "Proveedores", "amount": ${1000 + rates.standard * 10}, "description": "Deuda con Proveedor SA" }
+        { "accountCode": "400", "accountName": "Proveedores", "amount": ${1000 + rates.standard * 10}, "description": "Deuda Proveedor SA" }
       ]
     }
   ],
-  "bankLoan": {
-    "entity": "Banco Ejemplo",
-    "loanNumber": "PRE-${params.year}-001",
-    "principal": 50000.00,
-    "annualRate": 4.5,
-    "termMonths": 60,
-    "startDate": "${params.year}-01-01",
-    "monthlyInstallment": 929.27,
-    "amortizationTable": [
-      { "period": 1, "date": "${params.year}-02-01", "installment": 929.27, "interest": 187.50, "principal": 741.77, "balance": 49258.23 },
-      { "period": 2, "date": "${params.year}-03-01", "installment": 929.27, "interest": 184.72, "principal": 744.55, "balance": 48513.68 },
-      { "period": 3, "date": "${params.year}-04-01", "installment": 929.27, "interest": 181.93, "principal": 747.34, "balance": 47766.34 }
-    ],
-    "journalNote": "Contabilización del préstamo bancario. Al recibir el préstamo se abona la cuenta 170 (largo plazo) o 520 (corto plazo). Cada cuota se desglosa en capital (520) e intereses (662).",
-    "accountDebits": [
-      { "accountCode": "572", "accountName": "Bancos e instituciones de crédito c/c vista", "amount": 50000.00, "description": "Recepción del préstamo" }
-    ],
-    "accountCredits": [
-      { "accountCode": "170", "accountName": "Deudas a largo plazo con entidades de crédito", "amount": 50000.00, "description": "Préstamo bancario concedido" }
-    ]
-  },
-  "creditPolicy": {
-    "entity": "Banco Ejemplo",
-    "policyNumber": "POL-${params.year}-001",
-    "limit": 30000.00,
-    "drawnAmount": 18000.00,
-    "annualRate": 5.5,
-    "openingCommission": 150.00,
-    "unusedCommission": 60.00,
-    "startDate": "${params.year}-06-01",
-    "endDate": "${params.year}-11-30",
-    "interestAmount": 495.00,
-    "totalSettlement": 705.00,
-    "journalNote": "Liquidación de póliza de crédito. Los intereses sobre el saldo dispuesto se cargan a la cuenta 663 (intereses de deudas) y las comisiones a la cuenta 626 (servicios bancarios).",
-    "accountDebits": [
-      { "accountCode": "663", "accountName": "Intereses de deudas", "amount": 495.00, "description": "Intereses sobre saldo dispuesto" },
-      { "accountCode": "626", "accountName": "Servicios bancarios y similares", "amount": 210.00, "description": "Comisiones de apertura y no disposición" }
-    ],
-    "accountCredits": [
-      { "accountCode": "5201", "accountName": "Deudas a corto plazo por póliza de crédito", "amount": 705.00, "description": "Total a pagar en liquidación" }
-    ]
-  },
+${optionalSectionsText}
   "creditCardStatement": {
     "cardNumber": "**** **** **** 1234",
     "entity": "Banco Ejemplo",
     "statementPeriod": "Octubre ${params.year}",
     "movements": [
-      { "date": "${params.year}-10-05", "description": "Suministros oficina - Papelería Central", "amount": 85.50, "category": "Suministros", "accountCode": "629", "accountName": "Otros servicios" },
-      { "date": "${params.year}-10-12", "description": "Gasolina - Estación BP", "amount": 120.00, "category": "Combustible", "accountCode": "628", "accountName": "Suministros" },
-      { "date": "${params.year}-10-18", "description": "Cena de trabajo - Restaurante El Olivo", "amount": 245.00, "category": "Restauración", "accountCode": "629", "accountName": "Otros servicios" },
-      { "date": "${params.year}-10-25", "description": "Suscripción software - Adobe Creative", "amount": 54.99, "category": "Software", "accountCode": "626", "accountName": "Servicios bancarios y similares" }
+      { "date": "${params.year}-10-05", "description": "Suministros oficina - Papelería", "amount": 85.50, "category": "Suministros", "accountCode": "629", "accountName": "Otros servicios" }
     ],
     "totalCharges": 505.49,
     "settlementDate": "${params.year}-11-05",
-    "journalNote": "Cada gasto con tarjeta de crédito se registra individualmente cargando la cuenta de gasto correspondiente y abonando la cuenta 5201 (tarjeta de crédito - deuda a corto plazo). Al recibir el cargo bancario: cargo a 5201 y abono a 572.",
+    "journalNote": "Cada gasto con tarjeta se registra cargando la cuenta de gasto y abonando la deuda (5201). Al cargo bancario: 5201 a 572.",
     "accountDebits": [
-      { "accountCode": "629", "accountName": "Otros servicios", "amount": 330.50, "description": "Suministros y restauración" },
-      { "accountCode": "628", "accountName": "Suministros", "amount": 120.00, "description": "Combustible" },
-      { "accountCode": "626", "accountName": "Servicios bancarios y similares", "amount": 54.99, "description": "Software" }
+      { "accountCode": "629", "accountName": "Otros servicios", "amount": 505.49, "description": "Gastos tarjeta" }
     ],
     "accountCredits": [
-      { "accountCode": "5201", "accountName": "Deudas a corto plazo por tarjeta de crédito", "amount": 505.49, "description": "Total pendiente de cargo" }
+      { "accountCode": "5201", "accountName": "Deudas a corto plazo por tarjeta de crédito", "amount": 505.49, "description": "Total pendiente" }
     ]
   },
   "insurancePolicies": [
@@ -166,13 +395,13 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
       "startDate": "${params.year}-09-01",
       "endDate": "${params.year + 1}-08-31",
       "prepaidExpense": 1200.00,
-      "journalNote": "El seguro anual pagado en septiembre cubre hasta agosto del año siguiente. Los meses de ${params.year + 1} (enero-agosto = 8 meses) se periodifican como gasto anticipado (cuenta 480).",
+      "journalNote": "Seguro anual pagado en septiembre. Los meses de ${params.year + 1} se periodifican como gasto anticipado (480).",
       "accountDebits": [
-        { "accountCode": "625", "accountName": "Primas de seguros", "amount": 600.00, "description": "Gasto del ejercicio (4 meses)" },
-        { "accountCode": "480", "accountName": "Gastos anticipados", "amount": 1200.00, "description": "Periodificación (8 meses año siguiente)" }
+        { "accountCode": "625", "accountName": "Primas de seguros", "amount": 600.00, "description": "4 meses año ${params.year}" },
+        { "accountCode": "480", "accountName": "Gastos anticipados", "amount": 1200.00, "description": "8 meses año ${params.year + 1}" }
       ],
       "accountCredits": [
-        { "accountCode": "572", "accountName": "Bancos", "amount": 1800.00, "description": "Pago de prima anual" }
+        { "accountCode": "572", "accountName": "Bancos", "amount": 1800.00, "description": "Pago prima anual" }
       ]
     }
   ],
@@ -183,62 +412,15 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
     "bookValue": 8500.00,
     "insuranceCompensation": 6000.00,
     "netLoss": 2500.00,
-    "journalNote": "El siniestro genera una pérdida extraordinaria (cuenta 678). La indemnización recibida del seguro se contabiliza como ingreso extraordinario (cuenta 778).",
+    "journalNote": "El siniestro genera una pérdida (678). La indemnización del seguro es ingreso extraordinario (778).",
     "accountDebits": [
-      { "accountCode": "678", "accountName": "Gastos excepcionales", "amount": 8500.00, "description": "Valor contable de bienes siniestrados" },
-      { "accountCode": "430", "accountName": "Clientes (seguro)", "amount": 6000.00, "description": "Indemnización a cobrar del seguro" }
+      { "accountCode": "678", "accountName": "Gastos excepcionales", "amount": 8500.00, "description": "Valor contable bienes siniestrados" },
+      { "accountCode": "430", "accountName": "Clientes (seguro)", "amount": 6000.00, "description": "Indemnización a cobrar" }
     ],
     "accountCredits": [
-      { "accountCode": "300", "accountName": "Mercaderías", "amount": 5000.00, "description": "Baja de existencias destruidas" },
-      { "accountCode": "221", "accountName": "Instalaciones técnicas", "amount": 3500.00, "description": "Baja de instalaciones dañadas" },
-      { "accountCode": "778", "accountName": "Ingresos excepcionales", "amount": 6000.00, "description": "Indemnización del seguro" }
-    ]
-  },
-  "payroll": {
-    "month": "Octubre ${params.year}",
-    "employees": [
-      {
-        "name": "María García López",
-        "naf": "281234567890",
-        "category": "Oficial de 1ª",
-        "grossSalary": 2200.00,
-        "irpfRate": 15,
-        "irpfAmount": 330.00,
-        "ssEmployeeRate": 6.35,
-        "ssEmployeeAmount": 139.70,
-        "netSalary": 1730.30,
-        "ssEmployerRate": 30.40,
-        "ssEmployerAmount": 668.80
-      },
-      {
-        "name": "Carlos Martínez Ruiz",
-        "naf": "281234567891",
-        "category": "Auxiliar",
-        "grossSalary": 1800.00,
-        "irpfRate": 12,
-        "irpfAmount": 216.00,
-        "ssEmployeeRate": 6.35,
-        "ssEmployeeAmount": 114.30,
-        "netSalary": 1469.70,
-        "ssEmployerRate": 30.40,
-        "ssEmployerAmount": 547.20
-      }
-    ],
-    "totalGross": 4000.00,
-    "totalIrpf": 546.00,
-    "totalSsEmployee": 254.00,
-    "totalNetSalary": 3200.00,
-    "totalSsEmployer": 1216.00,
-    "totalLaborCost": 5216.00,
-    "journalNote": "La nómina genera: (1) Gasto en sueldos (640); (2) Gasto SS empresa (642); (3) Retenciones IRPF (4751); (4) Cuotas SS (476); (5) Salarios netos (465).",
-    "accountDebits": [
-      { "accountCode": "640", "accountName": "Sueldos y salarios", "amount": 4000.00, "description": "Salario bruto total" },
-      { "accountCode": "642", "accountName": "Seguridad Social a cargo de la empresa", "amount": 1216.00, "description": "Cuota patronal SS" }
-    ],
-    "accountCredits": [
-      { "accountCode": "465", "accountName": "Remuneraciones pendientes de pago", "amount": 3200.00, "description": "Salarios netos a pagar" },
-      { "accountCode": "4751", "accountName": "H.P. acreedora por retenciones practicadas", "amount": 546.00, "description": "IRPF retenido" },
-      { "accountCode": "476", "accountName": "Organismos de la Seguridad Social acreedores", "amount": 1470.00, "description": "SS empleados + SS empresa" }
+      { "accountCode": "300", "accountName": "Mercaderías", "amount": 5000.00, "description": "Baja existencias" },
+      { "accountCode": "221", "accountName": "Instalaciones técnicas", "amount": 3500.00, "description": "Baja instalaciones" },
+      { "accountCode": "778", "accountName": "Ingresos excepcionales", "amount": 6000.00, "description": "Indemnización seguro" }
     ]
   },
   "bankStatements": [
@@ -250,9 +432,7 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
       "closingBalance": 21340.00,
       "transactions": [
         { "date": "${params.year}-10-02", "concept": "Transferencia recibida - Cliente SL", "debit": null, "credit": 3500.00, "balance": 28500.00 },
-        { "date": "${params.year}-10-05", "concept": "Pago nóminas octubre", "debit": 3200.00, "credit": null, "balance": 25300.00 },
-        { "date": "${params.year}-10-10", "concept": "Cuota préstamo bancario", "debit": 929.27, "credit": null, "balance": 24370.73 },
-        { "date": "${params.year}-10-31", "concept": "Cargo tarjeta crédito octubre", "debit": 505.49, "credit": null, "balance": 22369.24 }
+        { "date": "${params.year}-10-05", "concept": "Pago nóminas octubre", "debit": 3200.00, "credit": null, "balance": 25300.00 }
       ]
     }
   ],
@@ -260,41 +440,20 @@ El objeto JSON debe seguir EXACTAMENTE esta estructura. No añadas campos extra.
     {
       "entryNumber": "1",
       "date": "${params.year}-01-01",
-      "concept": "Apertura de ejercicio - Préstamo bancario",
-      "document": "PRE-${params.year}-001",
+      "concept": "Apertura de ejercicio",
+      "document": "APE-${params.year}",
       "debits": [
-        { "accountCode": "572", "accountName": "Bancos c/c", "amount": 50000.00, "description": "Ingreso del préstamo" }
+        { "accountCode": "572", "accountName": "Bancos c/c", "amount": 25000.00, "description": "Saldo inicial banco" }
       ],
       "credits": [
-        { "accountCode": "170", "accountName": "Deudas a largo plazo con entidades de crédito", "amount": 50000.00, "description": "Préstamo concedido" }
+        { "accountCode": "100", "accountName": "Capital social", "amount": 25000.00, "description": "Capital aportado" }
       ],
-      "totalAmount": 50000.00
-    },
-    {
-      "entryNumber": "2",
-      "date": "${params.year}-03-15",
-      "concept": "Compra de mercaderías a Proveedor SA",
-      "document": "F-${params.year}/001",
-      "debits": [
-        { "accountCode": "600", "accountName": "Compras de mercaderías", "amount": 1000.00, "description": "Mercaderías" },
-        { "accountCode": "472", "accountName": "${params.taxRegime} soportado", "amount": ${rates.standard * 10}, "description": "${params.taxRegime} ${rates.standard}%" }
-      ],
-      "credits": [
-        { "accountCode": "400", "accountName": "Proveedores", "amount": ${1000 + rates.standard * 10}, "description": "Deuda con proveedor" }
-      ],
-      "totalAmount": ${1000 + rates.standard * 10}
+      "totalAmount": 25000.00
     }
   ]
 }
 
-IMPORTANTE:
-1. Genera datos REALISTAS y COHERENTES para el sector ${params.sector}. Adapta los productos, clientes, proveedores y gastos al sector.
-2. Usa importes realistas para una empresa mediana española.
-3. Asegúrate de que los cálculos matemáticos sean CORRECTOS.
-4. Las fechas deben ser del año ${params.year} (salvo periodificaciones).
-5. Los asientos deben cuadrar (total debe = total haber).
-6. Genera al menos 4-5 facturas (mix de compras y ventas), 2 pólizas de seguro, y 2 empleados en nómina.
-7. Responde ÚNICAMENTE con el JSON, sin texto adicional, sin markdown, sin explicaciones.`;
+RECUERDA: Adapta TODOS los datos al sector ${params.sector}. Los importes deben ser coherentes y los cálculos exactos. Genera un mínimo de ${opsPerMonth * 12} asientos en journalEntries repartidos en todos los meses.`;
 }
 
 function getClient(config: AiConfig): OpenAI {
@@ -318,7 +477,7 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
 
   const response = await client.chat.completions.create({
     model,
-    max_tokens: 8192,
+    max_tokens: 16000,
     messages: [
       {
         role: "system",

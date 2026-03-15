@@ -161,6 +161,9 @@ export const UpdateSettingsResponse = zod.object({
  * Uses AI to generate a coherent accounting universe based on the given parameters
  * @summary Generate a new accounting universe
  */
+export const generateAccountingUniverseBodyOperationsPerMonthMin = 3;
+export const generateAccountingUniverseBodyOperationsPerMonthMax = 25;
+
 export const GenerateAccountingUniverseBody = zod.object({
   taxRegime: zod
     .enum(["IVA", "IGIC"])
@@ -172,6 +175,44 @@ export const GenerateAccountingUniverseBody = zod.object({
     .string()
     .nullish()
     .describe("Optional company name (AI will generate one if not provided)"),
+  educationLevel: zod
+    .enum(["Medio", "Superior"])
+    .optional()
+    .describe("Medio = FP Grado Medio, Superior = FP Grado Superior"),
+  operationsPerMonth: zod
+    .number()
+    .min(generateAccountingUniverseBodyOperationsPerMonthMin)
+    .max(generateAccountingUniverseBodyOperationsPerMonthMax)
+    .optional()
+    .describe("Number of journal entries per month to generate"),
+  includePayroll: zod
+    .boolean()
+    .optional()
+    .describe("Include payroll (nóminas) with IRPF and SS"),
+  includeSocialSecurity: zod
+    .boolean()
+    .optional()
+    .describe("Include monthly Social Security payments (TC1\/TC2)"),
+  includeTaxLiquidation: zod
+    .boolean()
+    .optional()
+    .describe("Include quarterly VAT\/IGIC and annual IS tax liquidations"),
+  includeBankLoan: zod
+    .boolean()
+    .optional()
+    .describe("Include a bank loan (préstamo bancario)"),
+  includeMortgage: zod
+    .boolean()
+    .optional()
+    .describe("Include a mortgage loan (hipoteca)"),
+  includeCreditPolicy: zod
+    .boolean()
+    .optional()
+    .describe("Include a credit policy (póliza de crédito)"),
+  includeFixedAssets: zod
+    .boolean()
+    .optional()
+    .describe("Include fixed assets with annual amortization"),
 });
 
 export const GenerateAccountingUniverseResponse = zod.object({
@@ -282,117 +323,25 @@ export const GenerateAccountingUniverseResponse = zod.object({
       ),
     }),
   ),
-  bankLoan: zod.object({
-    entity: zod.string(),
-    loanNumber: zod.string(),
-    principal: zod.number(),
-    annualRate: zod.number(),
-    termMonths: zod.number(),
-    startDate: zod.string(),
-    monthlyInstallment: zod.number(),
-    amortizationTable: zod.array(
-      zod.object({
-        period: zod.number(),
-        date: zod.string(),
-        installment: zod.number(),
-        interest: zod.number(),
-        principal: zod.number(),
-        balance: zod.number(),
-      }),
-    ),
-    journalNote: zod.string(),
-    accountDebits: zod.array(
-      zod.object({
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        amount: zod.number(),
-        description: zod.string(),
-      }),
-    ),
-    accountCredits: zod.array(
-      zod.object({
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        amount: zod.number(),
-        description: zod.string(),
-      }),
-    ),
-  }),
-  creditPolicy: zod.object({
-    entity: zod.string(),
-    policyNumber: zod.string(),
-    limit: zod.number(),
-    drawnAmount: zod.number(),
-    annualRate: zod.number(),
-    openingCommission: zod.number(),
-    unusedCommission: zod.number(),
-    startDate: zod.string(),
-    endDate: zod.string(),
-    interestAmount: zod.number(),
-    totalSettlement: zod.number(),
-    journalNote: zod.string(),
-    accountDebits: zod.array(
-      zod.object({
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        amount: zod.number(),
-        description: zod.string(),
-      }),
-    ),
-    accountCredits: zod.array(
-      zod.object({
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        amount: zod.number(),
-        description: zod.string(),
-      }),
-    ),
-  }),
-  creditCardStatement: zod.object({
-    cardNumber: zod.string(),
-    entity: zod.string(),
-    statementPeriod: zod.string(),
-    movements: zod.array(
-      zod.object({
-        date: zod.string(),
-        description: zod.string(),
-        amount: zod.number(),
-        category: zod.string(),
-        accountCode: zod.string(),
-        accountName: zod.string(),
-      }),
-    ),
-    totalCharges: zod.number(),
-    settlementDate: zod.string(),
-    journalNote: zod.string(),
-    accountDebits: zod.array(
-      zod.object({
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        amount: zod.number(),
-        description: zod.string(),
-      }),
-    ),
-    accountCredits: zod.array(
-      zod.object({
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        amount: zod.number(),
-        description: zod.string(),
-      }),
-    ),
-  }),
-  insurancePolicies: zod.array(
-    zod.object({
-      policyNumber: zod.string(),
-      insurer: zod.string(),
-      type: zod.string(),
-      annualPremium: zod.number(),
+  bankLoan: zod
+    .object({
+      entity: zod.string(),
+      loanNumber: zod.string(),
+      principal: zod.number(),
+      annualRate: zod.number(),
+      termMonths: zod.number(),
       startDate: zod.string(),
-      endDate: zod.string(),
-      prepaidExpense: zod
-        .number()
-        .describe("Amount to defer to next period (cuenta 480)"),
+      monthlyInstallment: zod.number(),
+      amortizationTable: zod.array(
+        zod.object({
+          period: zod.number(),
+          date: zod.string(),
+          installment: zod.number(),
+          interest: zod.number(),
+          principal: zod.number(),
+          balance: zod.number(),
+        }),
+      ),
       journalNote: zod.string(),
       accountDebits: zod.array(
         zod.object({
@@ -410,74 +359,328 @@ export const GenerateAccountingUniverseResponse = zod.object({
           description: zod.string(),
         }),
       ),
-    }),
-  ),
-  casualtyEvent: zod.object({
-    date: zod.string(),
-    description: zod.string(),
-    assetAffected: zod.string(),
-    bookValue: zod.number(),
-    insuranceCompensation: zod.number(),
-    netLoss: zod.number(),
-    journalNote: zod.string(),
-    accountDebits: zod.array(
+    })
+    .optional(),
+  mortgage: zod
+    .object({
+      entity: zod.string(),
+      loanNumber: zod.string(),
+      propertyDescription: zod.string(),
+      propertyValue: zod.number(),
+      principal: zod.number(),
+      annualRate: zod.number(),
+      termMonths: zod.number(),
+      startDate: zod.string(),
+      monthlyInstallment: zod.number(),
+      amortizationTable: zod.array(
+        zod.object({
+          period: zod.number(),
+          date: zod.string(),
+          installment: zod.number(),
+          interest: zod.number(),
+          principal: zod.number(),
+          balance: zod.number(),
+        }),
+      ),
+      journalNote: zod.string(),
+      accountDebits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+      accountCredits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+    })
+    .optional(),
+  creditPolicy: zod
+    .object({
+      entity: zod.string(),
+      policyNumber: zod.string(),
+      limit: zod.number(),
+      drawnAmount: zod.number(),
+      annualRate: zod.number(),
+      openingCommission: zod.number(),
+      unusedCommission: zod.number(),
+      startDate: zod.string(),
+      endDate: zod.string(),
+      interestAmount: zod.number(),
+      totalSettlement: zod.number(),
+      journalNote: zod.string(),
+      accountDebits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+      accountCredits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+    })
+    .optional(),
+  creditCardStatement: zod
+    .object({
+      cardNumber: zod.string(),
+      entity: zod.string(),
+      statementPeriod: zod.string(),
+      movements: zod.array(
+        zod.object({
+          date: zod.string(),
+          description: zod.string(),
+          amount: zod.number(),
+          category: zod.string(),
+          accountCode: zod.string(),
+          accountName: zod.string(),
+        }),
+      ),
+      totalCharges: zod.number(),
+      settlementDate: zod.string(),
+      journalNote: zod.string(),
+      accountDebits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+      accountCredits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+    })
+    .optional(),
+  insurancePolicies: zod
+    .array(
       zod.object({
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        amount: zod.number(),
+        policyNumber: zod.string(),
+        insurer: zod.string(),
+        type: zod.string(),
+        annualPremium: zod.number(),
+        startDate: zod.string(),
+        endDate: zod.string(),
+        prepaidExpense: zod
+          .number()
+          .describe("Amount to defer to next period (cuenta 480)"),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
+  casualtyEvent: zod
+    .object({
+      date: zod.string(),
+      description: zod.string(),
+      assetAffected: zod.string(),
+      bookValue: zod.number(),
+      insuranceCompensation: zod.number(),
+      netLoss: zod.number(),
+      journalNote: zod.string(),
+      accountDebits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+      accountCredits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+    })
+    .optional(),
+  payroll: zod
+    .object({
+      month: zod.string(),
+      employees: zod.array(
+        zod.object({
+          name: zod.string(),
+          naf: zod.string(),
+          category: zod.string(),
+          grossSalary: zod.number(),
+          irpfRate: zod.number(),
+          irpfAmount: zod.number(),
+          ssEmployeeRate: zod.number(),
+          ssEmployeeAmount: zod.number(),
+          netSalary: zod.number(),
+          ssEmployerRate: zod.number(),
+          ssEmployerAmount: zod.number(),
+        }),
+      ),
+      totalGross: zod.number(),
+      totalIrpf: zod.number(),
+      totalSsEmployee: zod.number(),
+      totalNetSalary: zod.number(),
+      totalSsEmployer: zod.number(),
+      totalLaborCost: zod.number(),
+      journalNote: zod.string(),
+      accountDebits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+      accountCredits: zod.array(
+        zod.object({
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          amount: zod.number(),
+          description: zod.string(),
+        }),
+      ),
+    })
+    .optional(),
+  socialSecurityPayments: zod
+    .array(
+      zod.object({
+        month: zod.string(),
+        dueDate: zod.string(),
+        employeeCount: zod.number(),
+        totalGross: zod.number(),
+        ssEmployeeAmount: zod
+          .number()
+          .describe("Cuota obrera (SS a cargo del trabajador)"),
+        ssEmployerAmount: zod
+          .number()
+          .describe("Cuota patronal (SS a cargo de la empresa)"),
+        totalPayment: zod
+          .number()
+          .describe("Total TC1: ssEmployeeAmount + ssEmployerAmount"),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
+  taxLiquidations: zod
+    .array(
+      zod.object({
+        model: zod
+          .enum(["303", "420", "IS"])
+          .describe("303=IVA, 420=IGIC, IS=Impuesto Sociedades"),
+        period: zod.string().describe("T1, T2, T3, T4 or Annual"),
+        dueDate: zod.string(),
+        taxableBase: zod.number(),
+        outputTax: zod.number().describe("Cuota IVA\/IGIC devengado"),
+        inputTax: zod.number().describe("Cuota IVA\/IGIC deducible"),
+        result: zod.number().describe("Positive = to pay, negative = refund"),
+        paymentType: zod.enum(["ingreso", "devolución", "compensación"]),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
+  fixedAssets: zod
+    .array(
+      zod.object({
+        code: zod.string(),
         description: zod.string(),
+        purchaseDate: zod.string(),
+        purchaseCost: zod.number(),
+        usefulLifeYears: zod.number(),
+        annualDepreciation: zod.number(),
+        accumulatedDepreciation: zod.number(),
+        netBookValue: zod.number(),
+        depreciationMethod: zod.string().describe("Lineal, Regresivo, etc."),
+        assetAccountCode: zod
+          .string()
+          .describe("PGC asset account (e.g. 213, 216)"),
+        accDepreciationCode: zod
+          .string()
+          .describe("Accumulated depreciation account (e.g. 2813)"),
+        depExpenseCode: zod
+          .string()
+          .describe("Depreciation expense account (e.g. 681)"),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
       }),
-    ),
-    accountCredits: zod.array(
-      zod.object({
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        amount: zod.number(),
-        description: zod.string(),
-      }),
-    ),
-  }),
-  payroll: zod.object({
-    month: zod.string(),
-    employees: zod.array(
-      zod.object({
-        name: zod.string(),
-        naf: zod.string(),
-        category: zod.string(),
-        grossSalary: zod.number(),
-        irpfRate: zod.number(),
-        irpfAmount: zod.number(),
-        ssEmployeeRate: zod.number(),
-        ssEmployeeAmount: zod.number(),
-        netSalary: zod.number(),
-        ssEmployerRate: zod.number(),
-        ssEmployerAmount: zod.number(),
-      }),
-    ),
-    totalGross: zod.number(),
-    totalIrpf: zod.number(),
-    totalSsEmployee: zod.number(),
-    totalNetSalary: zod.number(),
-    totalSsEmployer: zod.number(),
-    totalLaborCost: zod.number(),
-    journalNote: zod.string(),
-    accountDebits: zod.array(
-      zod.object({
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        amount: zod.number(),
-        description: zod.string(),
-      }),
-    ),
-    accountCredits: zod.array(
-      zod.object({
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        amount: zod.number(),
-        description: zod.string(),
-      }),
-    ),
-  }),
+    )
+    .optional(),
   bankStatements: zod.array(
     zod.object({
       bank: zod.string(),
@@ -658,117 +861,25 @@ export const SaveGenerationBody = zod.object({
         ),
       }),
     ),
-    bankLoan: zod.object({
-      entity: zod.string(),
-      loanNumber: zod.string(),
-      principal: zod.number(),
-      annualRate: zod.number(),
-      termMonths: zod.number(),
-      startDate: zod.string(),
-      monthlyInstallment: zod.number(),
-      amortizationTable: zod.array(
-        zod.object({
-          period: zod.number(),
-          date: zod.string(),
-          installment: zod.number(),
-          interest: zod.number(),
-          principal: zod.number(),
-          balance: zod.number(),
-        }),
-      ),
-      journalNote: zod.string(),
-      accountDebits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-      accountCredits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-    }),
-    creditPolicy: zod.object({
-      entity: zod.string(),
-      policyNumber: zod.string(),
-      limit: zod.number(),
-      drawnAmount: zod.number(),
-      annualRate: zod.number(),
-      openingCommission: zod.number(),
-      unusedCommission: zod.number(),
-      startDate: zod.string(),
-      endDate: zod.string(),
-      interestAmount: zod.number(),
-      totalSettlement: zod.number(),
-      journalNote: zod.string(),
-      accountDebits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-      accountCredits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-    }),
-    creditCardStatement: zod.object({
-      cardNumber: zod.string(),
-      entity: zod.string(),
-      statementPeriod: zod.string(),
-      movements: zod.array(
-        zod.object({
-          date: zod.string(),
-          description: zod.string(),
-          amount: zod.number(),
-          category: zod.string(),
-          accountCode: zod.string(),
-          accountName: zod.string(),
-        }),
-      ),
-      totalCharges: zod.number(),
-      settlementDate: zod.string(),
-      journalNote: zod.string(),
-      accountDebits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-      accountCredits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-    }),
-    insurancePolicies: zod.array(
-      zod.object({
-        policyNumber: zod.string(),
-        insurer: zod.string(),
-        type: zod.string(),
-        annualPremium: zod.number(),
+    bankLoan: zod
+      .object({
+        entity: zod.string(),
+        loanNumber: zod.string(),
+        principal: zod.number(),
+        annualRate: zod.number(),
+        termMonths: zod.number(),
         startDate: zod.string(),
-        endDate: zod.string(),
-        prepaidExpense: zod
-          .number()
-          .describe("Amount to defer to next period (cuenta 480)"),
+        monthlyInstallment: zod.number(),
+        amortizationTable: zod.array(
+          zod.object({
+            period: zod.number(),
+            date: zod.string(),
+            installment: zod.number(),
+            interest: zod.number(),
+            principal: zod.number(),
+            balance: zod.number(),
+          }),
+        ),
         journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
@@ -786,74 +897,328 @@ export const SaveGenerationBody = zod.object({
             description: zod.string(),
           }),
         ),
-      }),
-    ),
-    casualtyEvent: zod.object({
-      date: zod.string(),
-      description: zod.string(),
-      assetAffected: zod.string(),
-      bookValue: zod.number(),
-      insuranceCompensation: zod.number(),
-      netLoss: zod.number(),
-      journalNote: zod.string(),
-      accountDebits: zod.array(
+      })
+      .optional(),
+    mortgage: zod
+      .object({
+        entity: zod.string(),
+        loanNumber: zod.string(),
+        propertyDescription: zod.string(),
+        propertyValue: zod.number(),
+        principal: zod.number(),
+        annualRate: zod.number(),
+        termMonths: zod.number(),
+        startDate: zod.string(),
+        monthlyInstallment: zod.number(),
+        amortizationTable: zod.array(
+          zod.object({
+            period: zod.number(),
+            date: zod.string(),
+            installment: zod.number(),
+            interest: zod.number(),
+            principal: zod.number(),
+            balance: zod.number(),
+          }),
+        ),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    creditPolicy: zod
+      .object({
+        entity: zod.string(),
+        policyNumber: zod.string(),
+        limit: zod.number(),
+        drawnAmount: zod.number(),
+        annualRate: zod.number(),
+        openingCommission: zod.number(),
+        unusedCommission: zod.number(),
+        startDate: zod.string(),
+        endDate: zod.string(),
+        interestAmount: zod.number(),
+        totalSettlement: zod.number(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    creditCardStatement: zod
+      .object({
+        cardNumber: zod.string(),
+        entity: zod.string(),
+        statementPeriod: zod.string(),
+        movements: zod.array(
+          zod.object({
+            date: zod.string(),
+            description: zod.string(),
+            amount: zod.number(),
+            category: zod.string(),
+            accountCode: zod.string(),
+            accountName: zod.string(),
+          }),
+        ),
+        totalCharges: zod.number(),
+        settlementDate: zod.string(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    insurancePolicies: zod
+      .array(
         zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
+          policyNumber: zod.string(),
+          insurer: zod.string(),
+          type: zod.string(),
+          annualPremium: zod.number(),
+          startDate: zod.string(),
+          endDate: zod.string(),
+          prepaidExpense: zod
+            .number()
+            .describe("Amount to defer to next period (cuenta 480)"),
+          journalNote: zod.string(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+        }),
+      )
+      .optional(),
+    casualtyEvent: zod
+      .object({
+        date: zod.string(),
+        description: zod.string(),
+        assetAffected: zod.string(),
+        bookValue: zod.number(),
+        insuranceCompensation: zod.number(),
+        netLoss: zod.number(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    payroll: zod
+      .object({
+        month: zod.string(),
+        employees: zod.array(
+          zod.object({
+            name: zod.string(),
+            naf: zod.string(),
+            category: zod.string(),
+            grossSalary: zod.number(),
+            irpfRate: zod.number(),
+            irpfAmount: zod.number(),
+            ssEmployeeRate: zod.number(),
+            ssEmployeeAmount: zod.number(),
+            netSalary: zod.number(),
+            ssEmployerRate: zod.number(),
+            ssEmployerAmount: zod.number(),
+          }),
+        ),
+        totalGross: zod.number(),
+        totalIrpf: zod.number(),
+        totalSsEmployee: zod.number(),
+        totalNetSalary: zod.number(),
+        totalSsEmployer: zod.number(),
+        totalLaborCost: zod.number(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    socialSecurityPayments: zod
+      .array(
+        zod.object({
+          month: zod.string(),
+          dueDate: zod.string(),
+          employeeCount: zod.number(),
+          totalGross: zod.number(),
+          ssEmployeeAmount: zod
+            .number()
+            .describe("Cuota obrera (SS a cargo del trabajador)"),
+          ssEmployerAmount: zod
+            .number()
+            .describe("Cuota patronal (SS a cargo de la empresa)"),
+          totalPayment: zod
+            .number()
+            .describe("Total TC1: ssEmployeeAmount + ssEmployerAmount"),
+          journalNote: zod.string(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+        }),
+      )
+      .optional(),
+    taxLiquidations: zod
+      .array(
+        zod.object({
+          model: zod
+            .enum(["303", "420", "IS"])
+            .describe("303=IVA, 420=IGIC, IS=Impuesto Sociedades"),
+          period: zod.string().describe("T1, T2, T3, T4 or Annual"),
+          dueDate: zod.string(),
+          taxableBase: zod.number(),
+          outputTax: zod.number().describe("Cuota IVA\/IGIC devengado"),
+          inputTax: zod.number().describe("Cuota IVA\/IGIC deducible"),
+          result: zod.number().describe("Positive = to pay, negative = refund"),
+          paymentType: zod.enum(["ingreso", "devolución", "compensación"]),
+          journalNote: zod.string(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+        }),
+      )
+      .optional(),
+    fixedAssets: zod
+      .array(
+        zod.object({
+          code: zod.string(),
           description: zod.string(),
+          purchaseDate: zod.string(),
+          purchaseCost: zod.number(),
+          usefulLifeYears: zod.number(),
+          annualDepreciation: zod.number(),
+          accumulatedDepreciation: zod.number(),
+          netBookValue: zod.number(),
+          depreciationMethod: zod.string().describe("Lineal, Regresivo, etc."),
+          assetAccountCode: zod
+            .string()
+            .describe("PGC asset account (e.g. 213, 216)"),
+          accDepreciationCode: zod
+            .string()
+            .describe("Accumulated depreciation account (e.g. 2813)"),
+          depExpenseCode: zod
+            .string()
+            .describe("Depreciation expense account (e.g. 681)"),
+          journalNote: zod.string(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
         }),
-      ),
-      accountCredits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-    }),
-    payroll: zod.object({
-      month: zod.string(),
-      employees: zod.array(
-        zod.object({
-          name: zod.string(),
-          naf: zod.string(),
-          category: zod.string(),
-          grossSalary: zod.number(),
-          irpfRate: zod.number(),
-          irpfAmount: zod.number(),
-          ssEmployeeRate: zod.number(),
-          ssEmployeeAmount: zod.number(),
-          netSalary: zod.number(),
-          ssEmployerRate: zod.number(),
-          ssEmployerAmount: zod.number(),
-        }),
-      ),
-      totalGross: zod.number(),
-      totalIrpf: zod.number(),
-      totalSsEmployee: zod.number(),
-      totalNetSalary: zod.number(),
-      totalSsEmployer: zod.number(),
-      totalLaborCost: zod.number(),
-      journalNote: zod.string(),
-      accountDebits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-      accountCredits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-    }),
+      )
+      .optional(),
     bankStatements: zod.array(
       zod.object({
         bank: zod.string(),
@@ -1028,117 +1393,25 @@ export const GetGenerationResponse = zod.object({
         ),
       }),
     ),
-    bankLoan: zod.object({
-      entity: zod.string(),
-      loanNumber: zod.string(),
-      principal: zod.number(),
-      annualRate: zod.number(),
-      termMonths: zod.number(),
-      startDate: zod.string(),
-      monthlyInstallment: zod.number(),
-      amortizationTable: zod.array(
-        zod.object({
-          period: zod.number(),
-          date: zod.string(),
-          installment: zod.number(),
-          interest: zod.number(),
-          principal: zod.number(),
-          balance: zod.number(),
-        }),
-      ),
-      journalNote: zod.string(),
-      accountDebits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-      accountCredits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-    }),
-    creditPolicy: zod.object({
-      entity: zod.string(),
-      policyNumber: zod.string(),
-      limit: zod.number(),
-      drawnAmount: zod.number(),
-      annualRate: zod.number(),
-      openingCommission: zod.number(),
-      unusedCommission: zod.number(),
-      startDate: zod.string(),
-      endDate: zod.string(),
-      interestAmount: zod.number(),
-      totalSettlement: zod.number(),
-      journalNote: zod.string(),
-      accountDebits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-      accountCredits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-    }),
-    creditCardStatement: zod.object({
-      cardNumber: zod.string(),
-      entity: zod.string(),
-      statementPeriod: zod.string(),
-      movements: zod.array(
-        zod.object({
-          date: zod.string(),
-          description: zod.string(),
-          amount: zod.number(),
-          category: zod.string(),
-          accountCode: zod.string(),
-          accountName: zod.string(),
-        }),
-      ),
-      totalCharges: zod.number(),
-      settlementDate: zod.string(),
-      journalNote: zod.string(),
-      accountDebits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-      accountCredits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-    }),
-    insurancePolicies: zod.array(
-      zod.object({
-        policyNumber: zod.string(),
-        insurer: zod.string(),
-        type: zod.string(),
-        annualPremium: zod.number(),
+    bankLoan: zod
+      .object({
+        entity: zod.string(),
+        loanNumber: zod.string(),
+        principal: zod.number(),
+        annualRate: zod.number(),
+        termMonths: zod.number(),
         startDate: zod.string(),
-        endDate: zod.string(),
-        prepaidExpense: zod
-          .number()
-          .describe("Amount to defer to next period (cuenta 480)"),
+        monthlyInstallment: zod.number(),
+        amortizationTable: zod.array(
+          zod.object({
+            period: zod.number(),
+            date: zod.string(),
+            installment: zod.number(),
+            interest: zod.number(),
+            principal: zod.number(),
+            balance: zod.number(),
+          }),
+        ),
         journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
@@ -1156,74 +1429,328 @@ export const GetGenerationResponse = zod.object({
             description: zod.string(),
           }),
         ),
-      }),
-    ),
-    casualtyEvent: zod.object({
-      date: zod.string(),
-      description: zod.string(),
-      assetAffected: zod.string(),
-      bookValue: zod.number(),
-      insuranceCompensation: zod.number(),
-      netLoss: zod.number(),
-      journalNote: zod.string(),
-      accountDebits: zod.array(
+      })
+      .optional(),
+    mortgage: zod
+      .object({
+        entity: zod.string(),
+        loanNumber: zod.string(),
+        propertyDescription: zod.string(),
+        propertyValue: zod.number(),
+        principal: zod.number(),
+        annualRate: zod.number(),
+        termMonths: zod.number(),
+        startDate: zod.string(),
+        monthlyInstallment: zod.number(),
+        amortizationTable: zod.array(
+          zod.object({
+            period: zod.number(),
+            date: zod.string(),
+            installment: zod.number(),
+            interest: zod.number(),
+            principal: zod.number(),
+            balance: zod.number(),
+          }),
+        ),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    creditPolicy: zod
+      .object({
+        entity: zod.string(),
+        policyNumber: zod.string(),
+        limit: zod.number(),
+        drawnAmount: zod.number(),
+        annualRate: zod.number(),
+        openingCommission: zod.number(),
+        unusedCommission: zod.number(),
+        startDate: zod.string(),
+        endDate: zod.string(),
+        interestAmount: zod.number(),
+        totalSettlement: zod.number(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    creditCardStatement: zod
+      .object({
+        cardNumber: zod.string(),
+        entity: zod.string(),
+        statementPeriod: zod.string(),
+        movements: zod.array(
+          zod.object({
+            date: zod.string(),
+            description: zod.string(),
+            amount: zod.number(),
+            category: zod.string(),
+            accountCode: zod.string(),
+            accountName: zod.string(),
+          }),
+        ),
+        totalCharges: zod.number(),
+        settlementDate: zod.string(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    insurancePolicies: zod
+      .array(
         zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
+          policyNumber: zod.string(),
+          insurer: zod.string(),
+          type: zod.string(),
+          annualPremium: zod.number(),
+          startDate: zod.string(),
+          endDate: zod.string(),
+          prepaidExpense: zod
+            .number()
+            .describe("Amount to defer to next period (cuenta 480)"),
+          journalNote: zod.string(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+        }),
+      )
+      .optional(),
+    casualtyEvent: zod
+      .object({
+        date: zod.string(),
+        description: zod.string(),
+        assetAffected: zod.string(),
+        bookValue: zod.number(),
+        insuranceCompensation: zod.number(),
+        netLoss: zod.number(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    payroll: zod
+      .object({
+        month: zod.string(),
+        employees: zod.array(
+          zod.object({
+            name: zod.string(),
+            naf: zod.string(),
+            category: zod.string(),
+            grossSalary: zod.number(),
+            irpfRate: zod.number(),
+            irpfAmount: zod.number(),
+            ssEmployeeRate: zod.number(),
+            ssEmployeeAmount: zod.number(),
+            netSalary: zod.number(),
+            ssEmployerRate: zod.number(),
+            ssEmployerAmount: zod.number(),
+          }),
+        ),
+        totalGross: zod.number(),
+        totalIrpf: zod.number(),
+        totalSsEmployee: zod.number(),
+        totalNetSalary: zod.number(),
+        totalSsEmployer: zod.number(),
+        totalLaborCost: zod.number(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      })
+      .optional(),
+    socialSecurityPayments: zod
+      .array(
+        zod.object({
+          month: zod.string(),
+          dueDate: zod.string(),
+          employeeCount: zod.number(),
+          totalGross: zod.number(),
+          ssEmployeeAmount: zod
+            .number()
+            .describe("Cuota obrera (SS a cargo del trabajador)"),
+          ssEmployerAmount: zod
+            .number()
+            .describe("Cuota patronal (SS a cargo de la empresa)"),
+          totalPayment: zod
+            .number()
+            .describe("Total TC1: ssEmployeeAmount + ssEmployerAmount"),
+          journalNote: zod.string(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+        }),
+      )
+      .optional(),
+    taxLiquidations: zod
+      .array(
+        zod.object({
+          model: zod
+            .enum(["303", "420", "IS"])
+            .describe("303=IVA, 420=IGIC, IS=Impuesto Sociedades"),
+          period: zod.string().describe("T1, T2, T3, T4 or Annual"),
+          dueDate: zod.string(),
+          taxableBase: zod.number(),
+          outputTax: zod.number().describe("Cuota IVA\/IGIC devengado"),
+          inputTax: zod.number().describe("Cuota IVA\/IGIC deducible"),
+          result: zod.number().describe("Positive = to pay, negative = refund"),
+          paymentType: zod.enum(["ingreso", "devolución", "compensación"]),
+          journalNote: zod.string(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+        }),
+      )
+      .optional(),
+    fixedAssets: zod
+      .array(
+        zod.object({
+          code: zod.string(),
           description: zod.string(),
+          purchaseDate: zod.string(),
+          purchaseCost: zod.number(),
+          usefulLifeYears: zod.number(),
+          annualDepreciation: zod.number(),
+          accumulatedDepreciation: zod.number(),
+          netBookValue: zod.number(),
+          depreciationMethod: zod.string().describe("Lineal, Regresivo, etc."),
+          assetAccountCode: zod
+            .string()
+            .describe("PGC asset account (e.g. 213, 216)"),
+          accDepreciationCode: zod
+            .string()
+            .describe("Accumulated depreciation account (e.g. 2813)"),
+          depExpenseCode: zod
+            .string()
+            .describe("Depreciation expense account (e.g. 681)"),
+          journalNote: zod.string(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
         }),
-      ),
-      accountCredits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-    }),
-    payroll: zod.object({
-      month: zod.string(),
-      employees: zod.array(
-        zod.object({
-          name: zod.string(),
-          naf: zod.string(),
-          category: zod.string(),
-          grossSalary: zod.number(),
-          irpfRate: zod.number(),
-          irpfAmount: zod.number(),
-          ssEmployeeRate: zod.number(),
-          ssEmployeeAmount: zod.number(),
-          netSalary: zod.number(),
-          ssEmployerRate: zod.number(),
-          ssEmployerAmount: zod.number(),
-        }),
-      ),
-      totalGross: zod.number(),
-      totalIrpf: zod.number(),
-      totalSsEmployee: zod.number(),
-      totalNetSalary: zod.number(),
-      totalSsEmployer: zod.number(),
-      totalLaborCost: zod.number(),
-      journalNote: zod.string(),
-      accountDebits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-      accountCredits: zod.array(
-        zod.object({
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          amount: zod.number(),
-          description: zod.string(),
-        }),
-      ),
-    }),
+      )
+      .optional(),
     bankStatements: zod.array(
       zod.object({
         bank: zod.string(),

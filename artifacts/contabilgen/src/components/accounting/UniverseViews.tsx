@@ -8,7 +8,18 @@ import {
   CreditCardMovement,
   PayrollEmployee,
   BankTransaction,
-  JournalEntry
+  JournalEntry,
+  TaxLiquidation,
+  Mortgage,
+  SocialSecurityPayment,
+  FixedAsset,
+  BankLoan,
+  CreditPolicy,
+  CreditCardStatement,
+  InsurancePolicy,
+  CasualtyEvent,
+  Payroll,
+  BankStatement,
 } from "@workspace/api-client-react";
 import { cn, formatEuro, formatDate, formatAccountCode } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -312,154 +323,168 @@ export const InvoicesView = ({ data }: { data: Invoice[] }) => {
   );
 };
 
-export const FinancialView = ({ loan, policy, card }: { loan: BankLoan, policy: CreditPolicy, card: CreditCardStatement }) => {
+export const FinancialView = ({ loan, policy, card }: { loan?: BankLoan | null, policy?: CreditPolicy | null, card?: CreditCardStatement | null }) => {
+  if (!loan && !policy && !card) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se han generado datos financieros.</p>
+        <p className="text-sm mt-1">Activa las opciones de préstamo y póliza en la configuración avanzada.</p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
       {/* Préstamo */}
-      <section>
-        <SectionTitle title="Préstamo Bancario" description="Condiciones del préstamo y cuadro de amortización (Sistema Francés)." />
-        <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
-          <CardHeader className="bg-slate-50 border-b grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Entidad</p>
-              <p className="font-bold">{loan.entity}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Principal</p>
-              <p className="font-mono font-bold text-primary text-lg">{formatEuro(loan.principal)}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Tipo Interés</p>
-              <p className="font-mono font-medium">{loan.annualRate}% Anual</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Plazo</p>
-              <p className="font-medium">{loan.termMonths} meses</p>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <h4 className="text-sm font-bold text-muted-foreground uppercase mb-4">Cuadro de Amortización (Primeros meses)</h4>
-            <div className="rounded-xl border overflow-hidden mb-6">
-              <Table>
-                <TableHeader className="bg-slate-100">
-                  <TableRow>
-                    <TableHead className="text-center w-16">Mes</TableHead>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead className="text-right">Cuota (Total)</TableHead>
-                    <TableHead className="text-right">Intereses</TableHead>
-                    <TableHead className="text-right">Amort. Principal</TableHead>
-                    <TableHead className="text-right">Capital Pendiente</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {loan.amortizationTable.slice(0, 12).map(row => (
-                    <TableRow key={row.period}>
-                      <TableCell className="text-center font-medium">{row.period}</TableCell>
-                      <TableCell>{formatDate(row.date)}</TableCell>
-                      <TableCell className="text-right font-mono bg-slate-50">{formatEuro(row.installment)}</TableCell>
-                      <TableCell className="text-right font-mono text-destructive/80">{formatEuro(row.interest)}</TableCell>
-                      <TableCell className="text-right font-mono text-primary/80">{formatEuro(row.principal)}</TableCell>
-                      <TableCell className="text-right font-mono font-medium">{formatEuro(row.balance)}</TableCell>
+      {loan && (
+        <section>
+          <SectionTitle title="Préstamo Bancario" description="Condiciones del préstamo y cuadro de amortización (Sistema Francés)." />
+          <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
+            <CardHeader className="bg-slate-50 border-b grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Entidad</p>
+                <p className="font-bold">{loan.entity}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Principal</p>
+                <p className="font-mono font-bold text-primary text-lg">{formatEuro(loan.principal)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Tipo Interés</p>
+                <p className="font-mono font-medium">{loan.annualRate}% Anual</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Plazo</p>
+                <p className="font-medium">{loan.termMonths} meses</p>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <h4 className="text-sm font-bold text-muted-foreground uppercase mb-4">Cuadro de Amortización (Primeros meses)</h4>
+              <div className="rounded-xl border overflow-hidden mb-6">
+                <Table>
+                  <TableHeader className="bg-slate-100">
+                    <TableRow>
+                      <TableHead className="text-center w-16">Mes</TableHead>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead className="text-right">Cuota (Total)</TableHead>
+                      <TableHead className="text-right">Intereses</TableHead>
+                      <TableHead className="text-right">Amort. Principal</TableHead>
+                      <TableHead className="text-right">Capital Pendiente</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <AsientoContable debits={loan.accountDebits} credits={loan.accountCredits} note={loan.journalNote} />
-          </CardContent>
-        </Card>
-      </section>
+                  </TableHeader>
+                  <TableBody>
+                    {loan.amortizationTable.slice(0, 12).map(row => (
+                      <TableRow key={row.period}>
+                        <TableCell className="text-center font-medium">{row.period}</TableCell>
+                        <TableCell>{formatDate(row.date)}</TableCell>
+                        <TableCell className="text-right font-mono bg-slate-50">{formatEuro(row.installment)}</TableCell>
+                        <TableCell className="text-right font-mono text-destructive/80">{formatEuro(row.interest)}</TableCell>
+                        <TableCell className="text-right font-mono text-primary/80">{formatEuro(row.principal)}</TableCell>
+                        <TableCell className="text-right font-mono font-medium">{formatEuro(row.balance)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <AsientoContable debits={loan.accountDebits} credits={loan.accountCredits} note={loan.journalNote} />
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Póliza */}
-      <section>
-        <SectionTitle title="Póliza de Crédito" description="Liquidación de intereses de la línea de crédito." />
-        <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
-          <CardHeader className="bg-slate-50 border-b grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Entidad</p>
-              <p className="font-bold">{policy.entity}</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Límite / Dispuesto</p>
-              <p className="font-mono font-medium">
-                {formatEuro(policy.limit)} / <span className="text-destructive font-bold">{formatEuro(policy.drawnAmount)}</span>
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Interés Anual</p>
-              <p className="font-mono font-medium">{policy.annualRate}%</p>
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Liquidación Total</p>
-              <p className="font-mono font-bold text-destructive text-lg">{formatEuro(policy.totalSettlement)}</p>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <AsientoContable debits={policy.accountDebits} credits={policy.accountCredits} note={policy.journalNote} />
-          </CardContent>
-        </Card>
-      </section>
+      {policy && (
+        <section>
+          <SectionTitle title="Póliza de Crédito" description="Liquidación de intereses de la línea de crédito." />
+          <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
+            <CardHeader className="bg-slate-50 border-b grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Entidad</p>
+                <p className="font-bold">{policy.entity}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Límite / Dispuesto</p>
+                <p className="font-mono font-medium">
+                  {formatEuro(policy.limit)} / <span className="text-destructive font-bold">{formatEuro(policy.drawnAmount)}</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Interés Anual</p>
+                <p className="font-mono font-medium">{policy.annualRate}%</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Liquidación Total</p>
+                <p className="font-mono font-bold text-destructive text-lg">{formatEuro(policy.totalSettlement)}</p>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <AsientoContable debits={policy.accountDebits} credits={policy.accountCredits} note={policy.journalNote} />
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* Tarjeta */}
-      <section>
-        <SectionTitle title="Extracto Tarjeta de Crédito" description="Relación de gastos mensuales cargados en la tarjeta corporativa." />
-        <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
-          <CardHeader className="bg-slate-50 border-b flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                Tarjeta {card.cardNumber}
-                <Badge variant="outline">{card.entity}</Badge>
-              </CardTitle>
-              <CardDescription>Período: {card.statementPeriod} | Liquidación: {formatDate(card.settlementDate)}</CardDescription>
-            </div>
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground uppercase font-semibold">Total Cargos</p>
-              <p className="font-mono font-bold text-xl text-destructive">{formatEuro(card.totalCharges)}</p>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="rounded-xl border overflow-hidden mb-6">
-              <Table>
-                <TableHeader className="bg-slate-100">
-                  <TableRow>
-                    <TableHead>Fecha</TableHead>
-                    <TableHead>Descripción</TableHead>
-                    <TableHead>Categoría / Cuenta</TableHead>
-                    <TableHead className="text-right">Importe</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {card.movements.map((mov, i) => (
-                    <TableRow key={i}>
-                      <TableCell>{formatDate(mov.date)}</TableCell>
-                      <TableCell className="font-medium">{mov.description}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-mono font-normal mr-2">{mov.accountCode}</Badge>
-                        <span className="text-sm text-muted-foreground">{mov.category}</span>
-                      </TableCell>
-                      <TableCell className="text-right font-mono font-medium">{formatEuro(mov.amount)}</TableCell>
+      {card && (
+        <section>
+          <SectionTitle title="Extracto Tarjeta de Crédito" description="Relación de gastos mensuales cargados en la tarjeta corporativa." />
+          <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
+            <CardHeader className="bg-slate-50 border-b flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  Tarjeta {card.cardNumber}
+                  <Badge variant="outline">{card.entity}</Badge>
+                </CardTitle>
+                <CardDescription>Período: {card.statementPeriod} | Liquidación: {formatDate(card.settlementDate)}</CardDescription>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-muted-foreground uppercase font-semibold">Total Cargos</p>
+                <p className="font-mono font-bold text-xl text-destructive">{formatEuro(card.totalCharges)}</p>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="rounded-xl border overflow-hidden mb-6">
+                <Table>
+                  <TableHeader className="bg-slate-100">
+                    <TableRow>
+                      <TableHead>Fecha</TableHead>
+                      <TableHead>Descripción</TableHead>
+                      <TableHead>Categoría / Cuenta</TableHead>
+                      <TableHead className="text-right">Importe</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-            <AsientoContable debits={card.accountDebits} credits={card.accountCredits} note={card.journalNote} />
-          </CardContent>
-        </Card>
-      </section>
+                  </TableHeader>
+                  <TableBody>
+                    {card.movements.map((mov, i) => (
+                      <TableRow key={i}>
+                        <TableCell>{formatDate(mov.date)}</TableCell>
+                        <TableCell className="font-medium">{mov.description}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="font-mono font-normal mr-2">{mov.accountCode}</Badge>
+                          <span className="text-sm text-muted-foreground">{mov.category}</span>
+                        </TableCell>
+                        <TableCell className="text-right font-mono font-medium">{formatEuro(mov.amount)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <AsientoContable debits={card.accountDebits} credits={card.accountCredits} note={card.journalNote} />
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
     </div>
   );
 };
 
-export const ExtraordinaryView = ({ insurance, casualty }: { insurance: InsurancePolicy[], casualty: CasualtyEvent }) => {
+export const ExtraordinaryView = ({ insurance, casualty }: { insurance?: InsurancePolicy[] | null, casualty?: CasualtyEvent | null }) => {
   return (
     <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <section>
         <SectionTitle title="Pólizas de Seguro" description="Primas anuales y ajustes de periodificación (gastos anticipados)." />
         <div className="space-y-6">
-          {insurance.map((ins, i) => (
+          {(insurance ?? []).map((ins, i) => (
             <Card key={i} className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
               <CardHeader className="bg-slate-50 border-b flex flex-row items-center justify-between">
                 <div>
@@ -489,44 +514,54 @@ export const ExtraordinaryView = ({ insurance, casualty }: { insurance: Insuranc
         </div>
       </section>
 
-      <section>
-        <SectionTitle title="Siniestro" description="Registro de pérdidas extraordinarias y compensaciones del seguro." />
-        <Card className="rounded-2xl border-destructive/20 shadow-md overflow-hidden print-break-inside-avoid">
-          <CardHeader className="bg-destructive/5 border-b border-destructive/10">
-            <CardTitle className="text-destructive flex items-center gap-2">
-              Siniestro: {casualty.assetAffected}
-            </CardTitle>
-            <CardDescription className="text-destructive/70">{casualty.description} - Fecha: {formatDate(casualty.date)}</CardDescription>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Valor Contable (Pérdida)</p>
-                <p className="font-mono text-xl text-destructive font-bold">{formatEuro(casualty.bookValue)}</p>
+      {casualty && (
+        <section>
+          <SectionTitle title="Siniestro" description="Registro de pérdidas extraordinarias y compensaciones del seguro." />
+          <Card className="rounded-2xl border-destructive/20 shadow-md overflow-hidden print-break-inside-avoid">
+            <CardHeader className="bg-destructive/5 border-b border-destructive/10">
+              <CardTitle className="text-destructive flex items-center gap-2">
+                Siniestro: {casualty.assetAffected}
+              </CardTitle>
+              <CardDescription className="text-destructive/70">{casualty.description} - Fecha: {formatDate(casualty.date)}</CardDescription>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Valor Contable (Pérdida)</p>
+                  <p className="font-mono text-xl text-destructive font-bold">{formatEuro(casualty.bookValue)}</p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Indemnización Seguro</p>
+                  <p className="font-mono text-xl text-emerald-600 font-bold">{formatEuro(casualty.insuranceCompensation)}</p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+                  <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Impacto Neto (Cta 678/778)</p>
+                  <p className={cn(
+                    "font-mono text-xl font-bold",
+                    casualty.netLoss > 0 ? "text-destructive" : "text-emerald-600"
+                  )}>
+                    {formatEuro(Math.abs(casualty.netLoss))} {casualty.netLoss > 0 ? '(Pérdida)' : '(Beneficio)'}
+                  </p>
+                </div>
               </div>
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Indemnización Seguro</p>
-                <p className="font-mono text-xl text-emerald-600 font-bold">{formatEuro(casualty.insuranceCompensation)}</p>
-              </div>
-              <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-                <p className="text-xs text-muted-foreground uppercase font-bold mb-1">Impacto Neto (Cta 678/778)</p>
-                <p className={cn(
-                  "font-mono text-xl font-bold",
-                  casualty.netLoss > 0 ? "text-destructive" : "text-emerald-600"
-                )}>
-                  {formatEuro(Math.abs(casualty.netLoss))} {casualty.netLoss > 0 ? '(Pérdida)' : '(Beneficio)'}
-                </p>
-              </div>
-            </div>
-            <AsientoContable debits={casualty.accountDebits} credits={casualty.accountCredits} note={casualty.journalNote} />
-          </CardContent>
-        </Card>
-      </section>
+              <AsientoContable debits={casualty.accountDebits} credits={casualty.accountCredits} note={casualty.journalNote} />
+            </CardContent>
+          </Card>
+        </section>
+      )}
     </div>
   );
 };
 
-export const PayrollView = ({ data }: { data: Payroll }) => {
+export const PayrollView = ({ data }: { data?: Payroll | null }) => {
+  if (!data) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se han generado nóminas.</p>
+        <p className="text-sm mt-1">Activa la opción Nóminas en la configuración avanzada del generador.</p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <SectionTitle title={`Nóminas - ${data.month}`} description="Resumen de liquidación de sueldos, retenciones y seguros sociales." />
@@ -717,6 +752,459 @@ export const JournalView = ({ entries }: { entries: JournalEntry[] }) => {
           </Table>
         </div>
       </Card>
+    </div>
+  );
+};
+
+// ─── Document Header (Logo for print) ──────────────────────────────────────
+export const DocumentHeader = ({ company }: { company: AccountingUniverse["companyProfile"] }) => (
+  <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-primary/20">
+    <div className="flex items-center gap-3">
+      <img src="/logo.png" alt="ContabilGen Pro" className="h-10 w-auto" />
+    </div>
+    <div className="text-right">
+      <div className="font-display font-bold text-lg text-foreground">{company.name}</div>
+      <div className="text-sm text-muted-foreground">NIF: {company.nif} | Ejercicio {company.fiscalYear}</div>
+    </div>
+  </div>
+);
+
+// ─── Tax Liquidations ───────────────────────────────────────────────────────
+interface TaxLiquidationsViewProps {
+  liquidations: TaxLiquidation[];
+  company: AccountingUniverse["companyProfile"];
+}
+
+export const TaxLiquidationsView = ({ liquidations, company }: TaxLiquidationsViewProps) => {
+  if (!liquidations || liquidations.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se han generado liquidaciones fiscales.</p>
+        <p className="text-sm mt-1">Activa la opción en la configuración avanzada del generador.</p>
+      </div>
+    );
+  }
+
+  const modelLabels: Record<string, string> = {
+    "303": "Modelo 303 - IVA Trimestral",
+    "420": "Modelo 420 - IGIC Trimestral",
+    "IS": "Modelo 200 - Impuesto sobre Sociedades",
+  };
+
+  const paymentBadge: Record<string, string> = {
+    "ingreso": "bg-red-100 text-red-700 border-red-200",
+    "devolución": "bg-green-100 text-green-700 border-green-200",
+    "compensación": "bg-blue-100 text-blue-700 border-blue-200",
+  };
+
+  return (
+    <div className="space-y-8">
+      <SectionTitle
+        title="Liquidaciones Fiscales"
+        description="Modelos de IVA/IGIC trimestrales e Impuesto sobre Sociedades anual"
+      />
+      <DocumentHeader company={company} />
+
+      {liquidations.map((liq, idx) => (
+        <Card key={idx} className="border-border/60 shadow-sm overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-orange-50 to-transparent pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <CardTitle className="text-base font-bold">
+                  {modelLabels[liq.model] ?? `Modelo ${liq.model}`}
+                </CardTitle>
+                <CardDescription>
+                  Período: <strong>{liq.period}</strong> · Vencimiento: {formatDate(liq.dueDate)}
+                </CardDescription>
+              </div>
+              <Badge className={`border ${paymentBadge[liq.paymentType] ?? ""} text-sm px-3 py-1`}>
+                {liq.paymentType === "ingreso" ? "A ingresar" : liq.paymentType === "devolución" ? "A devolver" : "A compensar"}:&nbsp;{formatEuro(Math.abs(liq.result))}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+              <div className="bg-slate-50 rounded-xl p-3">
+                <div className="text-xs text-muted-foreground">Base imponible</div>
+                <div className="font-mono font-bold text-lg text-foreground">{formatEuro(liq.taxableBase)}</div>
+              </div>
+              {liq.model !== "IS" && (
+                <>
+                  <div className="bg-orange-50 rounded-xl p-3">
+                    <div className="text-xs text-muted-foreground">Cuota devengada</div>
+                    <div className="font-mono font-bold text-lg text-orange-700">{formatEuro(liq.outputTax)}</div>
+                  </div>
+                  <div className="bg-green-50 rounded-xl p-3">
+                    <div className="text-xs text-muted-foreground">Cuota deducible</div>
+                    <div className="font-mono font-bold text-lg text-green-700">{formatEuro(liq.inputTax)}</div>
+                  </div>
+                </>
+              )}
+              <div className={`rounded-xl p-3 ${liq.result >= 0 ? "bg-red-50" : "bg-emerald-50"}`}>
+                <div className="text-xs text-muted-foreground">Resultado</div>
+                <div className={`font-mono font-bold text-lg ${liq.result >= 0 ? "text-red-700" : "text-emerald-700"}`}>
+                  {formatEuro(Math.abs(liq.result))}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-4 mb-4">
+              <h4 className="text-xs font-bold uppercase tracking-wide text-amber-700 mb-1">📚 Nota contable</h4>
+              <p className="text-sm text-slate-700 leading-relaxed">{liq.journalNote}</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">DEBE</h4>
+                <div className="space-y-1.5">
+                  {liq.accountDebits.map((e, i) => (
+                    <div key={i} className="flex items-center justify-between bg-blue-50/60 rounded-lg px-3 py-2">
+                      <div>
+                        <span className="font-mono text-sm text-blue-700 font-bold">{e.accountCode}</span>
+                        <span className="ml-2 text-sm text-slate-700">{e.accountName}</span>
+                      </div>
+                      <span className="font-mono font-bold text-blue-700">{formatEuro(e.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">HABER</h4>
+                <div className="space-y-1.5">
+                  {liq.accountCredits.map((e, i) => (
+                    <div key={i} className="flex items-center justify-between bg-emerald-50/60 rounded-lg px-3 py-2">
+                      <div>
+                        <span className="font-mono text-sm text-emerald-700 font-bold">{e.accountCode}</span>
+                        <span className="ml-2 text-sm text-slate-700">{e.accountName}</span>
+                      </div>
+                      <span className="font-mono font-bold text-emerald-700">{formatEuro(e.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  );
+};
+
+// ─── Social Security Payments ───────────────────────────────────────────────
+interface SocialSecurityViewProps {
+  payments: SocialSecurityPayment[];
+  company: AccountingUniverse["companyProfile"];
+}
+
+export const SocialSecurityView = ({ payments, company }: SocialSecurityViewProps) => {
+  if (!payments || payments.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se han generado boletines de Seguridad Social.</p>
+        <p className="text-sm mt-1">Activa las opciones Nóminas y TC1 en la configuración avanzada.</p>
+      </div>
+    );
+  }
+
+  const totalSsEmployee = payments.reduce((s, p) => s + p.ssEmployeeAmount, 0);
+  const totalSsEmployer = payments.reduce((s, p) => s + p.ssEmployerAmount, 0);
+  const totalPayments = payments.reduce((s, p) => s + p.totalPayment, 0);
+
+  return (
+    <div className="space-y-8">
+      <SectionTitle
+        title="Boletines TC1 - Seguridad Social"
+        description="Liquidación mensual de cuotas a la Tesorería General de la Seguridad Social"
+      />
+      <DocumentHeader company={company} />
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+          <div className="text-xs text-blue-600 font-medium">Cuota Obrera (Total año)</div>
+          <div className="font-mono font-bold text-xl text-blue-800 mt-1">{formatEuro(totalSsEmployee)}</div>
+        </div>
+        <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
+          <div className="text-xs text-orange-600 font-medium">Cuota Patronal (Total año)</div>
+          <div className="font-mono font-bold text-xl text-orange-800 mt-1">{formatEuro(totalSsEmployer)}</div>
+        </div>
+        <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+          <div className="text-xs text-red-600 font-medium">Total TC1 (Año completo)</div>
+          <div className="font-mono font-bold text-xl text-red-800 mt-1">{formatEuro(totalPayments)}</div>
+        </div>
+      </div>
+
+      <Card className="border-border/60 shadow-sm overflow-hidden">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-800">
+                <TableHead className="text-slate-300">Mes</TableHead>
+                <TableHead className="text-slate-300">Vencimiento</TableHead>
+                <TableHead className="text-slate-300 text-right">Nº Trabajadores</TableHead>
+                <TableHead className="text-slate-300 text-right">Base Cotización</TableHead>
+                <TableHead className="text-slate-300 text-right">Cuota Obrera</TableHead>
+                <TableHead className="text-slate-300 text-right">Cuota Patronal</TableHead>
+                <TableHead className="text-slate-300 text-right font-bold">Total TC1</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {payments.map((p, idx) => (
+                <TableRow key={idx} className="hover:bg-slate-50">
+                  <TableCell className="font-medium">{p.month}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(p.dueDate)}</TableCell>
+                  <TableCell className="text-right">{p.employeeCount}</TableCell>
+                  <TableCell className="text-right font-mono">{formatEuro(p.totalGross)}</TableCell>
+                  <TableCell className="text-right font-mono text-blue-700">{formatEuro(p.ssEmployeeAmount)}</TableCell>
+                  <TableCell className="text-right font-mono text-orange-700">{formatEuro(p.ssEmployerAmount)}</TableCell>
+                  <TableCell className="text-right font-mono font-bold text-red-700">{formatEuro(p.totalPayment)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-4">
+        <h4 className="text-xs font-bold uppercase tracking-wide text-amber-700 mb-1">📚 Nota contable</h4>
+        <p className="text-sm text-slate-700 leading-relaxed">{payments[0]?.journalNote}</p>
+      </div>
+    </div>
+  );
+};
+
+// ─── Mortgage View ──────────────────────────────────────────────────────────
+interface MortgageViewProps {
+  mortgage: Mortgage | null | undefined;
+  company: AccountingUniverse["companyProfile"];
+}
+
+export const MortgageView = ({ mortgage, company }: MortgageViewProps) => {
+  if (!mortgage) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se ha generado hipoteca.</p>
+        <p className="text-sm mt-1">Activa la opción Hipoteca en la configuración avanzada del generador.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <SectionTitle
+        title="Préstamo Hipotecario"
+        description={`${mortgage.entity} · ${mortgage.loanNumber}`}
+      />
+      <DocumentHeader company={company} />
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200 col-span-2">
+          <div className="text-xs text-muted-foreground">Inmueble hipotecado</div>
+          <div className="font-semibold text-foreground mt-1">{mortgage.propertyDescription}</div>
+          <div className="text-sm text-muted-foreground mt-0.5">Valor: {formatEuro(mortgage.propertyValue)}</div>
+        </div>
+        <div className="bg-primary/5 rounded-xl p-4 border border-primary/20">
+          <div className="text-xs text-muted-foreground">Capital prestado</div>
+          <div className="font-mono font-bold text-xl text-primary mt-1">{formatEuro(mortgage.principal)}</div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+          <div className="text-xs text-muted-foreground">Cuota mensual</div>
+          <div className="font-mono font-bold text-xl mt-1">{formatEuro(mortgage.monthlyInstallment)}</div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+          <div className="text-xs text-muted-foreground">Tipo de interés</div>
+          <div className="font-mono font-bold text-xl mt-1">{mortgage.annualRate}%</div>
+          <div className="text-xs text-muted-foreground">TAE anual</div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+          <div className="text-xs text-muted-foreground">Plazo</div>
+          <div className="font-mono font-bold text-xl mt-1">{mortgage.termMonths} meses</div>
+          <div className="text-xs text-muted-foreground">({Math.round(mortgage.termMonths / 12)} años)</div>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+          <div className="text-xs text-muted-foreground">Fecha inicio</div>
+          <div className="font-semibold text-lg mt-1">{formatDate(mortgage.startDate)}</div>
+        </div>
+      </div>
+
+      <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-4">
+        <h4 className="text-xs font-bold uppercase tracking-wide text-amber-700 mb-1">📚 Nota contable</h4>
+        <p className="text-sm text-slate-700 leading-relaxed">{mortgage.journalNote}</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">DEBE — Asiento de alta</h4>
+          <div className="space-y-1.5">
+            {mortgage.accountDebits.map((e, i) => (
+              <div key={i} className="flex items-center justify-between bg-blue-50/60 rounded-lg px-3 py-2">
+                <div><span className="font-mono text-sm text-blue-700 font-bold">{e.accountCode}</span><span className="ml-2 text-sm text-slate-700">{e.accountName}</span></div>
+                <span className="font-mono font-bold text-blue-700">{formatEuro(e.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">HABER — Asiento de alta</h4>
+          <div className="space-y-1.5">
+            {mortgage.accountCredits.map((e, i) => (
+              <div key={i} className="flex items-center justify-between bg-emerald-50/60 rounded-lg px-3 py-2">
+                <div><span className="font-mono text-sm text-emerald-700 font-bold">{e.accountCode}</span><span className="ml-2 text-sm text-slate-700">{e.accountName}</span></div>
+                <span className="font-mono font-bold text-emerald-700">{formatEuro(e.amount)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <h3 className="font-bold text-base text-foreground">Cuadro de Amortización (primeros períodos)</h3>
+      <Card className="border-border/60 shadow-sm overflow-hidden">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-800">
+                <TableHead className="text-slate-300">Período</TableHead>
+                <TableHead className="text-slate-300">Fecha</TableHead>
+                <TableHead className="text-slate-300 text-right">Cuota</TableHead>
+                <TableHead className="text-slate-300 text-right">Intereses</TableHead>
+                <TableHead className="text-slate-300 text-right">Amort. Capital</TableHead>
+                <TableHead className="text-slate-300 text-right">Capital Pendiente</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {mortgage.amortizationTable.map((row, idx) => (
+                <TableRow key={idx} className="hover:bg-slate-50">
+                  <TableCell className="font-mono text-center">{row.period}</TableCell>
+                  <TableCell>{formatDate(row.date)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatEuro(row.installment)}</TableCell>
+                  <TableCell className="text-right font-mono text-red-600">{formatEuro(row.interest)}</TableCell>
+                  <TableCell className="text-right font-mono text-blue-700">{formatEuro(row.principal)}</TableCell>
+                  <TableCell className="text-right font-mono font-bold">{formatEuro(row.balance)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// ─── Fixed Assets View ──────────────────────────────────────────────────────
+interface FixedAssetsViewProps {
+  assets: FixedAsset[];
+  company: AccountingUniverse["companyProfile"];
+}
+
+export const FixedAssetsView = ({ assets, company }: FixedAssetsViewProps) => {
+  if (!assets || assets.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se ha generado inmovilizado.</p>
+        <p className="text-sm mt-1">Activa la opción Inmovilizado en la configuración avanzada del generador.</p>
+      </div>
+    );
+  }
+
+  const totalCost = assets.reduce((s, a) => s + a.purchaseCost, 0);
+  const totalDepreciation = assets.reduce((s, a) => s + a.annualDepreciation, 0);
+  const totalNetValue = assets.reduce((s, a) => s + a.netBookValue, 0);
+
+  return (
+    <div className="space-y-8">
+      <SectionTitle
+        title="Inmovilizado Material y Amortización"
+        description="Elementos del activo fijo y dotación anual de amortización"
+      />
+      <DocumentHeader company={company} />
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+          <div className="text-xs text-muted-foreground">Coste total adquisición</div>
+          <div className="font-mono font-bold text-xl mt-1">{formatEuro(totalCost)}</div>
+        </div>
+        <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
+          <div className="text-xs text-orange-600">Dotación amortización anual</div>
+          <div className="font-mono font-bold text-xl text-orange-700 mt-1">{formatEuro(totalDepreciation)}</div>
+        </div>
+        <div className="bg-green-50 rounded-xl p-4 border border-green-100">
+          <div className="text-xs text-green-600">Valor neto contable</div>
+          <div className="font-mono font-bold text-xl text-green-700 mt-1">{formatEuro(totalNetValue)}</div>
+        </div>
+      </div>
+
+      <Card className="border-border/60 shadow-sm overflow-hidden">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-slate-800">
+                <TableHead className="text-slate-300">Código</TableHead>
+                <TableHead className="text-slate-300">Descripción</TableHead>
+                <TableHead className="text-slate-300">F. Adquisición</TableHead>
+                <TableHead className="text-slate-300 text-right">Coste</TableHead>
+                <TableHead className="text-slate-300">Vida útil</TableHead>
+                <TableHead className="text-slate-300">Método</TableHead>
+                <TableHead className="text-slate-300 text-right">Amort. Anual</TableHead>
+                <TableHead className="text-slate-300 text-right">Amort. Acum.</TableHead>
+                <TableHead className="text-slate-300 text-right">Valor Neto</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {assets.map((asset, idx) => (
+                <TableRow key={idx} className="hover:bg-slate-50">
+                  <TableCell className="font-mono text-xs text-muted-foreground">{asset.code}</TableCell>
+                  <TableCell className="font-medium">{asset.description}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(asset.purchaseDate)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatEuro(asset.purchaseCost)}</TableCell>
+                  <TableCell>{asset.usefulLifeYears} años</TableCell>
+                  <TableCell>{asset.depreciationMethod}</TableCell>
+                  <TableCell className="text-right font-mono text-orange-700">{formatEuro(asset.annualDepreciation)}</TableCell>
+                  <TableCell className="text-right font-mono text-red-600">{formatEuro(asset.accumulatedDepreciation)}</TableCell>
+                  <TableCell className="text-right font-mono font-bold text-green-700">{formatEuro(asset.netBookValue)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      {assets.map((asset, idx) => (
+        <Card key={idx} className="border-border/60 shadow-sm overflow-hidden">
+          <CardHeader className="bg-gradient-to-r from-slate-50 to-transparent pb-3">
+            <CardTitle className="text-sm font-bold">{asset.code} — {asset.description}</CardTitle>
+            <CardDescription>Cuentas: {asset.assetAccountCode} (activo) · {asset.accDepreciationCode} (amort. acum.) · {asset.depExpenseCode} (gasto)</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-3">
+            <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-4 mb-4">
+              <h4 className="text-xs font-bold uppercase tracking-wide text-amber-700 mb-1">📚 Nota contable</h4>
+              <p className="text-sm text-slate-700 leading-relaxed">{asset.journalNote}</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">DEBE</h4>
+                <div className="space-y-1.5">
+                  {asset.accountDebits.map((e, i) => (
+                    <div key={i} className="flex items-center justify-between bg-blue-50/60 rounded-lg px-3 py-2">
+                      <div><span className="font-mono text-sm text-blue-700 font-bold">{e.accountCode}</span><span className="ml-2 text-sm text-slate-700">{e.accountName}</span></div>
+                      <span className="font-mono font-bold text-blue-700">{formatEuro(e.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">HABER</h4>
+                <div className="space-y-1.5">
+                  {asset.accountCredits.map((e, i) => (
+                    <div key={i} className="flex items-center justify-between bg-emerald-50/60 rounded-lg px-3 py-2">
+                      <div><span className="font-mono text-sm text-emerald-700 font-bold">{e.accountCode}</span><span className="ml-2 text-sm text-slate-700">{e.accountName}</span></div>
+                      <span className="font-mono font-bold text-emerald-700">{formatEuro(e.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 };

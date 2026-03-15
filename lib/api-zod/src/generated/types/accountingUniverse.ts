@@ -12,12 +12,16 @@ import type { Client } from "./client";
 import type { CompanyProfile } from "./companyProfile";
 import type { CreditCardStatement } from "./creditCardStatement";
 import type { CreditPolicy } from "./creditPolicy";
+import type { FixedAsset } from "./fixedAsset";
 import type { InsurancePolicy } from "./insurancePolicy";
 import type { Inventory } from "./inventory";
 import type { Invoice } from "./invoice";
 import type { JournalEntry } from "./journalEntry";
+import type { Mortgage } from "./mortgage";
 import type { Payroll } from "./payroll";
+import type { SocialSecurityPayment } from "./socialSecurityPayment";
 import type { Supplier } from "./supplier";
+import type { TaxLiquidation } from "./taxLiquidation";
 
 export interface AccountingUniverse {
   companyProfile: CompanyProfile;
@@ -25,12 +29,16 @@ export interface AccountingUniverse {
   suppliers: Supplier[];
   clients: Client[];
   invoices: Invoice[];
-  bankLoan: BankLoan;
-  creditPolicy: CreditPolicy;
-  creditCardStatement: CreditCardStatement;
-  insurancePolicies: InsurancePolicy[];
-  casualtyEvent: CasualtyEvent;
-  payroll: Payroll;
+  bankLoan?: BankLoan;
+  mortgage?: Mortgage;
+  creditPolicy?: CreditPolicy;
+  creditCardStatement?: CreditCardStatement;
+  insurancePolicies?: InsurancePolicy[];
+  casualtyEvent?: CasualtyEvent;
+  payroll?: Payroll;
+  socialSecurityPayments?: SocialSecurityPayment[];
+  taxLiquidations?: TaxLiquidation[];
+  fixedAssets?: FixedAsset[];
   bankStatements: BankStatement[];
   journalEntries: JournalEntry[];
 }

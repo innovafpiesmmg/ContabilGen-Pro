@@ -455,6 +455,36 @@ components:
         companyName:
           type: ["string", "null"]
           description: Optional company name (AI will generate one if not provided)
+        educationLevel:
+          type: string
+          enum: [Medio, Superior]
+          description: "Medio = FP Grado Medio, Superior = FP Grado Superior"
+        operationsPerMonth:
+          type: integer
+          minimum: 3
+          maximum: 25
+          description: "Number of journal entries per month to generate"
+        includePayroll:
+          type: boolean
+          description: "Include payroll (nóminas) with IRPF and SS"
+        includeSocialSecurity:
+          type: boolean
+          description: "Include monthly Social Security payments (TC1/TC2)"
+        includeTaxLiquidation:
+          type: boolean
+          description: "Include quarterly VAT/IGIC and annual IS tax liquidations"
+        includeBankLoan:
+          type: boolean
+          description: "Include a bank loan (préstamo bancario)"
+        includeMortgage:
+          type: boolean
+          description: "Include a mortgage loan (hipoteca)"
+        includeCreditPolicy:
+          type: boolean
+          description: "Include a credit policy (póliza de crédito)"
+        includeFixedAssets:
+          type: boolean
+          description: "Include fixed assets with annual amortization"
       required:
         - taxRegime
         - sector
@@ -482,6 +512,8 @@ components:
             $ref: "#/components/schemas/Invoice"
         bankLoan:
           $ref: "#/components/schemas/BankLoan"
+        mortgage:
+          $ref: "#/components/schemas/Mortgage"
         creditPolicy:
           $ref: "#/components/schemas/CreditPolicy"
         creditCardStatement:
@@ -494,6 +526,18 @@ components:
           $ref: "#/components/schemas/CasualtyEvent"
         payroll:
           $ref: "#/components/schemas/Payroll"
+        socialSecurityPayments:
+          type: array
+          items:
+            $ref: "#/components/schemas/SocialSecurityPayment"
+        taxLiquidations:
+          type: array
+          items:
+            $ref: "#/components/schemas/TaxLiquidation"
+        fixedAssets:
+          type: array
+          items:
+            $ref: "#/components/schemas/FixedAsset"
         bankStatements:
           type: array
           items:
@@ -508,12 +552,6 @@ components:
         - suppliers
         - clients
         - invoices
-        - bankLoan
-        - creditPolicy
-        - creditCardStatement
-        - insurancePolicies
-        - casualtyEvent
-        - payroll
         - bankStatements
         - journalEntries
 
@@ -1075,6 +1113,205 @@ components:
         - totalNetSalary
         - totalSsEmployer
         - totalLaborCost
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    TaxLiquidation:
+      type: object
+      properties:
+        model:
+          type: string
+          enum: ["303", "420", "IS"]
+          description: "303=IVA, 420=IGIC, IS=Impuesto Sociedades"
+        period:
+          type: string
+          description: "T1, T2, T3, T4 or Annual"
+        dueDate:
+          type: string
+        taxableBase:
+          type: number
+        outputTax:
+          type: number
+          description: "Cuota IVA/IGIC devengado"
+        inputTax:
+          type: number
+          description: "Cuota IVA/IGIC deducible"
+        result:
+          type: number
+          description: "Positive = to pay, negative = refund"
+        paymentType:
+          type: string
+          enum: ["ingreso", "devolución", "compensación"]
+        journalNote:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - model
+        - period
+        - dueDate
+        - taxableBase
+        - outputTax
+        - inputTax
+        - result
+        - paymentType
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    Mortgage:
+      type: object
+      properties:
+        entity:
+          type: string
+        loanNumber:
+          type: string
+        propertyDescription:
+          type: string
+        propertyValue:
+          type: number
+        principal:
+          type: number
+        annualRate:
+          type: number
+        termMonths:
+          type: integer
+        startDate:
+          type: string
+        monthlyInstallment:
+          type: number
+        amortizationTable:
+          type: array
+          items:
+            $ref: "#/components/schemas/AmortizationRow"
+        journalNote:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - entity
+        - loanNumber
+        - propertyDescription
+        - propertyValue
+        - principal
+        - annualRate
+        - termMonths
+        - startDate
+        - monthlyInstallment
+        - amortizationTable
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    SocialSecurityPayment:
+      type: object
+      properties:
+        month:
+          type: string
+        dueDate:
+          type: string
+        employeeCount:
+          type: integer
+        totalGross:
+          type: number
+        ssEmployeeAmount:
+          type: number
+          description: "Cuota obrera (SS a cargo del trabajador)"
+        ssEmployerAmount:
+          type: number
+          description: "Cuota patronal (SS a cargo de la empresa)"
+        totalPayment:
+          type: number
+          description: "Total TC1: ssEmployeeAmount + ssEmployerAmount"
+        journalNote:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - month
+        - dueDate
+        - employeeCount
+        - totalGross
+        - ssEmployeeAmount
+        - ssEmployerAmount
+        - totalPayment
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    FixedAsset:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+        purchaseDate:
+          type: string
+        purchaseCost:
+          type: number
+        usefulLifeYears:
+          type: integer
+        annualDepreciation:
+          type: number
+        accumulatedDepreciation:
+          type: number
+        netBookValue:
+          type: number
+        depreciationMethod:
+          type: string
+          description: "Lineal, Regresivo, etc."
+        assetAccountCode:
+          type: string
+          description: "PGC asset account (e.g. 213, 216)"
+        accDepreciationCode:
+          type: string
+          description: "Accumulated depreciation account (e.g. 2813)"
+        depExpenseCode:
+          type: string
+          description: "Depreciation expense account (e.g. 681)"
+        journalNote:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - code
+        - description
+        - purchaseDate
+        - purchaseCost
+        - usefulLifeYears
+        - annualDepreciation
+        - accumulatedDepreciation
+        - netBookValue
+        - depreciationMethod
+        - assetAccountCode
+        - accDepreciationCode
+        - depExpenseCode
         - journalNote
         - accountDebits
         - accountCredits

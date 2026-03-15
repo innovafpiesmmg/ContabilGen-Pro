@@ -14,6 +14,7 @@ export default function SavedUniverse() {
   
   const { data, isLoading, isError } = useGetGeneration(id, {
     query: {
+      queryKey: ['generation', id],
       enabled: id > 0,
       retry: false
     }

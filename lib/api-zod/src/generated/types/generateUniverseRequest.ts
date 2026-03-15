@@ -6,6 +6,7 @@
  * OpenAPI spec version: 0.1.0
  */
 import type { GenerateUniverseRequestComplexity } from "./generateUniverseRequestComplexity";
+import type { GenerateUniverseRequestEducationLevel } from "./generateUniverseRequestEducationLevel";
 import type { GenerateUniverseRequestSector } from "./generateUniverseRequestSector";
 import type { GenerateUniverseRequestTaxRegime } from "./generateUniverseRequestTaxRegime";
 
@@ -21,4 +22,26 @@ export interface GenerateUniverseRequest {
    * @nullable
    */
   companyName?: string | null;
+  /** Medio = FP Grado Medio, Superior = FP Grado Superior */
+  educationLevel?: GenerateUniverseRequestEducationLevel;
+  /**
+   * Number of journal entries per month to generate
+   * @minimum 3
+   * @maximum 25
+   */
+  operationsPerMonth?: number;
+  /** Include payroll (nóminas) with IRPF and SS */
+  includePayroll?: boolean;
+  /** Include monthly Social Security payments (TC1/TC2) */
+  includeSocialSecurity?: boolean;
+  /** Include quarterly VAT/IGIC and annual IS tax liquidations */
+  includeTaxLiquidation?: boolean;
+  /** Include a bank loan (préstamo bancario) */
+  includeBankLoan?: boolean;
+  /** Include a mortgage loan (hipoteca) */
+  includeMortgage?: boolean;
+  /** Include a credit policy (póliza de crédito) */
+  includeCreditPolicy?: boolean;
+  /** Include fixed assets with annual amortization */
+  includeFixedAssets?: boolean;
 }

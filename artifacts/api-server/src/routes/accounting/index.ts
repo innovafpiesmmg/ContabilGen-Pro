@@ -24,7 +24,12 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
     return;
   }
 
-  const { taxRegime, sector, complexity, year, companyName } = parsed.data;
+  const {
+    taxRegime, sector, complexity, year, companyName,
+    educationLevel, operationsPerMonth,
+    includePayroll, includeSocialSecurity, includeTaxLiquidation,
+    includeBankLoan, includeMortgage, includeCreditPolicy, includeFixedAssets,
+  } = parsed.data;
 
   const settings = await getSettingsForUser(req.user.id);
   const provider = settings.provider ?? "openai";
@@ -53,7 +58,19 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
   }
 
   const universe = await generateAccountingUniverse(
-    { taxRegime, sector, complexity, year, companyName: companyName ?? null },
+    {
+      taxRegime, sector, complexity, year,
+      companyName: companyName ?? null,
+      educationLevel: educationLevel ?? null,
+      operationsPerMonth: operationsPerMonth ?? null,
+      includePayroll: includePayroll ?? null,
+      includeSocialSecurity: includeSocialSecurity ?? null,
+      includeTaxLiquidation: includeTaxLiquidation ?? null,
+      includeBankLoan: includeBankLoan ?? null,
+      includeMortgage: includeMortgage ?? null,
+      includeCreditPolicy: includeCreditPolicy ?? null,
+      includeFixedAssets: includeFixedAssets ?? null,
+    },
     aiConfig,
   );
 

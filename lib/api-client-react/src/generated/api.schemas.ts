@@ -113,6 +113,17 @@ export const GenerateUniverseRequestComplexity = {
   Avanzado: "Avanzado",
 } as const;
 
+/**
+ * Medio = FP Grado Medio, Superior = FP Grado Superior
+ */
+export type GenerateUniverseRequestEducationLevel =
+  (typeof GenerateUniverseRequestEducationLevel)[keyof typeof GenerateUniverseRequestEducationLevel];
+
+export const GenerateUniverseRequestEducationLevel = {
+  Medio: "Medio",
+  Superior: "Superior",
+} as const;
+
 export interface GenerateUniverseRequest {
   /** IVA for Peninsula/Baleares, IGIC for Canarias */
   taxRegime: GenerateUniverseRequestTaxRegime;
@@ -125,6 +136,28 @@ export interface GenerateUniverseRequest {
    * @nullable
    */
   companyName?: string | null;
+  /** Medio = FP Grado Medio, Superior = FP Grado Superior */
+  educationLevel?: GenerateUniverseRequestEducationLevel;
+  /**
+   * Number of journal entries per month to generate
+   * @minimum 3
+   * @maximum 25
+   */
+  operationsPerMonth?: number;
+  /** Include payroll (nóminas) with IRPF and SS */
+  includePayroll?: boolean;
+  /** Include monthly Social Security payments (TC1/TC2) */
+  includeSocialSecurity?: boolean;
+  /** Include quarterly VAT/IGIC and annual IS tax liquidations */
+  includeTaxLiquidation?: boolean;
+  /** Include a bank loan (préstamo bancario) */
+  includeBankLoan?: boolean;
+  /** Include a mortgage loan (hipoteca) */
+  includeMortgage?: boolean;
+  /** Include a credit policy (póliza de crédito) */
+  includeCreditPolicy?: boolean;
+  /** Include fixed assets with annual amortization */
+  includeFixedAssets?: boolean;
 }
 
 export interface CompanyProfile {
@@ -255,6 +288,22 @@ export interface BankLoan {
   accountCredits: AccountEntry[];
 }
 
+export interface Mortgage {
+  entity: string;
+  loanNumber: string;
+  propertyDescription: string;
+  propertyValue: number;
+  principal: number;
+  annualRate: number;
+  termMonths: number;
+  startDate: string;
+  monthlyInstallment: number;
+  amortizationTable: AmortizationRow[];
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
+}
+
 export interface CreditPolicy {
   entity: string;
   policyNumber: string;
@@ -347,6 +396,84 @@ export interface Payroll {
   accountCredits: AccountEntry[];
 }
 
+export interface SocialSecurityPayment {
+  month: string;
+  dueDate: string;
+  employeeCount: number;
+  totalGross: number;
+  /** Cuota obrera (SS a cargo del trabajador) */
+  ssEmployeeAmount: number;
+  /** Cuota patronal (SS a cargo de la empresa) */
+  ssEmployerAmount: number;
+  /** Total TC1: ssEmployeeAmount + ssEmployerAmount */
+  totalPayment: number;
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
+}
+
+/**
+ * 303=IVA, 420=IGIC, IS=Impuesto Sociedades
+ */
+export type TaxLiquidationModel =
+  (typeof TaxLiquidationModel)[keyof typeof TaxLiquidationModel];
+
+export const TaxLiquidationModel = {
+  NUMBER_303: "303",
+  NUMBER_420: "420",
+  IS: "IS",
+} as const;
+
+export type TaxLiquidationPaymentType =
+  (typeof TaxLiquidationPaymentType)[keyof typeof TaxLiquidationPaymentType];
+
+export const TaxLiquidationPaymentType = {
+  ingreso: "ingreso",
+  devolución: "devolución",
+  compensación: "compensación",
+} as const;
+
+export interface TaxLiquidation {
+  /** 303=IVA, 420=IGIC, IS=Impuesto Sociedades */
+  model: TaxLiquidationModel;
+  /** T1, T2, T3, T4 or Annual */
+  period: string;
+  dueDate: string;
+  taxableBase: number;
+  /** Cuota IVA/IGIC devengado */
+  outputTax: number;
+  /** Cuota IVA/IGIC deducible */
+  inputTax: number;
+  /** Positive = to pay, negative = refund */
+  result: number;
+  paymentType: TaxLiquidationPaymentType;
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
+}
+
+export interface FixedAsset {
+  code: string;
+  description: string;
+  purchaseDate: string;
+  purchaseCost: number;
+  usefulLifeYears: number;
+  annualDepreciation: number;
+  accumulatedDepreciation: number;
+  netBookValue: number;
+  /** Lineal, Regresivo, etc. */
+  depreciationMethod: string;
+  /** PGC asset account (e.g. 213, 216) */
+  assetAccountCode: string;
+  /** Accumulated depreciation account (e.g. 2813) */
+  accDepreciationCode: string;
+  /** Depreciation expense account (e.g. 681) */
+  depExpenseCode: string;
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
+}
+
 export interface BankTransaction {
   date: string;
   concept: string;
@@ -383,12 +510,16 @@ export interface AccountingUniverse {
   suppliers: Supplier[];
   clients: Client[];
   invoices: Invoice[];
-  bankLoan: BankLoan;
-  creditPolicy: CreditPolicy;
-  creditCardStatement: CreditCardStatement;
-  insurancePolicies: InsurancePolicy[];
-  casualtyEvent: CasualtyEvent;
-  payroll: Payroll;
+  bankLoan?: BankLoan;
+  mortgage?: Mortgage;
+  creditPolicy?: CreditPolicy;
+  creditCardStatement?: CreditCardStatement;
+  insurancePolicies?: InsurancePolicy[];
+  casualtyEvent?: CasualtyEvent;
+  payroll?: Payroll;
+  socialSecurityPayments?: SocialSecurityPayment[];
+  taxLiquidations?: TaxLiquidation[];
+  fixedAssets?: FixedAsset[];
   bankStatements: BankStatement[];
   journalEntries: JournalEntry[];
 }

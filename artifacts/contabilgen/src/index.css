@@ -171,37 +171,75 @@
 
 /* Print Utilities */
 @media print {
+  @page {
+    margin: 15mm 12mm;
+    size: A4;
+  }
+
   body {
     background: white !important;
     color: black !important;
+    font-size: 11pt;
   }
   
   /* Hide non-printable elements */
   .no-print, 
-  [role="tablist"], 
+  [role="tablist"],
   aside, 
-  nav, 
-  header,
-  button {
+  nav {
     display: none !important;
   }
 
-  /* Force tabs to show all content sequentially */
+  /* Show only active tab, hide inactive */
   [data-state="inactive"] {
+    display: none !important;
+  }
+  [data-state="active"] {
     display: block !important;
   }
 
+  /* Show print-only elements */
+  .print-only {
+    display: block !important;
+  }
+
+  /* Ensure page breaks work */
   .print-break-inside-avoid {
     page-break-inside: avoid;
+    break-inside: avoid;
   }
   
   .print-break-after {
     page-break-after: always;
+    break-after: always;
   }
   
   /* Reset shadows and borders for print */
-  .border, .shadow-md, .shadow-lg, .rounded-xl {
+  * {
     box-shadow: none !important;
-    border-color: #e5e7eb !important;
+  }
+  
+  /* Preserve colors for print */
+  .text-blue-700, .text-emerald-700, .text-red-600, .text-primary {
+    color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  .bg-slate-50, .bg-blue-50, .bg-green-50, .bg-red-50, .bg-orange-50, .bg-amber-50 {
+    color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Ensure tables print correctly */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  th, td {
+    border: 1px solid #e5e7eb;
+    padding: 4px 8px;
   }
 }
