@@ -67,16 +67,21 @@ function cleanJson(raw: string): string {
 
 function repairTruncatedJson(raw: string): unknown | null {
   const cleaned = cleanJson(raw);
-  // Try parsing as-is first
   try { return JSON.parse(cleaned); } catch { /* continue to repair */ }
 
-  // Remove trailing partial token/string and repair brackets
   let s = cleaned.trimEnd();
-  // Drop trailing incomplete string if any (ends mid-quote)
-  s = s.replace(/,\s*"[^"]*$/, "").replace(/,\s*\{[^{}]*$/, "");
+
+  if (s.endsWith('"')) {
+    s = s.replace(/,\s*"[^"]*"?\s*$/, "");
+  }
+
+  s = s.replace(/,\s*\{[^{}]*$/, "");
+  s = s.replace(/,\s*\[[^\[\]]*$/, "");
+  s = s.replace(/,\s*"[^"]*$/, "");
+  s = s.replace(/:\s*"[^"]*$/, ': ""');
+  s = s.replace(/:\s*$/, ': null');
   s = s.replace(/,\s*$/, "");
 
-  // Count open/close to add missing closers
   let braces = 0, brackets = 0;
   let inStr = false, escape = false;
   for (const ch of s) {
@@ -89,10 +94,31 @@ function repairTruncatedJson(raw: string): unknown | null {
     else if (ch === "[") brackets++;
     else if (ch === "]") brackets--;
   }
+  if (inStr) s += '"';
   for (let i = 0; i < brackets; i++) s += "]";
   for (let i = 0; i < braces; i++) s += "}";
 
-  try { return JSON.parse(s); } catch { return null; }
+  try { return JSON.parse(s); } catch { /* continue to aggressive repair */ }
+
+  const lastGoodArray = s.lastIndexOf("}]");
+  if (lastGoodArray > 0) {
+    let attempt = s.substring(0, lastGoodArray + 2);
+    let b2 = 0, k2 = 0;
+    let inS2 = false, esc2 = false;
+    for (const ch of attempt) {
+      if (esc2) { esc2 = false; continue; }
+      if (ch === "\\" && inS2) { esc2 = true; continue; }
+      if (ch === '"') { inS2 = !inS2; continue; }
+      if (inS2) continue;
+      if (ch === "{") b2++; else if (ch === "}") b2--;
+      if (ch === "[") k2++; else if (ch === "]") k2--;
+    }
+    for (let i = 0; i < k2; i++) attempt += "]";
+    for (let i = 0; i < b2; i++) attempt += "}";
+    try { return JSON.parse(attempt); } catch { /* fall through */ }
+  }
+
+  return null;
 }
 
 async function callAI(client: OpenAI, model: string, prompt: string, maxTokens: number): Promise<unknown> {
@@ -102,7 +128,7 @@ async function callAI(client: OpenAI, model: string, prompt: string, maxTokens: 
     messages: [
       {
         role: "system",
-        content: "Eres un experto contable español especializado en el Plan General Contable (PGC). Responde ÚNICAMENTE con JSON válido, sin texto adicional, sin markdown, sin bloques de código.",
+        content: "Eres un experto contable español especializado en el Plan General Contable (PGC). Responde ÚNICAMENTE con JSON válido, sin texto adicional. PROHIBIDO usar bloques de código markdown (```). Empieza directamente con { y termina con }.",
       },
       { role: "user", content: prompt },
     ],
@@ -944,7 +970,7 @@ REGLAS:
 - Usa nombre/cuenta bancaria del escenario
 - Asientos cuadrados (debe = haber)`;
 
-  return await callAI(client, model, prompt, 5000) as Record<string, unknown>;
+  return await callAI(client, model, prompt, 6000) as Record<string, unknown>;
 }
 
 // ─── CALL 4: EQUITY BLOCK ─────────────────────────────────────────────────────
@@ -1163,7 +1189,7 @@ REGLAS CRÍTICAS:
 - SÉ CONCISO: description de cada línea en máximo 4 palabras
 - Máximo 3 líneas de débito y 3 de crédito por asiento`;
 
-  return await callAI(client, model, prompt, 7000) as Record<string, unknown>;
+  return await callAI(client, model, prompt, 8192) as Record<string, unknown>;
 }
 
 // ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
