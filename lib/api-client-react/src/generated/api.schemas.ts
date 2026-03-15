@@ -176,8 +176,8 @@ export interface GenerateUniverseRequest {
 
 export interface CompanyProfile {
   name: string;
-  nif: string;
-  address: string;
+  nif?: string;
+  address?: string;
   city: string;
   sector: string;
   taxRegime: string;
@@ -193,8 +193,8 @@ export interface InventoryItem {
   code: string;
   description: string;
   quantity: number;
-  unitCost: number;
-  totalCost: number;
+  unitCost?: number;
+  totalCost?: number;
   /** PGC account code (e.g. 300, 310) */
   accountCode: string;
 }
@@ -205,13 +205,13 @@ export interface Inventory {
   initialTotal: number;
   finalTotal: number;
   /** Variación de existencias (positive = increase, negative = decrease) */
-  stockVariation: number;
+  stockVariation?: number;
 }
 
 export interface Supplier {
   name: string;
-  nif: string;
-  address: string;
+  nif?: string;
+  address?: string;
   city: string;
   /** PGC account (400, 401) */
   accountCode: string;
@@ -219,8 +219,8 @@ export interface Supplier {
 
 export interface Client {
   name: string;
-  nif: string;
-  address: string;
+  nif?: string;
+  address?: string;
   city: string;
   /** PGC account (430, 431) */
   accountCode: string;
@@ -238,7 +238,7 @@ export interface InvoiceLine {
   description: string;
   quantity: number;
   unitPrice: number;
-  discount: number;
+  discount?: number;
   subtotal: number;
   taxRate: number;
   taxAmount: number;
@@ -269,7 +269,7 @@ export interface Invoice {
   date: string;
   type: InvoiceType;
   partyName: string;
-  partyNif: string;
+  partyNif?: string;
   lines: InvoiceLine[];
   subtotal: number;
   taxBase: number;
@@ -277,7 +277,7 @@ export interface Invoice {
   total: number;
   paymentMethod: InvoicePaymentMethod;
   /** @nullable */
-  dueDate: string | null;
+  dueDate?: string | null;
   /** Explanation of accounting entries */
   journalNote?: string;
   accountDebits: AccountEntry[];
@@ -285,12 +285,12 @@ export interface Invoice {
 }
 
 export interface AmortizationRow {
-  period: number;
+  period?: number | string;
   date: string;
-  installment: number;
-  interest: number;
+  installment?: number;
+  interest?: number;
   principal: number;
-  balance: number;
+  balance?: number;
 }
 
 export interface BankLoan {
@@ -404,7 +404,7 @@ export interface PayrollEmployee {
 export interface Payroll {
   month: string;
   employees: PayrollEmployee[];
-  totalGross: number;
+  totalGross?: number;
   totalIrpf: number;
   totalSsEmployee: number;
   totalNetSalary: number;
@@ -418,8 +418,8 @@ export interface Payroll {
 export interface SocialSecurityPayment {
   month: string;
   dueDate: string;
-  employeeCount: number;
-  totalGross: number;
+  employeeCount?: number;
+  totalGross?: number;
   /** Cuota obrera (SS a cargo del trabajador) */
   ssEmployeeAmount: number;
   /** Cuota patronal (SS a cargo de la empresa) */
@@ -508,7 +508,7 @@ export const ShareholderRole = {
 
 export interface Shareholder {
   name: string;
-  nif: string;
+  nif?: string;
   /** Role in the company */
   role: ShareholderRole;
   /** Ownership percentage (0-100) */
@@ -531,9 +531,9 @@ export interface ShareholdersInfo {
   nominalValuePerShare: number;
   totalShares: number;
   /** Date of constitution */
-  constitutionDate: string;
+  constitutionDate?: string;
   /** Registro Mercantil entry reference */
-  registryEntry: string;
+  registryEntry?: string;
   shareholders: Shareholder[];
   /** Didactic note explaining the capital accounts (100, 118, etc.) */
   journalNote?: string;
@@ -582,7 +582,7 @@ export interface ShareholderAccountTransaction {
   accountName: string;
   debit?: number | null;
   credit?: number | null;
-  balance: number;
+  balance?: number;
 }
 
 /**
@@ -604,10 +604,10 @@ export interface ShareholderAccounts {
 export interface DividendPerShareholder {
   shareholderName?: string;
   participationPercentage?: number;
-  grossDividend: number;
+  grossDividend?: number;
   irpfWithholdingRate: number;
-  irpfWithholdingAmount: number;
-  netDividend: number;
+  irpfWithholdingAmount?: number;
+  netDividend?: number;
 }
 
 /**
@@ -641,10 +641,10 @@ export interface BankTransaction {
   date: string;
   concept: string;
   /** @nullable */
-  debit: number | null;
+  debit?: number | null;
   /** @nullable */
-  credit: number | null;
-  balance: number;
+  credit?: number | null;
+  balance?: number;
 }
 
 export interface BankStatement {
@@ -661,7 +661,7 @@ export interface JournalEntry {
   date: string;
   concept: string;
   /** Reference document (invoice number, etc.) */
-  document: string;
+  document?: string;
   debits: AccountEntry[];
   credits: AccountEntry[];
   totalAmount: number;
