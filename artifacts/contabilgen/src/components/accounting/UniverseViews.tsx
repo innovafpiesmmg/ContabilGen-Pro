@@ -125,7 +125,7 @@ export const CompanyProfileView = ({ data }: { data: AccountingUniverse }) => {
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Sector</p>
-              <p className="font-medium">{company.sector}</p>
+              <p className="font-medium">{company.sector}{company.activity ? ` — ${company.activity}` : ""}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground uppercase font-semibold mb-1">Ejercicio</p>

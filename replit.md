@@ -20,7 +20,7 @@ ContabilGen Pro es un generador de universos contables para prácticas de Grado 
 
 ## Features
 
-1. **Configuración**: Régimen fiscal (IVA/IGIC), Sector económico, Año fiscal, Nombre empresa (opcional)
+1. **Configuración**: Régimen fiscal (IVA/IGIC), Sector económico + Actividad (sub-sector), Año fiscal, Nombre empresa (opcional)
 2. **Generación IA**: Universo contable completo con todos los documentos
 3. **Historial**: Guardar y cargar generaciones previas
 4. **Documentos generados**:

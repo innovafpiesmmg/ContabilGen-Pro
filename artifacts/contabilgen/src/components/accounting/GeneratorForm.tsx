@@ -50,9 +50,90 @@ import {
 } from "@/components/ui/form";
 import { GenerateUniverseRequest } from "@workspace/api-client-react";
 
+const ACTIVITIES_BY_SECTOR: Record<string, string[]> = {
+  Comercio: [
+    "Agrícola y fitosanitarios",
+    "Alimentación y bebidas",
+    "Automoción y recambios",
+    "Construcción y materiales",
+    "Deportes y ocio",
+    "Droguería y limpieza",
+    "Electrodomésticos",
+    "Electrónica y tecnología",
+    "Farmacia y parafarmacia",
+    "Ferretería e industrial",
+    "Joyería y relojería",
+    "Juguetería",
+    "Librería y papelería",
+    "Moda y textil",
+    "Mobiliario y decoración",
+    "Óptica",
+    "Productos para mascotas",
+    "Productos de peluquería y estética",
+  ],
+  Servicios: [
+    "Academia y formación",
+    "Asesoría fiscal y contable",
+    "Clínica dental",
+    "Clínica veterinaria",
+    "Consultoría empresarial",
+    "Desarrollo de software",
+    "Diseño gráfico y publicidad",
+    "Electricidad e instalaciones",
+    "Fontanería y calefacción",
+    "Fotografía y vídeo",
+    "Gestoría administrativa",
+    "Limpieza profesional",
+    "Mantenimiento y reparaciones",
+    "Marketing digital",
+    "Peluquería y estética",
+    "Taller mecánico",
+    "Transporte y logística",
+    "Turismo y agencia de viajes",
+  ],
+  Industria: [
+    "Agroalimentaria",
+    "Carpintería y madera",
+    "Cerámica y vidrio",
+    "Confección textil",
+    "Cosmética y perfumería",
+    "Electrónica",
+    "Envasado y embalaje",
+    "Fabricación metálica",
+    "Impresión y artes gráficas",
+    "Industria cárnica",
+    "Industria láctea",
+    "Maquinaria industrial",
+    "Materiales de construcción",
+    "Panadería y bollería industrial",
+    "Plásticos y caucho",
+    "Productos químicos",
+    "Vitivinícola y bodegas",
+  ],
+  Hostelería: [
+    "Bar y cafetería",
+    "Catering y eventos",
+    "Cervecería artesanal",
+    "Comida rápida y take-away",
+    "Food truck",
+    "Heladería y repostería",
+    "Hostal y pensión",
+    "Hotel",
+    "Hotel rural y turismo rural",
+    "Pizzería",
+    "Pub y coctelería",
+    "Restaurante",
+    "Restaurante de comida asiática",
+    "Restaurante vegetariano/vegano",
+    "Sidrería",
+    "Taberna y tapas",
+  ],
+};
+
 const formSchema = z.object({
   taxRegime: z.enum(["IVA", "IGIC"]),
   sector: z.enum(["Comercio", "Servicios", "Industria", "Hostelería"]),
+  activity: z.string().optional().nullable(),
   complexity: z.enum(["Avanzado"]),
   year: z.coerce.number().min(2000).max(2100),
   companyName: z.string().optional().nullable(),
@@ -124,6 +205,7 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
     defaultValues: {
       taxRegime: "IGIC",
       sector: "Comercio",
+      activity: null,
       complexity: "Avanzado",
       year: currentYear,
       companyName: "",
@@ -151,6 +233,8 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
   const watchOps = form.watch("operationsPerMonth") ?? 8;
   const watchStart = form.watch("startDate") ?? defaultStart;
   const watchEnd = form.watch("endDate") ?? defaultEnd;
+  const watchSector = form.watch("sector");
+  const activitiesForSector = ACTIVITIES_BY_SECTOR[watchSector] ?? [];
 
   const numMonths = useCustomPeriod ? getMonthsBetween(watchStart, watchEnd) : 12;
   const estimatedEntries = watchOps * numMonths;
@@ -230,7 +314,7 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
                     <Briefcase className="w-4 h-4 text-muted-foreground" />
                     Sector Económico
                   </FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={(v) => { field.onChange(v); form.setValue("activity", null); }} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger className="rounded-xl bg-slate-50/50">
                         <SelectValue placeholder="Selecciona un sector" />
@@ -243,6 +327,39 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
                       <SelectItem value="Hostelería">Hostelería</SelectItem>
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="activity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-muted-foreground" />
+                    Actividad
+                  </FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value ?? ""}
+                    key={watchSector}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="rounded-xl bg-slate-50/50">
+                        <SelectValue placeholder="Selecciona actividad (opcional)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {activitiesForSector.map((act) => (
+                        <SelectItem key={act} value={act}>{act}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Contextualiza los productos, proveedores y documentos
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

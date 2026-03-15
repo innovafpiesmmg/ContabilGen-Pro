@@ -128,6 +128,7 @@ export interface GenerateUniverseRequest {
   /** IVA for Peninsula/Baleares, IGIC for Canarias */
   taxRegime: GenerateUniverseRequestTaxRegime;
   sector: GenerateUniverseRequestSector;
+  activity?: string | null;
   complexity: GenerateUniverseRequestComplexity;
   /** Fiscal year for the accounting universe */
   year: number;
@@ -180,6 +181,7 @@ export interface CompanyProfile {
   address?: string;
   city: string;
   sector: string;
+  activity?: string | null;
   taxRegime: string;
   fiscalYear: number;
   description: string;

@@ -3,6 +3,7 @@ import OpenAI from "openai";
 interface GenerateParams {
   taxRegime: "IVA" | "IGIC";
   sector: "Comercio" | "Servicios" | "Industria" | "Hostelería";
+  activity?: string | null;
   complexity: "Avanzado";
   year: number;
   companyName?: string | null;
@@ -133,12 +134,14 @@ async function generateScenario(params: GenerateParams, client: OpenAI, model: s
   const { periodStart, periodEnd, numMonths, midMonthLabel } = getPeriodInfo(params);
   const numEmployees = params.includePayroll !== false ? 2 : 0;
   const withMortgage = params.includeMortgage === true;
-  const companyHint = params.companyName ? `La empresa se llama "${params.companyName}".` : "Inventa un nombre realista para el sector.";
+  const companyHint = params.companyName ? `La empresa se llama "${params.companyName}".` : "Inventa un nombre realista para el sector y actividad.";
+  const activityHint = params.activity ? `- Actividad concreta: ${params.activity}` : "";
 
   const prompt = `Genera un PLANO DE ESCENARIO compacto para un universo contable de prácticas de FP española.
 
 PARÁMETROS:
 - Sector: ${params.sector}
+${activityHint}
 - Régimen fiscal: ${params.taxRegime} (general ${rates.standard}%, reducido ${rates.reduced}%)
 - Período: ${periodStart} a ${periodEnd} (${numMonths} mes${numMonths > 1 ? "es" : ""})
 - Año fiscal: ${params.year}
@@ -201,15 +204,21 @@ Devuelve SOLO este JSON con datos realistas para el sector indicado:
 }
 
 // ─── SECTOR CONTEXT ───────────────────────────────────────────────────────────
-function getSectorContext(sector: string, taxRegime: string) {
+function getActivityLabel(params: GenerateParams): string {
+  if (params.activity) return `${params.sector} — ${params.activity}`;
+  return params.sector;
+}
+
+function getSectorContext(sector: string, taxRegime: string, activity?: string | null) {
   const tax = taxRegime === "IGIC" ? "IGIC" : "IVA";
+  const activityNote = activity ? `\nACTIVIDAD CONCRETA: ${activity}. TODOS los productos, mercaderías, materias primas, servicios, proveedores y clientes deben ser coherentes con esta actividad. Usa terminología y productos propios del subsector.` : "";
 
   switch (sector) {
     case "Servicios":
       return {
-        inventoryNote: `INVENTARIO: empresa de SERVICIOS. Sin mercaderías para reventa. El inventario puede incluir únicamente consumibles de oficina (cta. 328) o material de trabajo (602). Si los importes son insignificantes genera inventario con initialTotal=0 y finalTotal=0 y arrays vacíos.`,
-        invoiceNote: `FACTURAS: empresa de SERVICIOS — vende SERVICIOS, NO bienes físicos.
-  - Facturas de VENTA (type:"sale"): servicios prestados (consultoría, asesoría, diseño, formación, mantenimiento, limpieza, software, transporte, etc.).
+        inventoryNote: `INVENTARIO: empresa de SERVICIOS. Sin mercaderías para reventa. El inventario puede incluir únicamente consumibles de oficina (cta. 328) o material de trabajo (602). Si los importes son insignificantes genera inventario con initialTotal=0 y finalTotal=0 y arrays vacíos.${activityNote}`,
+        invoiceNote: `FACTURAS: empresa de SERVICIOS — vende SERVICIOS, NO bienes físicos.${activityNote}
+  - Facturas de VENTA (type:"sale"): servicios prestados coherentes con la actividad.
     Líneas: "Horas de servicio" o "Servicio de X" × tarifa/hora o precio fijo. Cuenta venta: 705 (Prestaciones de servicios), NO 700.
     journalNote: "705 → 477 (${tax} repercutido) + 430 (Clientes)"; accountDebits: [430]; accountCredits: [705, 477]
   - Facturas de COMPRA (type:"purchase"): gastos necesarios para prestar el servicio — subcontratación de profesionales (621), software/licencias (626), telefonía (629), material de oficina (602), servicios de limpieza (629), publicidad (627), asesoría jurídica/fiscal (623), seguros profesionales (625), etc. Cuenta compra: 62x (gastos), NO 600.
@@ -221,11 +230,11 @@ function getSectorContext(sector: string, taxRegime: string) {
       };
     case "Industria":
       return {
-        inventoryNote: `INVENTARIO: empresa INDUSTRIAL. Tiene materias primas (310), productos en curso (330) y productos terminados (350). Usa accountCode "310" para materias primas, "300" para productos terminados.`,
-        invoiceNote: `FACTURAS: empresa INDUSTRIAL — fabrica y vende productos elaborados propios.
-  - Facturas de VENTA (type:"sale"): venta de productos fabricados. Cuenta: 701 (Ventas de productos terminados).
+        inventoryNote: `INVENTARIO: empresa INDUSTRIAL. Tiene materias primas (310), productos en curso (330) y productos terminados (350). Usa accountCode "310" para materias primas, "300" para productos terminados.${activityNote}`,
+        invoiceNote: `FACTURAS: empresa INDUSTRIAL — fabrica y vende productos elaborados propios.${activityNote}
+  - Facturas de VENTA (type:"sale"): venta de productos fabricados coherentes con la actividad. Cuenta: 701 (Ventas de productos terminados).
     journalNote: "701 → 477 + 430"; accountDebits: [430]; accountCredits: [701, 477]
-  - Facturas de COMPRA (type:"purchase"): compra de materias primas y componentes. Cuenta: 601 (Compras de materias primas).
+  - Facturas de COMPRA (type:"purchase"): compra de materias primas y componentes propios de la actividad. Cuenta: 601 (Compras de materias primas).
     journalNote: "601 → 472 + 400"; accountDebits: [601, 472]; accountCredits: [400]`,
         saleAccount: { code: "701", name: "Ventas de productos terminados" },
         purchaseAccount: { code: "601", name: "Compras de materias primas" },
@@ -234,11 +243,11 @@ function getSectorContext(sector: string, taxRegime: string) {
       };
     case "Hostelería":
       return {
-        inventoryNote: `INVENTARIO: empresa de HOSTELERÍA. Tiene existencias perecederas: alimentos y bebidas (cta. 300). Rotación alta y cantidades variables. Incluye 2-3 productos representativos (vinos, bebidas, alimentos).`,
-        invoiceNote: `FACTURAS: empresa de HOSTELERÍA — vende servicios de alojamiento y/o restauración.
-  - Facturas de VENTA (type:"sale"): servicios de restaurante (menús, eventos), alojamiento, catering. Cuenta: 705 (Prestaciones de servicios hosteleros).
+        inventoryNote: `INVENTARIO: empresa de HOSTELERÍA. Tiene existencias perecederas: alimentos y bebidas (cta. 300). Rotación alta y cantidades variables. Incluye 2-3 productos representativos.${activityNote}`,
+        invoiceNote: `FACTURAS: empresa de HOSTELERÍA — vende servicios de alojamiento y/o restauración.${activityNote}
+  - Facturas de VENTA (type:"sale"): servicios coherentes con la actividad del negocio. Cuenta: 705 (Prestaciones de servicios hosteleros).
     journalNote: "705 → 477 + 430/570 (efectivo o cliente)"; accountDebits: [430]; accountCredits: [705, 477]
-  - Facturas de COMPRA (type:"purchase"): compra de alimentos, bebidas y suministros. Cuenta: 600 (Compras de mercaderías — alimentación), con ${tax} al tipo reducido donde aplique.
+  - Facturas de COMPRA (type:"purchase"): compra de alimentos, bebidas y suministros propios de la actividad. Cuenta: 600 (Compras de mercaderías — alimentación), con ${tax} al tipo reducido donde aplique.
     journalNote: "600 → 472 + 400"; accountDebits: [600, 472]; accountCredits: [400]`,
         saleAccount: { code: "705", name: "Prestaciones de servicios hosteleros" },
         purchaseAccount: { code: "600", name: "Compras de mercaderías (alimentación)" },
@@ -247,11 +256,11 @@ function getSectorContext(sector: string, taxRegime: string) {
       };
     default: // Comercio
       return {
-        inventoryNote: `INVENTARIO: empresa COMERCIAL. Compra y revende mercaderías (cta. 300). Incluye 2-3 líneas de productos representativos del sector.`,
-        invoiceNote: `FACTURAS: empresa COMERCIAL — compra bienes para revenderlos.
-  - Facturas de VENTA (type:"sale"): venta de mercaderías a clientes. Cuenta: 700 (Ventas de mercaderías).
+        inventoryNote: `INVENTARIO: empresa COMERCIAL. Compra y revende mercaderías (cta. 300). Incluye 2-3 líneas de productos representativos de la actividad.${activityNote}`,
+        invoiceNote: `FACTURAS: empresa COMERCIAL — compra bienes para revenderlos.${activityNote}
+  - Facturas de VENTA (type:"sale"): venta de mercaderías coherentes con la actividad a clientes. Cuenta: 700 (Ventas de mercaderías).
     journalNote: "700 → 477 + 430"; accountDebits: [430]; accountCredits: [700, 477]
-  - Facturas de COMPRA (type:"purchase"): compra de mercaderías a proveedores. Cuenta: 600 (Compras de mercaderías).
+  - Facturas de COMPRA (type:"purchase"): compra de mercaderías propias de la actividad a proveedores. Cuenta: 600 (Compras de mercaderías).
     journalNote: "600 → 472 + 400"; accountDebits: [600, 472]; accountCredits: [400]`,
         saleAccount: { code: "700", name: "Ventas de mercaderías" },
         purchaseAccount: { code: "600", name: "Compras de mercaderías" },
@@ -271,7 +280,7 @@ async function generateCommercialBlock(
   const rates = TAX_RATES[params.taxRegime];
   const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
   const sc = JSON.stringify(scenario, null, 0);
-  const sectorCtx = getSectorContext(params.sector, params.taxRegime);
+  const sectorCtx = getSectorContext(params.sector, params.taxRegime, params.activity);
 
   const prompt = `Genera el PERFIL COMERCIAL del universo contable usando este escenario:
 ${sc}
@@ -323,7 +332,7 @@ Genera exactamente este JSON (SIN facturas — se generan aparte):
   ]
 }
 
-Importes realistas para sector ${params.sector}. Usa datos del escenario.`;
+Importes realistas para ${getActivityLabel(params)}. Usa datos del escenario.`;
 
   return await callAI(client, model, prompt, 2500) as Record<string, unknown>;
 }
@@ -363,7 +372,7 @@ async function generateMonthlyBundle(
   openingBalance: number,
 ): Promise<{ invoices: unknown[]; bankStatement: unknown; cardMovements: unknown[] }> {
   const rates = TAX_RATES[params.taxRegime];
-  const sectorCtx = getSectorContext(params.sector, params.taxRegime);
+  const sectorCtx = getSectorContext(params.sector, params.taxRegime, params.activity);
 
   const sectorSaleHint = params.sector === "Servicios"
     ? "servicios prestados (consultoría, diseño, formación), cta 705"
@@ -387,7 +396,7 @@ async function generateMonthlyBundle(
   const buyAcc = sectorCtx.purchaseAccount;
   const iva = rates.standard;
 
-  const prompt = `Datos contables de ${monthLabel} para "${scenario.companyName}" (${params.sector}, ${params.taxRegime}). Banco: ${scenario.bankEntity}, cta ${scenario.bankAccount}.
+  const prompt = `Datos contables de ${monthLabel} para "${scenario.companyName}" (${getActivityLabel(params)}, ${params.taxRegime}). Banco: ${scenario.bankEntity}, cta ${scenario.bankAccount}.
 IVA ${iva}%. Ventas→${sectorSaleHint}. Compras→${sectorBuyHint}.
 
 JSON exacto:
@@ -434,12 +443,12 @@ async function generateInsuranceCasualty(
   const expenseCurrentPeriod = Math.round(annualPremium * daysInPeriod / totalPolicyDays);
   const prepaidNextPeriod = annualPremium - expenseCurrentPeriod;
 
-  const prompt = `Genera seguros y siniestro para "${scenario.companyName}" (${params.sector}), período ${periodStart}–${periodEnd}.
+  const prompt = `Genera seguros y siniestro para "${scenario.companyName}" (${getActivityLabel(params)}), período ${periodStart}–${periodEnd}.
 
 JSON exacto:
 {"insurancePolicies":[{"policyNumber":"SEG-${params.year}-001","insurer":"Mapfre Seguros","type":"Seguro multirriesgo","annualPremium":${annualPremium}.00,"startDate":"${insStartStr}","endDate":"${insEndStr}","expenseCurrentPeriod":${expenseCurrentPeriod}.00,"prepaidNextPeriod":${prepaidNextPeriod}.00,"journalNote":"Póliza ${insStartStr}–${insEndStr}. Prima total ${annualPremium}€ pagada al contado. Parte corriente (${expenseCurrentPeriod}€) → cta 625 (Primas de seguros). Parte anticipada del próximo ejercicio (${prepaidNextPeriod}€) → cta 480 (Gastos anticipados). Ajuste de periodificación obligatorio por PGC.","accountDebits":[{"accountCode":"625","accountName":"Primas de seguros","amount":${expenseCurrentPeriod}.00,"description":"Prima seguro multirriesgo ${params.year}"},{"accountCode":"480","accountName":"Gastos anticipados","amount":${prepaidNextPeriod}.00,"description":"Parte prima ${params.year + 1} (periodificación)"}],"accountCredits":[{"accountCode":"572","accountName":"Bancos","amount":${annualPremium}.00,"description":"Pago prima seguro"}]}],"casualtyEvent":{"date":"${periodStart.slice(0,7)}-15","description":"Incendio parcial en almacén — daños en equipos informáticos","assetAffected":"Equipos para procesos de información","bookValue":5000.00,"insuranceCompensation":3500.00,"netLoss":1500.00,"journalNote":"Siniestro: baja del bien (cta 217 Equipos informáticos) y su amortización acumulada (2817). Pérdida neta → 678 (Pérdidas por siniestros). Indemnización aseguradora → 430 (Clientes, cobro pendiente) y 778 (Ingresos excepcionales) al haber.","accountDebits":[{"accountCode":"678","accountName":"Pérdidas procedentes del inmovilizado material","amount":1500.00,"description":"Pérdida neta siniestro"},{"accountCode":"2817","accountName":"Amort. acum. equipos informáticos","amount":3500.00,"description":"Amortización acumulada baja"},{"accountCode":"430","accountName":"Clientes — aseguradora","amount":3500.00,"description":"Indemnización a cobrar Mapfre"}],"accountCredits":[{"accountCode":"217","accountName":"Equipos para procesos de información","amount":5000.00,"description":"Baja por siniestro — valor contable bruto"},{"accountCode":"778","accountName":"Ingresos excepcionales","amount":3500.00,"description":"Indemnización seguro reconocida"}]}}
 
-Adapta descripción y sector ${params.sector}. 1-2 pólizas de seguro realistas con periodificación (cta 480).`;
+Adapta descripción y actividad ${getActivityLabel(params)}. 1-2 pólizas de seguro realistas con periodificación (cta 480).`;
 
   return await callAI(client, model, prompt, 2000) as Record<string, unknown>;
 }
@@ -453,7 +462,7 @@ async function generateExtraordinaryExpenses(
 ) {
   const { periodStart, periodEnd } = getPeriodInfo(params);
 
-  const prompt = `Genera gastos e ingresos extraordinarios para "${scenario.companyName}" (${params.sector}), período ${periodStart}–${periodEnd}.
+  const prompt = `Genera gastos e ingresos extraordinarios para "${scenario.companyName}" (${getActivityLabel(params)}), período ${periodStart}–${periodEnd}.
 
 Genera 2-4 partidas extraordinarias variadas. Tipos posibles:
 - "multa": Multas y sanciones administrativas (cta 678 "Gastos excepcionales")
@@ -481,7 +490,7 @@ JSON exacto:
 
 REGLAS:
 - Incluye al menos 1 gasto y 1 ingreso extraordinario
-- Los importes deben ser realistas para el sector ${params.sector}
+- Los importes deben ser realistas para ${getActivityLabel(params)}
 - Cada asiento DEBE cuadrar (sum debits = sum credits)
 - Para pérdidas de inmovilizado: incluye baja del bien (21x) y amortización acumulada (281x)
 - Para ingresos extraordinarios: contrapartida puede ser 572 (cobro) o 440 (deudor)
@@ -1096,7 +1105,7 @@ async function generateJournalBlock(
     bankAccount: scenario.bankAccount,
   }, null, 0);
 
-  const sectorCtxJ = getSectorContext(params.sector, params.taxRegime);
+  const sectorCtxJ = getSectorContext(params.sector, params.taxRegime, params.activity);
   const enabledOps: string[] = [
     "facturas de compra y venta",
     "cobros y pagos a clientes/proveedores",
@@ -1229,6 +1238,10 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     if (block && typeof block === "object") {
       Object.assign(universe, block);
     }
+  }
+
+  if (universe.companyProfile && typeof universe.companyProfile === "object") {
+    (universe.companyProfile as Record<string, unknown>).activity = params.activity || null;
   }
 
   // Merge monthly bundles

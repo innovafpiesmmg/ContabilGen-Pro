@@ -169,6 +169,10 @@ export const GenerateAccountingUniverseBody = zod.object({
     .enum(["IVA", "IGIC"])
     .describe("IVA for Peninsula\/Baleares, IGIC for Canarias"),
   sector: zod.enum(["Comercio", "Servicios", "Industria", "Hostelería"]),
+  activity: zod
+    .string()
+    .nullish()
+    .describe("Specific business activity within the sector (e.g. Agrícola, Tecnología, Textil)"),
   complexity: zod.enum(["Avanzado"]),
   year: zod.number().describe("Fiscal year for the accounting universe"),
   companyName: zod
@@ -262,6 +266,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
     address: zod.string().optional(),
     city: zod.string(),
     sector: zod.string(),
+    activity: zod.string().nullish(),
     taxRegime: zod.string(),
     fiscalYear: zod.number(),
     description: zod.string(),
