@@ -708,7 +708,7 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
 
   const response = await client.chat.completions.create({
     model,
-    max_tokens: 16000,
+    max_tokens: 8192,
     messages: [
       {
         role: "system",
