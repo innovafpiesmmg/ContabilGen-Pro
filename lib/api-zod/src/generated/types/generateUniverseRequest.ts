@@ -54,4 +54,8 @@ export interface GenerateUniverseRequest {
   includeShareholderAccounts?: boolean;
   /** Include dividend distribution approved at the shareholders meeting */
   includeDividends?: boolean;
+  /** Custom period start date (YYYY-MM-DD). If set, overrides the default Jan 1 of fiscal year. */
+  startDate?: Date;
+  /** Custom period end date (YYYY-MM-DD). If set, overrides the default Dec 31 of fiscal year. */
+  endDate?: Date;
 }

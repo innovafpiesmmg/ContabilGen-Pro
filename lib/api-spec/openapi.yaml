@@ -500,6 +500,14 @@ components:
         includeDividends:
           type: boolean
           description: "Include dividend distribution approved at the shareholders meeting"
+        startDate:
+          type: string
+          format: date
+          description: "Custom period start date (YYYY-MM-DD). If set, overrides the default Jan 1 of fiscal year."
+        endDate:
+          type: string
+          format: date
+          description: "Custom period end date (YYYY-MM-DD). If set, overrides the default Dec 31 of fiscal year."
       required:
         - taxRegime
         - sector

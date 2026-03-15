@@ -241,6 +241,18 @@ export const GenerateAccountingUniverseBody = zod.object({
     .describe(
       "Include dividend distribution approved at the shareholders meeting",
     ),
+  startDate: zod
+    .date()
+    .optional()
+    .describe(
+      "Custom period start date (YYYY-MM-DD). If set, overrides the default Jan 1 of fiscal year.",
+    ),
+  endDate: zod
+    .date()
+    .optional()
+    .describe(
+      "Custom period end date (YYYY-MM-DD). If set, overrides the default Dec 31 of fiscal year.",
+    ),
 });
 
 export const GenerateAccountingUniverseResponse = zod.object({

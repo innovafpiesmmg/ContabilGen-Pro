@@ -20,6 +20,8 @@ interface GenerateParams {
   includeInitialBalance?: boolean | null;
   includeShareholderAccounts?: boolean | null;
   includeDividends?: boolean | null;
+  startDate?: string | null;
+  endDate?: string | null;
 }
 
 interface AiConfig {
@@ -52,6 +54,26 @@ function buildPrompt(params: GenerateParams): string {
   const withShareholderAccounts = params.includeShareholderAccounts !== false;
   const withDividends = params.includeDividends !== false;
 
+  // Period calculation
+  const hasCustomPeriod = !!(params.startDate && params.endDate);
+  const periodStart = hasCustomPeriod ? params.startDate! : `${params.year}-01-01`;
+  const periodEnd = hasCustomPeriod ? params.endDate! : `${params.year}-12-31`;
+  const startParts = periodStart.split("-");
+  const endParts = periodEnd.split("-");
+  const startMonthNum = parseInt(startParts[1], 10);
+  const endMonthNum = parseInt(endParts[1], 10);
+  const startYearNum = parseInt(startParts[0], 10);
+  const endYearNum = parseInt(endParts[0], 10);
+  const numMonths = Math.max(1, (endYearNum - startYearNum) * 12 + (endMonthNum - startMonthNum) + 1);
+  const MONTHS_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+  const periodLabel = hasCustomPeriod
+    ? `del ${parseInt(startParts[2], 10)} de ${MONTHS_ES[startMonthNum - 1]} de ${startYearNum} al ${parseInt(endParts[2], 10)} de ${MONTHS_ES[endMonthNum - 1]} de ${endYearNum} (${numMonths} mes${numMonths > 1 ? "es" : ""})`
+    : `ejercicio completo ${params.year} (12 meses)`;
+  // A representative mid-period month for document examples
+  const midMonthIdx = Math.floor((startMonthNum - 1 + numMonths / 2)) % 12;
+  const midYear = startYearNum + Math.floor((startMonthNum - 1 + Math.floor(numMonths / 2)) / 12);
+  const midMonthLabel = `${MONTHS_ES[midMonthIdx].charAt(0).toUpperCase() + MONTHS_ES[midMonthIdx].slice(1)} ${midYear}`;
+
   const levelNote = level === "Superior"
     ? "Nivel Superior (FP Grado Superior): incluye operaciones complejas como periodificaciones contables, ajustes de ejercicio, operaciones con efectos comerciales, factoring, leasing, y mayor detalle en impuestos."
     : "Nivel Medio (FP Grado Medio): operaciones claras y bien comentadas, enfocadas en facturas, nóminas, IVA trimestral y préstamos básicos.";
@@ -60,7 +82,7 @@ function buildPrompt(params: GenerateParams): string {
 
   if (withPayroll) {
     conditionalSections.push(`  "payroll": {
-    "month": "Octubre ${params.year}",
+    "month": "${midMonthLabel}",
     "employees": [
       {
         "name": "María García López",
@@ -479,9 +501,11 @@ function buildPrompt(params: GenerateParams): string {
 PARÁMETROS:
 - Sector económico: ${params.sector}
 - Régimen fiscal: ${params.taxRegime} (Tipo general: ${rates.standard}%, Reducido: ${rates.reduced}%, Superreducido: ${rates.superreduced}%)
+- Período del ejercicio: ${periodLabel}
+- Todas las fechas DEBEN estar comprendidas entre ${periodStart} y ${periodEnd} inclusive.
 - Año fiscal: ${params.year}
 - Nivel educativo: ${levelNote}
-- Operaciones en el libro diario: mínimo ${opsPerMonth} asientos por mes (total año: mínimo ${opsPerMonth * 12})
+- Operaciones en el libro diario: mínimo ${opsPerMonth} asientos por mes (total período: mínimo ${opsPerMonth * numMonths})
 - ${companyHint}
 
 TIPO DE EMPRESA:
@@ -660,7 +684,7 @@ ${optionalSectionsText}
   ]
 }
 
-RECUERDA: Adapta TODOS los datos al sector ${params.sector}. Los importes deben ser coherentes y los cálculos exactos. Genera un mínimo de ${opsPerMonth * 12} asientos en journalEntries repartidos en todos los meses.`;
+RECUERDA: Adapta TODOS los datos al sector ${params.sector}. Los importes deben ser coherentes y los cálculos exactos. Genera un mínimo de ${opsPerMonth * numMonths} asientos en journalEntries repartidos en los meses del período (${periodStart} a ${periodEnd}). TODAS las fechas deben caer dentro de este intervalo.`;
 }
 
 function getClient(config: AiConfig): OpenAI {

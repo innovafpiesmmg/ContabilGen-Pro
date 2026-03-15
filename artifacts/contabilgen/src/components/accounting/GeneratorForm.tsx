@@ -21,7 +21,9 @@ import {
   PieChart,
   Scale,
   Banknote,
-  TrendingUp
+  TrendingUp,
+  CalendarDays,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +31,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -67,6 +70,8 @@ const formSchema = z.object({
   includeInitialBalance: z.boolean().optional(),
   includeShareholderAccounts: z.boolean().optional(),
   includeDividends: z.boolean().optional(),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -82,6 +87,7 @@ interface CheckOption {
   description: string;
   icon: React.ElementType;
   dependsOn?: keyof FormValues;
+  group?: "society";
 }
 
 const checkOptions: CheckOption[] = [
@@ -92,25 +98,34 @@ const checkOptions: CheckOption[] = [
   { name: "includeMortgage", label: "Hipoteca", description: "Préstamo hipotecario sobre inmueble con tabla de amortización", icon: Home },
   { name: "includeCreditPolicy", label: "Póliza de crédito", description: "Cuenta de crédito con liquidación de intereses y comisiones", icon: BarChart3 },
   { name: "includeFixedAssets", label: "Inmovilizado y amortización", description: "Elementos del activo fijo con dotación anual de amortización", icon: Building2 },
+  { name: "includeShareholdersInfo", label: "Socios y capital social", description: "Estructura de socios, participaciones y tipo de sociedad (SL, SA...)", icon: PieChart, group: "society" },
+  { name: "includeInitialBalance", label: "Balance de apertura", description: "Asiento de apertura con activos, pasivos y patrimonio neto inicial", icon: Scale, group: "society" },
+  { name: "includeShareholderAccounts", label: "C/C socios y admins", description: "Operaciones en cuentas 551 y 553: anticipos, préstamos y retribuciones", icon: Banknote, group: "society" },
+  { name: "includeDividends", label: "Reparto de dividendos", description: "Junta de socios: dotación de reservas y pago de dividendos con retención IRPF", icon: TrendingUp, group: "society" },
 ];
 
-const societyOptions: CheckOption[] = [
-  { name: "includeShareholdersInfo", label: "Socios y capital social", description: "Estructura de socios, participaciones y tipo de sociedad (SL, SA...)", icon: PieChart },
-  { name: "includeInitialBalance", label: "Balance de apertura", description: "Asiento de apertura con activos, pasivos y patrimonio neto inicial", icon: Scale, dependsOn: "isNewCompany" as any },
-  { name: "includeShareholderAccounts", label: "C/C socios y administradores", description: "Operaciones en cuentas 551 y 553: anticipos, préstamos y retribuciones", icon: Banknote },
-  { name: "includeDividends", label: "Reparto de dividendos", description: "Junta de socios: dotación de reservas y pago de dividendos con retención IRPF", icon: TrendingUp },
-];
+function getMonthsBetween(start: string, end: string): number {
+  const [sy, sm] = start.split("-").map(Number);
+  const [ey, em] = end.split("-").map(Number);
+  return Math.max(1, (ey - sy) * 12 + (em - sm) + 1);
+}
 
 export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
-  
+  const [useCustomPeriod, setUseCustomPeriod] = useState(false);
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const defaultStart = `${currentYear}-01-01`;
+  const defaultEnd = `${currentYear}-12-31`;
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       taxRegime: "IVA",
       sector: "Comercio",
       complexity: "Avanzado",
-      year: new Date().getFullYear(),
+      year: currentYear,
       companyName: "",
       educationLevel: "Medio",
       operationsPerMonth: 8,
@@ -126,12 +141,19 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
       includeInitialBalance: true,
       includeShareholderAccounts: true,
       includeDividends: true,
+      startDate: defaultStart,
+      endDate: defaultEnd,
     },
   });
 
   const watchPayroll = form.watch("includePayroll");
   const watchIsNew = form.watch("isNewCompany");
   const watchOps = form.watch("operationsPerMonth") ?? 8;
+  const watchStart = form.watch("startDate") ?? defaultStart;
+  const watchEnd = form.watch("endDate") ?? defaultEnd;
+
+  const numMonths = useCustomPeriod ? getMonthsBetween(watchStart, watchEnd) : 12;
+  const estimatedEntries = watchOps * numMonths;
 
   const handleSubmit = (data: FormValues) => {
     if (!data.includePayroll) {
@@ -141,12 +163,19 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
       data.includeInitialBalance = false;
       data.includeDividends = false;
     }
+    if (useCustomPeriod && data.startDate) {
+      data.year = parseInt(data.startDate.split("-")[0], 10);
+    } else {
+      data.startDate = null;
+      data.endDate = null;
+    }
     onSubmit(data as GenerateUniverseRequest);
   };
 
-  const allOptions = [...checkOptions, ...societyOptions];
-  const enabledCount = allOptions.filter(opt => {
+  const enabledCount = checkOptions.filter(opt => {
     if (opt.dependsOn && !form.watch(opt.dependsOn as any)) return false;
+    const isBalanceOrDividend = opt.name === "includeInitialBalance" || opt.name === "includeDividends";
+    if (watchIsNew && isBalanceOrDividend) return false;
     return form.watch(opt.name as any) === true;
   }).length;
 
@@ -245,27 +274,6 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
 
             <FormField
               control={form.control}
-              name="year"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    Ejercicio Fiscal
-                  </FormLabel>
-                  <FormControl>
-                    <Input 
-                      type="number" 
-                      className="rounded-xl bg-slate-50/50" 
-                      {...field} 
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
               name="educationLevel"
               render={({ field }) => (
                 <FormItem>
@@ -289,6 +297,110 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
                 </FormItem>
               )}
             />
+
+            {/* Period selector */}
+            <div className="lg:col-span-2">
+              <Label className="flex items-center gap-2 mb-2">
+                <CalendarDays className="w-4 h-4 text-muted-foreground" />
+                Período del Ejercicio
+              </Label>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="custom-period"
+                    checked={useCustomPeriod}
+                    onCheckedChange={(checked) => {
+                      setUseCustomPeriod(checked);
+                      if (!checked) {
+                        form.setValue("startDate", null);
+                        form.setValue("endDate", null);
+                      } else {
+                        const y = form.getValues("year");
+                        form.setValue("startDate", `${y}-01-01`);
+                        form.setValue("endDate", `${y}-12-31`);
+                      }
+                    }}
+                  />
+                  <label htmlFor="custom-period" className="text-sm text-muted-foreground cursor-pointer select-none">
+                    Período personalizado
+                  </label>
+                </div>
+                {useCustomPeriod && (
+                  <Badge variant="secondary" className="gap-1 text-xs">
+                    <Clock className="w-3 h-3" />
+                    {numMonths} mes{numMonths !== 1 ? "es" : ""}
+                  </Badge>
+                )}
+              </div>
+
+              {!useCustomPeriod ? (
+                <FormField
+                  control={form.control}
+                  name="year"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input 
+                            type="number" 
+                            className="rounded-xl bg-slate-50/50 pl-9" 
+                            placeholder="Año fiscal completo"
+                            {...field} 
+                          />
+                        </div>
+                      </FormControl>
+                      <FormDescription>Ejercicio anual completo (1 ene – 31 dic).</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={form.control}
+                    name="startDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs text-muted-foreground">Fecha inicio</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            className="rounded-xl bg-slate-50/50"
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              field.onChange(e.target.value);
+                              if (e.target.value) {
+                                form.setValue("year", parseInt(e.target.value.split("-")[0], 10));
+                              }
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="endDate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-xs text-muted-foreground">Fecha fin</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="date"
+                            className="rounded-xl bg-slate-50/50"
+                            value={field.value ?? ""}
+                            onChange={field.onChange}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="border border-border/40 rounded-xl overflow-hidden">
@@ -333,101 +445,86 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
                           </div>
                         </div>
                       </FormControl>
-                      <FormDescription>Total estimado: ~{watchOps * 12} asientos anuales</FormDescription>
+                      <FormDescription>
+                        Total estimado: ~{estimatedEntries} asientos
+                        {useCustomPeriod ? ` en ${numMonths} mes${numMonths !== 1 ? "es" : ""}` : " anuales"}
+                      </FormDescription>
                     </FormItem>
                   )}
                 />
 
                 <div>
-                  <Label className="text-sm font-semibold block mb-3">Módulos a incluir</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {checkOptions.map((opt) => {
-                      const disabled = opt.dependsOn && !form.watch(opt.dependsOn as any);
-                      const Icon = opt.icon;
-                      return (
-                        <FormField
-                          key={opt.name}
-                          control={form.control}
-                          name={opt.name as any}
-                          render={({ field }) => (
-                            <FormItem className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
-                              disabled ? "opacity-40 bg-slate-50" : field.value ? "border-primary/30 bg-primary/5" : "border-border/50 bg-slate-50/50"
-                            }`}>
-                              <FormControl>
-                                <Checkbox
-                                  checked={!!field.value}
-                                  onCheckedChange={field.onChange}
-                                  disabled={!!disabled}
-                                  className="mt-0.5"
-                                />
-                              </FormControl>
-                              <div className="space-y-0.5 flex-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
-                                  <FormLabel className="text-sm font-medium leading-tight cursor-pointer">{opt.label}</FormLabel>
-                                </div>
-                                <p className="text-xs text-muted-foreground leading-tight">{opt.description}</p>
-                                {disabled && <p className="text-xs text-amber-600">Requiere activar Nóminas</p>}
-                              </div>
-                            </FormItem>
-                          )}
-                        />
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="border-t border-border/40 pt-4">
                   <div className="flex items-center justify-between mb-3">
-                    <Label className="text-sm font-semibold">Sociedad y socios</Label>
-                    <FormField
-                      control={form.control}
-                      name="isNewCompany"
-                      render={({ field }) => (
-                        <FormItem className="flex items-center gap-2 space-y-0">
-                          <FormControl>
-                            <Checkbox checked={!!field.value} onCheckedChange={field.onChange} />
-                          </FormControl>
-                          <FormLabel className="text-xs text-muted-foreground font-normal cursor-pointer">Empresa de nueva creación</FormLabel>
-                        </FormItem>
-                      )}
-                    />
+                    <Label className="text-sm font-semibold">Módulos a incluir</Label>
+                    <div className="flex items-center gap-3">
+                      <FormField
+                        control={form.control}
+                        name="isNewCompany"
+                        render={({ field }) => (
+                          <FormItem className="flex items-center gap-2 space-y-0">
+                            <FormControl>
+                              <Checkbox checked={!!field.value} onCheckedChange={field.onChange} />
+                            </FormControl>
+                            <FormLabel className="text-xs text-muted-foreground font-normal cursor-pointer">Empresa de nueva creación</FormLabel>
+                          </FormItem>
+                        )}
+                      />
+                    </div>
                   </div>
+
                   {watchIsNew && (
                     <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2 mb-3 border border-amber-200">
                       Al ser empresa nueva no se generará balance de apertura ni reparto de dividendos.
                     </p>
                   )}
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {societyOptions.map((opt) => {
-                      const isBalanceOpt = opt.name === "includeInitialBalance";
-                      const isDividendOpt = opt.name === "includeDividends";
-                      const disabled = watchIsNew && (isBalanceOpt || isDividendOpt);
+                    {checkOptions.map((opt) => {
+                      const isSociety = opt.group === "society";
+                      const isSSDependency = opt.dependsOn === "includePayroll" && !watchPayroll;
+                      const isNewCompanyDisabled = watchIsNew && (opt.name === "includeInitialBalance" || opt.name === "includeDividends");
+                      const disabled = isSSDependency || isNewCompanyDisabled;
                       const Icon = opt.icon;
+
+                      let itemClass = "flex items-start gap-3 p-3 rounded-xl border transition-colors ";
+                      if (disabled) {
+                        itemClass += "opacity-40 bg-slate-50 border-border/30";
+                      } else if (isSociety) {
+                        const val = form.watch(opt.name as any);
+                        itemClass += val ? "border-violet-300 bg-violet-50/60" : "border-violet-100 bg-slate-50/50";
+                      } else {
+                        const val = form.watch(opt.name as any);
+                        itemClass += val ? "border-primary/30 bg-primary/5" : "border-border/50 bg-slate-50/50";
+                      }
+
                       return (
                         <FormField
                           key={opt.name}
                           control={form.control}
                           name={opt.name as any}
                           render={({ field }) => (
-                            <FormItem className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
-                              disabled ? "opacity-40 bg-slate-50" : field.value ? "border-violet-300 bg-violet-50/50" : "border-border/50 bg-slate-50/50"
-                            }`}>
+                            <FormItem className={itemClass}>
                               <FormControl>
                                 <Checkbox
                                   checked={!!field.value && !disabled}
                                   onCheckedChange={field.onChange}
                                   disabled={!!disabled}
-                                  className="mt-0.5"
+                                  className={`mt-0.5 ${isSociety && !disabled ? "data-[state=checked]:bg-violet-600 data-[state=checked]:border-violet-600" : ""}`}
                                 />
                               </FormControl>
                               <div className="space-y-0.5 flex-1 min-w-0">
                                 <div className="flex items-center gap-1.5">
-                                  <Icon className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+                                  <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${isSociety ? "text-violet-500" : "text-muted-foreground"}`} />
                                   <FormLabel className="text-sm font-medium leading-tight cursor-pointer">{opt.label}</FormLabel>
+                                  {isSociety && (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-600 border border-violet-200 leading-none">
+                                      Sociedad
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-xs text-muted-foreground leading-tight">{opt.description}</p>
-                                {disabled && <p className="text-xs text-amber-600">No aplica a empresa nueva</p>}
+                                {isSSDependency && <p className="text-xs text-amber-600">Requiere activar Nóminas</p>}
+                                {isNewCompanyDisabled && <p className="text-xs text-amber-600">No aplica a empresa nueva</p>}
                               </div>
                             </FormItem>
                           )}
