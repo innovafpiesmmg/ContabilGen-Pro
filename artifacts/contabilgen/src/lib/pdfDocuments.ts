@@ -1012,6 +1012,126 @@ function extractDate(dateStr: string | undefined | null, fallback: string): stri
   return fallback;
 }
 
+export function generateExtraordinaryExpensePdf(exp: any, cp: CP): Blob {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const typeLabels: Record<string, string> = {
+    multa: "Multa / Sanción", donacion: "Donación",
+    perdida_inmovilizado: "Pérdida Inmovilizado",
+    ingreso_extraordinario: "Ingreso Extraordinario", otro: "Gasto Extraordinario",
+  };
+  let y = headerBlock(doc, typeLabels[exp.type] || "Gasto Extraordinario", `Fecha: ${exp.date || ""}`, cp);
+  y = sectionTitle(doc, y, "Detalle de la Partida");
+  y = labelValue(doc, y, "Tipo:", typeLabels[exp.type] || exp.type);
+  y = labelValue(doc, y, "Descripción:", exp.description || "");
+  y = labelValue(doc, y, "Importe:", fmt(exp.amount));
+  y = labelValue(doc, y, "Cuenta:", `${exp.accountCode} - ${exp.accountName}`);
+  y = labelValue(doc, y, "Contrapartida:", `${exp.counterpartAccountCode} - ${exp.counterpartAccountName}`);
+  y += 5;
+
+  y = sectionTitle(doc, y, "Asiento Contable");
+  const cols = [
+    { label: "Cuenta", x: M, w: 15 },
+    { label: "Denominación", x: M + 16, w: 50 },
+    { label: "Debe", x: M + 90, w: 25, align: "right" as const },
+    { label: "Haber", x: M + 120, w: 25, align: "right" as const },
+  ];
+  y = tableHeader(doc, y, cols);
+  const debits = Array.isArray(exp.accountDebits) ? exp.accountDebits : [];
+  const credits = Array.isArray(exp.accountCredits) ? exp.accountCredits : [];
+  let row = 0;
+  for (const d of debits) {
+    y = tableRow(doc, y, cols, [d.accountCode, d.accountName, fmt(d.amount), ""], row++ % 2 === 0);
+  }
+  for (const c of credits) {
+    y = tableRow(doc, y, cols, [c.accountCode, c.accountName, "", fmt(c.amount)], row++ % 2 === 0);
+  }
+  if (exp.journalNote) {
+    y += 5;
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    gray(doc, 80, 80, 80);
+    const lines = doc.splitTextToSize(exp.journalNote, CW);
+    doc.text(lines, M, y);
+  }
+  fixupFooters(doc);
+  return doc.output("blob");
+}
+
+export function generateWarehouseCardPdf(card: any, cp: CP): Blob {
+  const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
+  const LW = 297;
+  const LH = 210;
+  const LM = 10;
+
+  let y = LM;
+  doc.setFillColor(41, 65, 122);
+  doc.rect(0, 0, LW, 26, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(14);
+  doc.setTextColor(255, 255, 255);
+  doc.text("FICHA DE ALMACÉN", LM, y + 10);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(`${cp.name || ""} · CIF: ${cp.nif || ""}`, LM, y + 17);
+  doc.text(`Producto: ${card.productCode} - ${card.productDescription}`, LW - LM, y + 10, { align: "right" });
+  doc.text(`Cuenta PGC: ${card.accountCode} · Método: ${card.valuationMethod}`, LW - LM, y + 17, { align: "right" });
+  y = 34;
+
+  const cols = [
+    { label: "Fecha", x: LM, w: 22 },
+    { label: "Concepto", x: LM + 23, w: 50 },
+    { label: "Doc.", x: LM + 74, w: 20 },
+    { label: "Uds.E", x: LM + 95, w: 12, align: "right" as const },
+    { label: "P.U.E", x: LM + 108, w: 18, align: "right" as const },
+    { label: "Total E", x: LM + 127, w: 20, align: "right" as const },
+    { label: "Uds.S", x: LM + 148, w: 12, align: "right" as const },
+    { label: "P.U.S", x: LM + 161, w: 18, align: "right" as const },
+    { label: "Total S", x: LM + 180, w: 20, align: "right" as const },
+    { label: "Uds.Ex", x: LM + 201, w: 12, align: "right" as const },
+    { label: "P.U.Ex", x: LM + 214, w: 18, align: "right" as const },
+    { label: "Total Ex", x: LM + 233, w: 25, align: "right" as const },
+  ];
+
+  const pn = { n: 1 };
+  y = tableHeader(doc, y, cols);
+
+  const movements = Array.isArray(card.movements) ? card.movements : [];
+  for (let i = 0; i < movements.length; i++) {
+    if (y + 6 > LH - 15) {
+      doc.addPage();
+      pn.n++;
+      y = LM + 5;
+      y = tableHeader(doc, y, cols);
+    }
+    const m = movements[i];
+    const dateStr = m.date?.includes("-") ? m.date : m.date;
+    y = tableRow(doc, y, cols, [
+      dateStr || "",
+      (m.concept || "").substring(0, 40),
+      (m.document || "").substring(0, 15),
+      m.entryQty > 0 ? String(m.entryQty) : "",
+      m.entryQty > 0 ? fmt(m.entryUnitCost) : "",
+      m.entryQty > 0 ? fmt(m.entryTotal) : "",
+      m.exitQty > 0 ? String(m.exitQty) : "",
+      m.exitQty > 0 ? fmt(m.exitUnitCost) : "",
+      m.exitQty > 0 ? fmt(m.exitTotal) : "",
+      String(m.balanceQty ?? 0),
+      fmt(m.balanceUnitCost),
+      fmt(m.balanceTotal),
+    ], i % 2 === 0);
+  }
+
+  const total = doc.getNumberOfPages();
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p);
+    doc.setFontSize(7);
+    gray(doc, 150, 150, 150);
+    doc.text(`Página ${p} de ${total}`, LW / 2, LH - 5, { align: "center" });
+    doc.text("Documento generado por ContabilGen Pro — Material didáctico para FP", LW / 2, LH - 2, { align: "center" });
+  }
+  return doc.output("blob");
+}
+
 export function buildAllDocuments(universe: any, cp: CP): ZipDocumentSet[] {
   const docs: ZipDocumentSet[] = [];
   const safe = (s: string) => (s || "").replace(/[/\\?%*:|"<>]/g, "-").substring(0, 50);
@@ -1152,6 +1272,30 @@ export function buildAllDocuments(universe: any, cp: CP): ZipDocumentSet[] {
       docType: "Siniestro",
       filename: `Siniestro.pdf`,
       blob: generateCasualtyReportPdf(universe.casualtyEvent, cp),
+    });
+  }
+
+  const extraExpenses = Array.isArray(universe.extraordinaryExpenses) ? universe.extraordinaryExpenses : [];
+  for (const exp of extraExpenses) {
+    const typeLabels: Record<string, string> = {
+      multa: "Multa", donacion: "Donacion", perdida_inmovilizado: "Perdida_Inmov",
+      ingreso_extraordinario: "Ingreso_Extra", otro: "Gasto_Extra",
+    };
+    docs.push({
+      date: extractDate(exp.date, fallback),
+      docType: typeLabels[exp.type] || "Gasto_Extra",
+      filename: `${typeLabels[exp.type] || "Gasto_Extra"}_${safe(exp.description || "")}.pdf`,
+      blob: generateExtraordinaryExpensePdf(exp, cp),
+    });
+  }
+
+  const warehouseCards = Array.isArray(universe.warehouseCards) ? universe.warehouseCards : [];
+  for (const card of warehouseCards) {
+    docs.push({
+      date: `${yr}-01-01`,
+      docType: "Ficha_Almacen",
+      filename: `Ficha_Almacen_${safe(card.productCode || "")}_${safe(card.productDescription || "")}.pdf`,
+      blob: generateWarehouseCardPdf(card, cp),
     });
   }
 

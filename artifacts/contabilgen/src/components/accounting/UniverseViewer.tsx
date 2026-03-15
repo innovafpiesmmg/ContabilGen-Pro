@@ -27,6 +27,8 @@ import {
   InvoicesView,
   FinancialView,
   ExtraordinaryView,
+  ExtraordinaryExpensesView,
+  WarehouseCardsView,
   PayrollView,
   BankStatementView,
   JournalView,
@@ -68,6 +70,8 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const bankDebitNotes: unknown[] = (universe as any).bankDebitNotes ?? [];
   const hasBankDebitNotes = bankDebitNotes.length > 0;
+  const hasExtraExpenses = universe.extraordinaryExpenses && universe.extraordinaryExpenses.length > 0;
+  const hasWarehouseCards = universe.warehouseCards && universe.warehouseCards.length > 0;
 
   const companyName = universe.companyProfile.name;
 
@@ -75,9 +79,10 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
   const handleExportCurrentTab = async () => {
     if (!contentRef.current) return;
     const labels: Record<string, string> = {
-      cronologia: "Cronología", empresa: "Empresa", inventarios: "Inventarios", facturas: "Facturas",
-      financiero: "Préstamo y Crédito", hipoteca: "Hipoteca", extraordinario: "Extraordinarios",
-      nominas: "Nóminas", ss: "SS TC1", impuestos: "Impuestos", inmovilizado: "Inmovilizado",
+      cronologia: "Cronología", empresa: "Empresa", inventarios: "Inventarios", almacen: "Almacén",
+      facturas: "Facturas", financiero: "Préstamo y Crédito", hipoteca: "Hipoteca",
+      extraordinario: "Extraordinarios", nominas: "Nóminas", ss: "SS TC1",
+      impuestos: "Impuestos", inmovilizado: "Inmovilizado",
       socios: "Socios", balance_apertura: "Balance Apertura", cc_socios: "CC Socios",
       dividendos: "Dividendos", bancos: "Extracto Bancario", diario: "Libro Diario",
       notas_cargo: "Notas de Cargo",
@@ -178,6 +183,11 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
             <TabsTrigger value="inventarios" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg gap-2">
               <PackageSearch className="w-4 h-4" /> Inventarios
             </TabsTrigger>
+            {hasWarehouseCards && (
+              <TabsTrigger value="almacen" className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800 rounded-lg gap-2">
+                <Archive className="w-4 h-4" /> Almacén
+              </TabsTrigger>
+            )}
             <TabsTrigger value="facturas" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg gap-2">
               <Receipt className="w-4 h-4" /> Facturas
             </TabsTrigger>
@@ -254,6 +264,11 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
           <TabsContent value="inventarios" className="mt-0 outline-none">
             <InventoryView data={universe.inventory} />
           </TabsContent>
+          {hasWarehouseCards && (
+            <TabsContent value="almacen" className="mt-0 outline-none">
+              <WarehouseCardsView data={universe.warehouseCards} />
+            </TabsContent>
+          )}
           <TabsContent value="facturas" className="mt-0 outline-none">
             <InvoicesView data={universe.invoices} />
           </TabsContent>
@@ -267,6 +282,7 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
           )}
           <TabsContent value="extraordinario" className="mt-0 outline-none">
             <ExtraordinaryView insurance={universe.insurancePolicies} casualty={universe.casualtyEvent} />
+            {hasExtraExpenses && <ExtraordinaryExpensesView data={universe.extraordinaryExpenses} />}
           </TabsContent>
           <TabsContent value="nominas" className="mt-0 outline-none">
             <PayrollView data={universe.payroll} />

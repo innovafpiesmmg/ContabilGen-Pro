@@ -577,6 +577,63 @@ export const GenerateAccountingUniverseResponse = zod.object({
       ),
     })
     .optional(),
+  extraordinaryExpenses: zod
+    .array(
+      zod.object({
+        date: zod.string(),
+        type: zod.enum(['multa', 'donacion', 'perdida_inmovilizado', 'ingreso_extraordinario', 'otro']),
+        description: zod.string(),
+        amount: zod.number(),
+        accountCode: zod.string(),
+        accountName: zod.string(),
+        counterpartAccountCode: zod.string(),
+        counterpartAccountName: zod.string(),
+        journalNote: zod.string().optional(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
+  warehouseCards: zod
+    .array(
+      zod.object({
+        productCode: zod.string(),
+        productDescription: zod.string(),
+        accountCode: zod.string(),
+        valuationMethod: zod.string(),
+        movements: zod.array(
+          zod.object({
+            date: zod.string(),
+            concept: zod.string(),
+            document: zod.string(),
+            entryQty: zod.number(),
+            entryUnitCost: zod.number(),
+            entryTotal: zod.number(),
+            exitQty: zod.number(),
+            exitUnitCost: zod.number(),
+            exitTotal: zod.number(),
+            balanceQty: zod.number(),
+            balanceUnitCost: zod.number(),
+            balanceTotal: zod.number(),
+          }),
+        ),
+      }),
+    )
+    .optional(),
   payroll: zod
     .object({
       month: zod.string(),
@@ -1384,6 +1441,63 @@ export const SaveGenerationBody = zod.object({
         ),
       })
       .optional(),
+    extraordinaryExpenses: zod
+      .array(
+        zod.object({
+          date: zod.string(),
+          type: zod.enum(['multa', 'donacion', 'perdida_inmovilizado', 'ingreso_extraordinario', 'otro']),
+          description: zod.string(),
+          amount: zod.number(),
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          counterpartAccountCode: zod.string(),
+          counterpartAccountName: zod.string(),
+          journalNote: zod.string().optional(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+        }),
+      )
+      .optional(),
+    warehouseCards: zod
+      .array(
+        zod.object({
+          productCode: zod.string(),
+          productDescription: zod.string(),
+          accountCode: zod.string(),
+          valuationMethod: zod.string(),
+          movements: zod.array(
+            zod.object({
+              date: zod.string(),
+              concept: zod.string(),
+              document: zod.string(),
+              entryQty: zod.number(),
+              entryUnitCost: zod.number(),
+              entryTotal: zod.number(),
+              exitQty: zod.number(),
+              exitUnitCost: zod.number(),
+              exitTotal: zod.number(),
+              balanceQty: zod.number(),
+              balanceUnitCost: zod.number(),
+              balanceTotal: zod.number(),
+            }),
+          ),
+        }),
+      )
+      .optional(),
     payroll: zod
       .object({
         month: zod.string(),
@@ -2190,6 +2304,63 @@ export const GetGenerationResponse = zod.object({
           }),
         ),
       })
+      .optional(),
+    extraordinaryExpenses: zod
+      .array(
+        zod.object({
+          date: zod.string(),
+          type: zod.enum(['multa', 'donacion', 'perdida_inmovilizado', 'ingreso_extraordinario', 'otro']),
+          description: zod.string(),
+          amount: zod.number(),
+          accountCode: zod.string(),
+          accountName: zod.string(),
+          counterpartAccountCode: zod.string(),
+          counterpartAccountName: zod.string(),
+          journalNote: zod.string().optional(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string(),
+            }),
+          ),
+        }),
+      )
+      .optional(),
+    warehouseCards: zod
+      .array(
+        zod.object({
+          productCode: zod.string(),
+          productDescription: zod.string(),
+          accountCode: zod.string(),
+          valuationMethod: zod.string(),
+          movements: zod.array(
+            zod.object({
+              date: zod.string(),
+              concept: zod.string(),
+              document: zod.string(),
+              entryQty: zod.number(),
+              entryUnitCost: zod.number(),
+              entryTotal: zod.number(),
+              exitQty: zod.number(),
+              exitUnitCost: zod.number(),
+              exitTotal: zod.number(),
+              balanceQty: zod.number(),
+              balanceUnitCost: zod.number(),
+              balanceTotal: zod.number(),
+            }),
+          ),
+        }),
+      )
       .optional(),
     payroll: zod
       .object({

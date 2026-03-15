@@ -387,6 +387,43 @@ export interface CasualtyEvent {
   accountCredits: AccountEntry[];
 }
 
+export interface ExtraordinaryExpense {
+  date: string;
+  type: 'multa' | 'donacion' | 'perdida_inmovilizado' | 'ingreso_extraordinario' | 'otro';
+  description: string;
+  amount: number;
+  accountCode: string;
+  accountName: string;
+  counterpartAccountCode: string;
+  counterpartAccountName: string;
+  journalNote?: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
+}
+
+export interface WarehouseMovement {
+  date: string;
+  concept: string;
+  document: string;
+  entryQty: number;
+  entryUnitCost: number;
+  entryTotal: number;
+  exitQty: number;
+  exitUnitCost: number;
+  exitTotal: number;
+  balanceQty: number;
+  balanceUnitCost: number;
+  balanceTotal: number;
+}
+
+export interface WarehouseCard {
+  productCode: string;
+  productDescription: string;
+  accountCode: string;
+  valuationMethod: string;
+  movements: WarehouseMovement[];
+}
+
 export interface PayrollEmployee {
   name: string;
   naf: string;
@@ -679,6 +716,8 @@ export interface AccountingUniverse {
   creditCardStatement?: CreditCardStatement;
   insurancePolicies?: InsurancePolicy[];
   casualtyEvent?: CasualtyEvent;
+  extraordinaryExpenses?: ExtraordinaryExpense[];
+  warehouseCards?: WarehouseCard[];
   payroll?: Payroll;
   socialSecurityPayments?: SocialSecurityPayment[];
   taxLiquidations?: TaxLiquidation[];

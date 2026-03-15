@@ -18,6 +18,9 @@ import {
   CreditCardStatement,
   InsurancePolicy,
   CasualtyEvent,
+  ExtraordinaryExpense,
+  WarehouseCard,
+  WarehouseMovement,
   Payroll,
   BankStatement,
   ShareholdersInfo,
@@ -554,6 +557,161 @@ export const ExtraordinaryView = ({ insurance, casualty }: { insurance?: Insuran
           </Card>
         </section>
       )}
+    </div>
+  );
+};
+
+const EXTRA_TYPE_LABELS: Record<string, { label: string; color: string; bgColor: string; borderColor: string }> = {
+  multa: { label: "Multa / Sanción", color: "text-red-700", bgColor: "bg-red-50", borderColor: "border-red-200" },
+  donacion: { label: "Donación", color: "text-purple-700", bgColor: "bg-purple-50", borderColor: "border-purple-200" },
+  perdida_inmovilizado: { label: "Pérdida Inmovilizado", color: "text-orange-700", bgColor: "bg-orange-50", borderColor: "border-orange-200" },
+  ingreso_extraordinario: { label: "Ingreso Extraordinario", color: "text-emerald-700", bgColor: "bg-emerald-50", borderColor: "border-emerald-200" },
+  otro: { label: "Otro", color: "text-slate-700", bgColor: "bg-slate-50", borderColor: "border-slate-200" },
+};
+
+export const ExtraordinaryExpensesView = ({ data }: { data?: ExtraordinaryExpense[] | null }) => {
+  if (!data?.length) return null;
+
+  const isIncome = (e: ExtraordinaryExpense) => e.type === 'ingreso_extraordinario' || (e.accountCode || '').startsWith('7');
+  const totalGastos = data.filter(e => !isIncome(e)).reduce((s, e) => s + e.amount, 0);
+  const totalIngresos = data.filter(e => isIncome(e)).reduce((s, e) => s + e.amount, 0);
+
+  return (
+    <section className="mt-8">
+      <SectionTitle title="Gastos e Ingresos Extraordinarios" description="Partidas no recurrentes: multas, sanciones, donaciones, pérdidas y beneficios extraordinarios." />
+      
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <Card className="rounded-xl border-destructive/20">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase font-bold">Total Gastos Extraordinarios</p>
+              <p className="text-sm text-muted-foreground">Ctas. 671, 678, etc.</p>
+            </div>
+            <p className="font-mono text-2xl font-bold text-destructive">{formatEuro(totalGastos)}</p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-xl border-emerald-200">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-muted-foreground uppercase font-bold">Total Ingresos Extraordinarios</p>
+              <p className="text-sm text-muted-foreground">Ctas. 771, 778, etc.</p>
+            </div>
+            <p className="font-mono text-2xl font-bold text-emerald-600">{formatEuro(totalIngresos)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="space-y-4">
+        {data.map((exp, i) => {
+          const style = EXTRA_TYPE_LABELS[exp.type] || EXTRA_TYPE_LABELS.otro;
+          const isIngreso = isIncome(exp);
+          return (
+            <Card key={i} className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
+              <CardHeader className="bg-slate-50 border-b flex flex-row items-center justify-between">
+                <div>
+                  <Badge variant="outline" className={cn("mb-2 uppercase tracking-wider text-xs font-bold", style.color, style.bgColor, style.borderColor)}>
+                    {style.label}
+                  </Badge>
+                  <CardTitle className="text-base">{exp.description}</CardTitle>
+                  <CardDescription>Fecha: {formatDate(exp.date)}</CardDescription>
+                </div>
+                <div className="text-right">
+                  <p className={cn("font-mono text-xl font-bold", isIngreso ? "text-emerald-600" : "text-destructive")}>
+                    {isIngreso ? "+" : "-"}{formatEuro(exp.amount)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Cta. {exp.accountCode} ({exp.accountName})
+                  </p>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <AsientoContable debits={exp.accountDebits} credits={exp.accountCredits} note={exp.journalNote} />
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </section>
+  );
+};
+
+export const WarehouseCardsView = ({ data }: { data?: WarehouseCard[] | null }) => {
+  if (!data?.length) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se han generado fichas de almacén.</p>
+        <p className="text-sm mt-1">Las fichas se generan automáticamente para empresas comerciales e industriales con inventario.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle title="Fichas de Almacén" description="Control de existencias por producto con método de valoración PMP (Precio Medio Ponderado)." />
+
+      {data.map((card, ci) => (
+        <Card key={ci} className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
+          <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50 border-b">
+            <div className="flex items-center justify-between">
+              <div>
+                <Badge variant="outline" className="mb-2 font-mono text-xs bg-amber-100 text-amber-800 border-amber-300">
+                  {card.productCode}
+                </Badge>
+                <CardTitle className="text-lg">{card.productDescription}</CardTitle>
+                <CardDescription>Cuenta PGC: {card.accountCode} · Método: {card.valuationMethod}</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-100">
+                    <TableHead rowSpan={2} className="border-r font-bold text-center align-middle">Fecha</TableHead>
+                    <TableHead rowSpan={2} className="border-r font-bold align-middle">Concepto</TableHead>
+                    <TableHead rowSpan={2} className="border-r font-bold text-xs align-middle">Doc.</TableHead>
+                    <TableHead colSpan={3} className="border-r text-center font-bold bg-emerald-50 text-emerald-700">ENTRADAS</TableHead>
+                    <TableHead colSpan={3} className="border-r text-center font-bold bg-red-50 text-red-700">SALIDAS</TableHead>
+                    <TableHead colSpan={3} className="text-center font-bold bg-blue-50 text-blue-700">EXISTENCIAS</TableHead>
+                  </TableRow>
+                  <TableRow className="bg-slate-50 text-xs">
+                    <TableHead className="text-right bg-emerald-50/50">Uds.</TableHead>
+                    <TableHead className="text-right bg-emerald-50/50">P.Unit.</TableHead>
+                    <TableHead className="text-right border-r bg-emerald-50/50">Total</TableHead>
+                    <TableHead className="text-right bg-red-50/50">Uds.</TableHead>
+                    <TableHead className="text-right bg-red-50/50">P.Unit.</TableHead>
+                    <TableHead className="text-right border-r bg-red-50/50">Total</TableHead>
+                    <TableHead className="text-right bg-blue-50/50">Uds.</TableHead>
+                    <TableHead className="text-right bg-blue-50/50">P.Unit.</TableHead>
+                    <TableHead className="text-right bg-blue-50/50">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {card.movements.map((mov, mi) => (
+                    <TableRow key={mi} className={cn(
+                      mi === 0 ? "bg-slate-50/50 font-medium" : "",
+                      mov.concept.includes("Regularización") ? "bg-amber-50/30" : ""
+                    )}>
+                      <TableCell className="border-r text-xs whitespace-nowrap">{mov.date.includes("-") ? formatDate(mov.date) : mov.date}</TableCell>
+                      <TableCell className="border-r text-sm max-w-[200px] truncate">{mov.concept}</TableCell>
+                      <TableCell className="border-r text-xs font-mono">{mov.document}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{mov.entryQty > 0 ? mov.entryQty : ""}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{mov.entryQty > 0 ? formatEuro(mov.entryUnitCost) : ""}</TableCell>
+                      <TableCell className="text-right font-mono text-xs border-r text-emerald-700">{mov.entryQty > 0 ? formatEuro(mov.entryTotal) : ""}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{mov.exitQty > 0 ? mov.exitQty : ""}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{mov.exitQty > 0 ? formatEuro(mov.exitUnitCost) : ""}</TableCell>
+                      <TableCell className="text-right font-mono text-xs border-r text-red-600">{mov.exitQty > 0 ? formatEuro(mov.exitTotal) : ""}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-medium">{mov.balanceQty}</TableCell>
+                      <TableCell className="text-right font-mono text-xs">{formatEuro(mov.balanceUnitCost)}</TableCell>
+                      <TableCell className="text-right font-mono text-xs font-bold text-primary">{formatEuro(mov.balanceTotal)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 };
@@ -1494,7 +1652,8 @@ type EventKind =
   | "prestamo" | "hipoteca" | "poliza_credito"
   | "ss" | "impuesto"
   | "nomina" | "socio" | "dividendo" | "apertura" | "inmovilizado"
-  | "seguro" | "siniestro" | "nota_cargo";
+  | "seguro" | "siniestro" | "nota_cargo"
+  | "gasto_extra" | "ingreso_extra";
 
 interface ChronoEvent {
   date: string;
@@ -1524,6 +1683,8 @@ const KIND_META: Record<EventKind, { color: string; bg: string; text: string; do
   siniestro:      { color: "text-rose-700",    bg: "bg-rose-50 border-rose-200",   text: "Siniestro",     dot: "bg-rose-500" },
   nota_cargo:     { color: "text-amber-700",   bg: "bg-amber-50 border-amber-200", text: "Nota de cargo", dot: "bg-amber-500" },
   poliza_credito: { color: "text-violet-700",  bg: "bg-violet-50 border-violet-200", text: "Póliza crédito", dot: "bg-violet-500" },
+  gasto_extra:    { color: "text-red-700",     bg: "bg-red-50 border-red-200",     text: "Gasto extraordinario", dot: "bg-red-400" },
+  ingreso_extra:  { color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", text: "Ingreso extraordinario", dot: "bg-emerald-400" },
 };
 
 function parsePayrollDate(month: string, year: number): string {
@@ -1641,6 +1802,13 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
       label: `Nota cargo: ${n.reference || ""}`, subtitle: n.concept || "", amount: n.amount });
   });
 
+  (universe.extraordinaryExpenses ?? []).forEach((exp) => {
+    const isInc = exp.type === "ingreso_extraordinario" || (exp.accountCode || "").startsWith("7");
+    const kind: EventKind = isInc ? "ingreso_extra" : "gasto_extra";
+    events.push({ date: exp.date, kind, label: exp.description,
+      subtitle: `Cta. ${exp.accountCode} — ${exp.accountName}`, amount: exp.amount });
+  });
+
   return events.filter(e => e.date && /^\d{4}-\d{2}-\d{2}/.test(e.date))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -1679,6 +1847,7 @@ export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data })
     { label: "Socios/Dividendos", kinds: ["socio","dividendo"], color: "text-pink-600" },
     { label: "Apertura/Inmov.", kinds: ["apertura","inmovilizado"], color: "text-emerald-600" },
     { label: "Seguros/Siniestro", kinds: ["seguro","siniestro"], color: "text-sky-600" },
+    { label: "Extraordinarios", kinds: ["gasto_extra","ingreso_extra"], color: "text-red-500" },
   ];
 
   return (

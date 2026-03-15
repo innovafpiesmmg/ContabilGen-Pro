@@ -26,12 +26,14 @@ ContabilGen Pro es un generador de universos contables para prácticas de Grado 
 4. **Documentos generados**:
    - Perfil de empresa, proveedores y clientes
    - Inventarios inicial y final (variación de existencias)
+   - Fichas de almacén (warehouse cards) con PMP — computadas automáticamente desde facturas + inventario
    - Facturas de compra y venta con asientos
    - Cuadro de amortización de préstamo (Sistema Francés)
    - Liquidación de póliza de crédito
    - Extracto de tarjeta de crédito con movimientos
    - Pólizas de seguros con periodificación (cuenta 480)
    - Siniestro (cuentas 678/778)
+   - Gastos e ingresos extraordinarios (multas 678, donaciones, pérdidas inmovilizado 671, ingresos excepcionales 778/771)
    - Nómina con SS e IRPF
    - Extracto bancario
    - Libro diario (asientos contables)

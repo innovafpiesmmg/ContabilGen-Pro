@@ -9,6 +9,8 @@ import type { BankLoan } from "./bankLoan";
 import type { BankStatement } from "./bankStatement";
 import type { CasualtyEvent } from "./casualtyEvent";
 import type { Client } from "./client";
+import type { ExtraordinaryExpense } from "./extraordinaryExpense";
+import type { WarehouseCard } from "./warehouseCard";
 import type { CompanyProfile } from "./companyProfile";
 import type { CreditCardStatement } from "./creditCardStatement";
 import type { CreditPolicy } from "./creditPolicy";
@@ -39,6 +41,8 @@ export interface AccountingUniverse {
   creditCardStatement?: CreditCardStatement;
   insurancePolicies?: InsurancePolicy[];
   casualtyEvent?: CasualtyEvent;
+  extraordinaryExpenses?: ExtraordinaryExpense[];
+  warehouseCards?: WarehouseCard[];
   payroll?: Payroll;
   socialSecurityPayments?: SocialSecurityPayment[];
   taxLiquidations?: TaxLiquidation[];

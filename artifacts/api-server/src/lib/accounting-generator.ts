@@ -444,6 +444,217 @@ Adapta descripción y sector ${params.sector}. 1-2 pólizas de seguro realistas 
   return await callAI(client, model, prompt, 2000) as Record<string, unknown>;
 }
 
+// ─── CALL 2C: EXTRAORDINARY EXPENSES ──────────────────────────────────────────
+async function generateExtraordinaryExpenses(
+  params: GenerateParams,
+  scenario: Record<string, unknown>,
+  client: OpenAI,
+  model: string,
+) {
+  const { periodStart, periodEnd } = getPeriodInfo(params);
+
+  const prompt = `Genera gastos e ingresos extraordinarios para "${scenario.companyName}" (${params.sector}), período ${periodStart}–${periodEnd}.
+
+Genera 2-4 partidas extraordinarias variadas. Tipos posibles:
+- "multa": Multas y sanciones administrativas (cta 678 "Gastos excepcionales")
+- "donacion": Donaciones realizadas (cta 678 "Gastos excepcionales")  
+- "perdida_inmovilizado": Pérdida por venta/baja de inmovilizado (cta 671 "Pérdidas del inmovilizado material")
+- "ingreso_extraordinario": Ingreso extraordinario como subvención, premio, etc. (cta 778 "Ingresos excepcionales" o 771 "Beneficios del inmovilizado material")
+- "otro": Otros gastos/ingresos no recurrentes
+
+JSON exacto:
+{"extraordinaryExpenses":[
+  {
+    "date": "YYYY-MM-DD (dentro del período)",
+    "type": "multa",
+    "description": "Descripción clara de la partida",
+    "amount": 500.00,
+    "accountCode": "678",
+    "accountName": "Gastos excepcionales",
+    "counterpartAccountCode": "572",
+    "counterpartAccountName": "Bancos c/c",
+    "journalNote": "Explicación del asiento contable",
+    "accountDebits": [{"accountCode":"678","accountName":"Gastos excepcionales","amount":500.00,"description":"Multa por..."}],
+    "accountCredits": [{"accountCode":"572","accountName":"Bancos c/c","amount":500.00,"description":"Pago multa"}]
+  }
+]}
+
+REGLAS:
+- Incluye al menos 1 gasto y 1 ingreso extraordinario
+- Los importes deben ser realistas para el sector ${params.sector}
+- Cada asiento DEBE cuadrar (sum debits = sum credits)
+- Para pérdidas de inmovilizado: incluye baja del bien (21x) y amortización acumulada (281x)
+- Para ingresos extraordinarios: contrapartida puede ser 572 (cobro) o 440 (deudor)
+- Fechas distribuidas a lo largo del período`;
+
+  return await callAI(client, model, prompt, 2000) as Record<string, unknown>;
+}
+
+// ─── WAREHOUSE CARD COMPUTATION (from invoices + inventory) ───────────────────
+function computeWarehouseCards(universe: Record<string, unknown>): unknown[] {
+  const inventory = universe.inventory as {
+    initialInventory: Array<{ code: string; description: string; quantity: number; unitCost?: number; totalCost?: number; accountCode: string }>;
+    finalInventory: Array<{ code: string; description: string; quantity: number; unitCost?: number; totalCost?: number; accountCode: string }>;
+  } | undefined;
+  const invoices = universe.invoices as Array<{
+    invoiceNumber: string; date: string; type: string;
+    lines: Array<{ description: string; quantity: number; unitPrice: number; subtotal: number }>;
+  }> | undefined;
+
+  if (!inventory?.initialInventory?.length) return [];
+
+  const cards: unknown[] = [];
+
+  for (const item of inventory.initialInventory) {
+    const finalItem = inventory.finalInventory?.find(f => f.code === item.code);
+    const initQty = item.quantity || 0;
+    const initCost = item.unitCost || (item.totalCost && initQty ? item.totalCost / initQty : 0);
+    const initTotal = item.totalCost || initQty * initCost;
+
+    const movements: Array<Record<string, unknown>> = [];
+
+    movements.push({
+      date: "Existencias iniciales",
+      concept: "Saldo inicial",
+      document: "INV-INICIAL",
+      entryQty: initQty,
+      entryUnitCost: round2(initCost),
+      entryTotal: round2(initTotal),
+      exitQty: 0, exitUnitCost: 0, exitTotal: 0,
+      balanceQty: initQty,
+      balanceUnitCost: round2(initCost),
+      balanceTotal: round2(initTotal),
+    });
+
+    let balQty = initQty;
+    let balTotal = initTotal;
+
+    if (invoices?.length) {
+      const purchases = invoices
+        .filter(inv => inv.type === "purchase")
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      for (const inv of purchases) {
+        for (const line of inv.lines) {
+          const desc = line.description?.toLowerCase() || "";
+          const itemDesc = item.description?.toLowerCase() || "";
+          const words = itemDesc.split(/\s+/).filter(w => w.length > 3);
+          const matches = words.some(w => desc.includes(w));
+          if (!matches) continue;
+
+          const qty = line.quantity || 0;
+          const cost = line.unitPrice || 0;
+          const total = line.subtotal || qty * cost;
+
+          balQty += qty;
+          balTotal += total;
+          const pmp = balQty > 0 ? balTotal / balQty : 0;
+
+          movements.push({
+            date: inv.date,
+            concept: `Compra: ${line.description}`,
+            document: inv.invoiceNumber,
+            entryQty: qty,
+            entryUnitCost: round2(cost),
+            entryTotal: round2(total),
+            exitQty: 0, exitUnitCost: 0, exitTotal: 0,
+            balanceQty: balQty,
+            balanceUnitCost: round2(pmp),
+            balanceTotal: round2(balTotal),
+          });
+        }
+      }
+
+      const sales = invoices
+        .filter(inv => inv.type === "sale")
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      for (const inv of sales) {
+        for (const line of inv.lines) {
+          const desc = line.description?.toLowerCase() || "";
+          const itemDesc = item.description?.toLowerCase() || "";
+          const words = itemDesc.split(/\s+/).filter(w => w.length > 3);
+          const matches = words.some(w => desc.includes(w));
+          if (!matches) continue;
+
+          const qty = Math.min(line.quantity || 0, balQty);
+          if (qty <= 0) continue;
+          const pmp = balQty > 0 ? balTotal / balQty : 0;
+          const exitTotal = qty * pmp;
+
+          balQty -= qty;
+          balTotal -= exitTotal;
+
+          movements.push({
+            date: inv.date,
+            concept: `Venta: ${line.description}`,
+            document: inv.invoiceNumber,
+            entryQty: 0, entryUnitCost: 0, entryTotal: 0,
+            exitQty: qty,
+            exitUnitCost: round2(pmp),
+            exitTotal: round2(exitTotal),
+            balanceQty: balQty,
+            balanceUnitCost: round2(balQty > 0 ? balTotal / balQty : 0),
+            balanceTotal: round2(balTotal),
+          });
+        }
+      }
+    }
+
+    if (finalItem) {
+      const finalQty = finalItem.quantity || 0;
+      const finalCost = finalItem.unitCost || (finalItem.totalCost && finalQty ? finalItem.totalCost / finalQty : 0);
+      const finalTotal = finalItem.totalCost || finalQty * finalCost;
+      const adjQty = finalQty - balQty;
+      if (Math.abs(adjQty) > 0) {
+        if (adjQty > 0) {
+          balQty += adjQty;
+          const adjTotal = adjQty * finalCost;
+          balTotal += adjTotal;
+          movements.push({
+            date: "Regularización",
+            concept: "Ajuste inventario final (sobrante)",
+            document: "REG-FINAL",
+            entryQty: adjQty, entryUnitCost: round2(finalCost), entryTotal: round2(adjTotal),
+            exitQty: 0, exitUnitCost: 0, exitTotal: 0,
+            balanceQty: finalQty, balanceUnitCost: round2(finalCost), balanceTotal: round2(finalTotal),
+          });
+        } else {
+          const exitQty = Math.abs(adjQty);
+          const pmp = balQty > 0 ? balTotal / balQty : finalCost;
+          const exitTotal = exitQty * pmp;
+          balQty -= exitQty;
+          balTotal -= exitTotal;
+          movements.push({
+            date: "Regularización",
+            concept: "Ajuste inventario final (faltante/merma)",
+            document: "REG-FINAL",
+            entryQty: 0, entryUnitCost: 0, entryTotal: 0,
+            exitQty: exitQty, exitUnitCost: round2(pmp), exitTotal: round2(exitTotal),
+            balanceQty: finalQty, balanceUnitCost: round2(finalCost), balanceTotal: round2(finalTotal),
+          });
+        }
+      }
+    }
+
+    if (movements.length > 1) {
+      cards.push({
+        productCode: item.code,
+        productDescription: item.description,
+        accountCode: item.accountCode || "300",
+        valuationMethod: "PMP (Precio Medio Ponderado)",
+        movements,
+      });
+    }
+  }
+
+  return cards;
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
 // ─── CALL 3: OPERATIONS BLOCK ─────────────────────────────────────────────────
 async function generateOperationsBlock(
   params: GenerateParams,
@@ -998,6 +1209,7 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
   const blockPromises: Promise<Record<string, unknown>>[] = [
     generateCommercialBlock(params, scenario, client, model),
     generateInsuranceCasualty(params, scenario, client, model),
+    generateExtraordinaryExpenses(params, scenario, client, model),
     generateOperationsBlock(params, scenario, client, model),
     generateJournalBlock(params, scenario, client, model),
   ];
@@ -1051,6 +1263,14 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
 
   // Phase 4: Build bank debit notes programmatically from all payment events
   universe.bankDebitNotes = buildBankDebitNotes(universe, scenario, params);
+
+  // Phase 5: Compute warehouse cards (fichas de almacén) from invoices + inventory
+  if (params.sector !== "Servicios") {
+    const warehouseCards = computeWarehouseCards(universe);
+    if (warehouseCards.length > 0) {
+      universe.warehouseCards = warehouseCards;
+    }
+  }
 
   return universe;
 }
