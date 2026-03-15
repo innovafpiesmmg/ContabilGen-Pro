@@ -1841,3 +1841,131 @@ export const DividendsView = ({ data }: { data?: DividendDistribution | null }) 
     </div>
   );
 };
+
+// ─── BANK DEBIT NOTES VIEW ────────────────────────────────────────────────────
+interface BankDebitNote {
+  id: string;
+  date: string;
+  concept: string;
+  reference: string;
+  beneficiary: string;
+  amount: number;
+  category: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
+  journalNote: string;
+}
+
+const CATEGORY_COLORS: Record<string, string> = {
+  "Seguridad Social":    "bg-blue-100 text-blue-800 border-blue-200",
+  "IRPF Mod.111":        "bg-amber-100 text-amber-800 border-amber-200",
+  "IVA Mod.303":         "bg-purple-100 text-purple-800 border-purple-200",
+  "IGIC Mod.420":        "bg-purple-100 text-purple-800 border-purple-200",
+  "Impuesto Sociedades": "bg-red-100 text-red-800 border-red-200",
+  "Préstamo Bancario":   "bg-indigo-100 text-indigo-800 border-indigo-200",
+  "Hipoteca":            "bg-indigo-100 text-indigo-800 border-indigo-200",
+  "Seguros":             "bg-teal-100 text-teal-800 border-teal-200",
+  "Póliza de Crédito":   "bg-orange-100 text-orange-800 border-orange-200",
+  "Nóminas":             "bg-emerald-100 text-emerald-800 border-emerald-200",
+  "Dividendos":          "bg-pink-100 text-pink-800 border-pink-200",
+};
+
+function catColor(cat: string): string {
+  if (CATEGORY_COLORS[cat]) return CATEGORY_COLORS[cat];
+  for (const key of Object.keys(CATEGORY_COLORS)) {
+    if (cat.startsWith(key.split(" ")[0])) return CATEGORY_COLORS[key];
+  }
+  return "bg-slate-100 text-slate-800 border-slate-200";
+}
+
+export const BankDebitNotesView = ({
+  notes,
+  company,
+}: {
+  notes: BankDebitNote[];
+  company: { name: string; nif: string };
+}) => {
+  const totalAmount = notes.reduce((s, n) => s + n.amount, 0);
+  const byCategory = notes.reduce<Record<string, number>>((acc, n) => {
+    acc[n.category] = (acc[n.category] ?? 0) + n.amount;
+    return acc;
+  }, {});
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle
+        title="Notas de Adeudo Bancario"
+        description="Documentos bancarios que acreditan cada cargo en cuenta — pagos a la TGSS, Hacienda, entidades financieras y otros acreedores."
+      />
+
+      {/* Summary card */}
+      <Card className="border-slate-200 shadow-sm overflow-hidden">
+        <div className="bg-slate-700 px-5 py-3 rounded-t-xl">
+          <p className="text-base font-semibold text-white">Resumen de cargos — {company.name}</p>
+        </div>
+        <CardContent className="pt-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-4">
+            {Object.entries(byCategory).map(([cat, total]) => (
+              <div key={cat} className={`rounded-lg border px-3 py-2 ${catColor(cat)}`}>
+                <div className="text-xs font-medium truncate leading-tight">{cat}</div>
+                <div className="text-sm font-bold font-mono mt-1">{formatEuro(total)}</div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between items-center border-t pt-3">
+            <span className="text-sm font-semibold text-slate-600">TOTAL CARGOS EN CUENTA</span>
+            <span className="text-lg font-bold font-mono text-red-600">{formatEuro(totalAmount)}</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Individual note cards */}
+      {notes.map((note) => (
+        <Card key={note.id} className="border border-slate-200 shadow-sm overflow-hidden print-break-inside-avoid">
+          {/* Bank document header */}
+          <div className="bg-slate-700 text-white px-5 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <div className="text-xs text-slate-400 font-mono tracking-wide">{note.reference}</div>
+              <div className="font-semibold text-sm sm:text-base leading-snug mt-0.5">{note.concept}</div>
+            </div>
+            <div className="text-right shrink-0">
+              <div className="text-2xl font-bold font-mono text-red-300">– {formatEuro(note.amount)}</div>
+              <div className="text-xs text-slate-400 uppercase tracking-wider">Cargo en cuenta</div>
+            </div>
+          </div>
+
+          <CardContent className="pt-4 space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Fecha valor</div>
+                <div className="font-semibold">{note.date ? formatDate(note.date) : "—"}</div>
+              </div>
+              <div className="col-span-1 sm:col-span-2">
+                <div className="text-xs text-muted-foreground mb-0.5">Beneficiario / Destinatario</div>
+                <div className="font-semibold text-xs leading-snug">{note.beneficiary}</div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-0.5">Tipo de pago</div>
+                <span className={`inline-block text-xs font-semibold px-2 py-0.5 rounded-full border ${catColor(note.category)}`}>
+                  {note.category}
+                </span>
+              </div>
+            </div>
+
+            <AsientoContable
+              debits={note.accountDebits}
+              credits={note.accountCredits}
+              note={note.journalNote}
+            />
+          </CardContent>
+        </Card>
+      ))}
+
+      {notes.length === 0 && (
+        <div className="text-center py-16 text-muted-foreground">
+          No hay notas de adeudo disponibles para este universo.
+        </div>
+      )}
+    </div>
+  );
+};

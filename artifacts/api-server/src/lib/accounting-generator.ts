@@ -1049,5 +1049,251 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     accountCredits: [{ accountCode: "5201", accountName: "Deudas tarjeta crédito", amount: totalCardCharges, description: "Total liquidado" }],
   };
 
+  // Phase 4: Build bank debit notes programmatically from all payment events
+  universe.bankDebitNotes = buildBankDebitNotes(universe, scenario, params);
+
   return universe;
+}
+
+// ─── BANK DEBIT NOTES BUILDER ─────────────────────────────────────────────────
+function buildBankDebitNotes(
+  universe: Record<string, unknown>,
+  scenario: Record<string, unknown>,
+  params: GenerateParams,
+): unknown[] {
+  const notes: Array<{
+    id: string;
+    date: string;
+    concept: string;
+    reference: string;
+    beneficiary: string;
+    amount: number;
+    category: string;
+    accountDebits: Array<{ accountCode: string; accountName: string; amount: number; description: string }>;
+    accountCredits: Array<{ accountCode: string; accountName: string; amount: number; description: string }>;
+    journalNote: string;
+  }> = [];
+
+  let seq = 1;
+  const bankEntity = String(scenario.bankEntity ?? "Entidad Bancaria");
+  const year = params.year;
+
+  function nextRef(prefix: string) {
+    return `NDC-${year}-${prefix}-${String(seq++).padStart(3, "0")}`;
+  }
+
+  // 1. SS / TC1 payments (one per month)
+  const ssPayments = Array.isArray(universe.socialSecurityPayments) ? universe.socialSecurityPayments : [];
+  for (const ss of ssPayments) {
+    const s = ss as Record<string, unknown>;
+    const amount = Number(s.totalPayment ?? 0);
+    if (!amount) continue;
+    notes.push({
+      id: `ss-${s.month}`,
+      date: String(s.dueDate ?? ""),
+      concept: `Adeudo TC1 Seguridad Social — ${s.month}`,
+      reference: nextRef("SS"),
+      beneficiary: "Tesorería General de la Seguridad Social (TGSS)",
+      amount,
+      category: "Seguridad Social",
+      accountDebits: [{ accountCode: "476", accountName: "Organismos SS acreedores", amount, description: `TC1 ${s.month}` }],
+      accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount, description: "Cargo domiciliado TGSS" }],
+      journalNote: `Pago TC1 ${s.month}: cancelación deuda 476 (SS total empresa + trabajador) mediante adeudo bancario en cuenta corriente (572).`,
+    });
+  }
+
+  // 2. Tax liquidations — IVA/IGIC (Mod.303/420) and IRPF (Mod.111)
+  const taxLiqs = Array.isArray(universe.taxLiquidations) ? universe.taxLiquidations : [];
+  for (const liq of taxLiqs) {
+    const l = liq as Record<string, unknown>;
+    const amount = Number(l.result ?? 0);
+    if (!amount || amount <= 0) continue;
+    const model = String(l.model ?? "");
+    const period = String(l.period ?? "");
+    if (model === "IS") {
+      notes.push({
+        id: `is-${year}`,
+        date: String(l.dueDate ?? `${year + 1}-07-25`),
+        concept: `Adeudo Mod.200 Impuesto sobre Sociedades ejercicio ${year}`,
+        reference: nextRef("IS"),
+        beneficiary: "Agencia Tributaria (AEAT)",
+        amount,
+        category: "Impuesto Sociedades",
+        accountDebits: [{ accountCode: "4752", accountName: "HP acreedora IS", amount, description: `IS ejercicio ${year}` }],
+        accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount, description: "Pago Mod.200" }],
+        journalNote: `Pago IS ejercicio ${year} (Mod.200): cancelación 4752 mediante adeudo en cuenta (572). Tipo general 25%.`,
+      });
+    } else if (model === "111") {
+      notes.push({
+        id: `irpf-${period}`,
+        date: String(l.dueDate ?? ""),
+        concept: `Adeudo Mod.111 IRPF retenciones rendimientos trabajo ${period}`,
+        reference: nextRef("111"),
+        beneficiary: "Agencia Tributaria (AEAT)",
+        amount,
+        category: "IRPF Mod.111",
+        accountDebits: [{ accountCode: "4751", accountName: "HP acreedora IRPF retenciones", amount, description: `Retenciones nóminas ${period}` }],
+        accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount, description: `Pago Mod.111 ${period}` }],
+        journalNote: `Pago Mod.111 ${period}: ingreso en Hacienda de las retenciones de IRPF practicadas sobre nóminas y administradores. 4751 al debe, 572 al haber.`,
+      });
+    } else {
+      // IVA/IGIC Mod.303/420
+      notes.push({
+        id: `iva-${period}`,
+        date: String(l.dueDate ?? ""),
+        concept: `Adeudo Mod.${model} ${params.taxRegime} ${period}`,
+        reference: nextRef(model),
+        beneficiary: model === "420" ? "Hacienda Canaria (ACAT)" : "Agencia Tributaria (AEAT)",
+        amount,
+        category: `${params.taxRegime} Mod.${model}`,
+        accountDebits: [{ accountCode: "4750", accountName: `HP acreedora por ${params.taxRegime}`, amount, description: `Cuota ${period}` }],
+        accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount, description: `Pago Mod.${model} ${period}` }],
+        journalNote: `Pago Mod.${model} ${params.taxRegime} ${period}: liquidación trimestral. Cancelación 4750 mediante cargo bancario (572).`,
+      });
+    }
+  }
+
+  // 3. Bank loan installments (amortization table)
+  const loan = universe.bankLoan as Record<string, unknown> | undefined;
+  if (loan?.amortizationTable && Array.isArray(loan.amortizationTable)) {
+    for (const row of loan.amortizationTable as Array<Record<string, unknown>>) {
+      const installment = Number(row.installment ?? row.cuota ?? 0);
+      const interest = Number(row.interest ?? row.intereses ?? 0);
+      const principal = Number(row.principal ?? row.capital ?? 0);
+      if (!installment) continue;
+      notes.push({
+        id: `loan-${row.period ?? row.period}`,
+        date: String(row.date ?? ""),
+        concept: `Cuota préstamo bancario — cuota ${row.period}`,
+        reference: nextRef("PRE"),
+        beneficiary: bankEntity,
+        amount: installment,
+        category: "Préstamo Bancario",
+        accountDebits: [
+          { accountCode: "170", accountName: "Deudas LP entidades crédito", amount: principal, description: "Amortización capital" },
+          { accountCode: "662", accountName: "Intereses de deudas", amount: interest, description: "Intereses préstamo" },
+        ],
+        accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount: installment, description: `Cuota ${row.period} préstamo` }],
+        journalNote: `Cuota préstamo ${row.period}: amortización de capital (170/520) e intereses (662) al debe; 572 al haber. Cuota: ${installment}€ = capital ${principal}€ + intereses ${interest}€.`,
+      });
+    }
+  }
+
+  // 4. Mortgage installments
+  const mortgage = universe.mortgage as Record<string, unknown> | undefined;
+  if (mortgage?.amortizationTable && Array.isArray(mortgage.amortizationTable)) {
+    for (const row of mortgage.amortizationTable as Array<Record<string, unknown>>) {
+      const installment = Number(row.installment ?? row.cuota ?? 0);
+      const interest = Number(row.interest ?? row.intereses ?? 0);
+      const principal = Number(row.principal ?? row.capital ?? 0);
+      if (!installment) continue;
+      notes.push({
+        id: `hip-${row.period}`,
+        date: String(row.date ?? ""),
+        concept: `Cuota hipoteca — cuota ${row.period}`,
+        reference: nextRef("HIP"),
+        beneficiary: bankEntity,
+        amount: installment,
+        category: "Hipoteca",
+        accountDebits: [
+          { accountCode: "170", accountName: "Deudas LP hipoteca", amount: principal, description: "Amortización capital" },
+          { accountCode: "662", accountName: "Intereses hipoteca", amount: interest, description: "Intereses hipotecarios" },
+        ],
+        accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount: installment, description: `Cuota ${row.period} hipoteca` }],
+        journalNote: `Cuota hipoteca ${row.period}: capital (170/521) e intereses (662) al debe; 572 al haber. Total: ${installment}€ = capital ${principal}€ + intereses ${interest}€.`,
+      });
+    }
+  }
+
+  // 5. Insurance premium
+  const insurances = Array.isArray(universe.insurancePolicies) ? universe.insurancePolicies : [];
+  for (const ins of insurances) {
+    const i = ins as Record<string, unknown>;
+    const premium = Number(i.annualPremium ?? 0);
+    if (!premium) continue;
+    notes.push({
+      id: `seg-${i.policyNumber}`,
+      date: String(i.startDate ?? ""),
+      concept: `Prima seguro ${i.type ?? "multirriesgo"} — póliza ${i.policyNumber}`,
+      reference: nextRef("SEG"),
+      beneficiary: String(i.insurer ?? "Compañía Aseguradora"),
+      amount: premium,
+      category: "Seguros",
+      accountDebits: [
+        { accountCode: "625", accountName: "Primas de seguros", amount: Number(i.expenseCurrentPeriod ?? premium), description: "Prima corriente ejercicio" },
+        ...(Number(i.prepaidNextPeriod ?? 0) > 0 ? [{
+          accountCode: "480", accountName: "Gastos anticipados", amount: Number(i.prepaidNextPeriod), description: "Periodificación ejercicio siguiente",
+        }] : []),
+      ],
+      accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount: premium, description: `Pago prima póliza ${i.policyNumber}` }],
+      journalNote: `Pago prima seguro (póliza ${i.policyNumber}): ${premium}€. Parte corriente ${i.expenseCurrentPeriod ?? premium}€ → 625. Periodificación ${i.prepaidNextPeriod ?? 0}€ → 480 (gasto anticipado ejercicio siguiente).`,
+    });
+  }
+
+  // 6. Credit policy settlement
+  const policy = universe.creditPolicy as Record<string, unknown> | undefined;
+  if (policy?.totalSettlement) {
+    const amount = Number(policy.totalSettlement);
+    notes.push({
+      id: "poliza-liquidacion",
+      date: String(policy.endDate ?? ""),
+      concept: `Liquidación póliza de crédito — ${policy.policyNumber}`,
+      reference: nextRef("POL"),
+      beneficiary: bankEntity,
+      amount,
+      category: "Póliza de Crédito",
+      accountDebits: [
+        { accountCode: "663", accountName: "Intereses de deudas", amount: Number(policy.interestAmount ?? 0), description: "Intereses saldo dispuesto" },
+        { accountCode: "626", accountName: "Servicios bancarios", amount: Number(policy.openingCommission ?? 0) + Number(policy.unusedCommission ?? 0), description: "Comisiones bancarias" },
+      ],
+      accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount, description: "Liquidación póliza crédito" }],
+      journalNote: `Liquidación póliza crédito ${policy.policyNumber} al vencimiento (${policy.endDate}). Intereses (663) + comisiones (626) al debe; adeudo total ${amount}€ en cuenta corriente (572) al haber.`,
+    });
+  }
+
+  // 7. Payroll net payment
+  const payroll = universe.payroll as Record<string, unknown> | undefined;
+  if (payroll?.totalNetSalary) {
+    const amount = Number(payroll.totalNetSalary);
+    notes.push({
+      id: "nomina-pago",
+      date: String(payroll.paymentDate ?? ""),
+      concept: `Pago nómina neta — ${payroll.month}`,
+      reference: nextRef("NOM"),
+      beneficiary: "Empleados (transferencia bancaria individual)",
+      amount,
+      category: "Nóminas",
+      accountDebits: [{ accountCode: "465", accountName: "Remuneraciones pendientes de pago", amount, description: `Salario neto ${payroll.month}` }],
+      accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount, description: "Transferencia salario neto" }],
+      journalNote: `Pago nómina ${payroll.month}: cancelación 465 (salario neto pendiente) mediante transferencias individuales a empleados. 465 al debe, 572 al haber. Importe total: ${amount}€.`,
+    });
+  }
+
+  // 8. Dividend payment (net)
+  const div = universe.dividendDistribution as Record<string, unknown> | undefined;
+  if (div?.netDividendPaid) {
+    const netAmount = Number(div.netDividendPaid);
+    const grossAmount = Number(div.totalDividends ?? netAmount);
+    const irpfAmount = Number(div.irpfWithholdingAmount ?? 0);
+    notes.push({
+      id: "dividendos-pago",
+      date: String(div.paymentDate ?? ""),
+      concept: `Pago dividendos netos ejercicio ${div.fiscalYear} — Mod.123`,
+      reference: nextRef("DIV"),
+      beneficiary: "Socios — transferencia bancaria",
+      amount: netAmount,
+      category: "Dividendos",
+      accountDebits: [{ accountCode: "526", accountName: "Dividendo activo a pagar", amount: grossAmount, description: `Dividendos brutos ejercicio ${div.fiscalYear}` }],
+      accountCredits: [
+        { accountCode: "572", accountName: "Bancos c/c", amount: netAmount, description: "Importe neto a socios" },
+        { accountCode: "4751", accountName: "HP acreedora IRPF retenciones", amount: irpfAmount, description: `Retención 19% IRPF — Mod.123 (vence ${div.mod123DueDate})` },
+      ],
+      journalNote: `Pago dividendos: ${grossAmount}€ brutos. Retención IRPF 19% (${irpfAmount}€) → 4751 (Mod.123 a presentar ${div.mod123DueDate}). Neto pagado a socios: ${netAmount}€ → 572.`,
+    });
+  }
+
+  // Sort by date ascending
+  notes.sort((a, b) => a.date.localeCompare(b.date));
+
+  return notes;
 }

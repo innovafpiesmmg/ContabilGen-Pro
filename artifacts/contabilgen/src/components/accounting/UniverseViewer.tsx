@@ -39,6 +39,7 @@ import {
   ShareholderAccountsView,
   DividendsView,
   CronologiaView,
+  BankDebitNotesView,
 } from "./UniverseViews";
 import { usePdfExport, PdfTab } from "@/hooks/usePdfExport";
 import { useToast } from "@/hooks/use-toast";
@@ -64,6 +65,9 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
   const hasInitialBalanceSheet = !!universe.initialBalanceSheet;
   const hasShareholderAccounts = !!universe.shareholderAccounts;
   const hasDividends = !!universe.dividendDistribution;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const bankDebitNotes: unknown[] = (universe as any).bankDebitNotes ?? [];
+  const hasBankDebitNotes = bankDebitNotes.length > 0;
 
   const companyName = universe.companyProfile.name;
 
@@ -84,12 +88,14 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
   const rBancos = useRef<HTMLDivElement>(null);
   const rDiario = useRef<HTMLDivElement>(null);
   const rCronologia = useRef<HTMLDivElement>(null);
+  const rNotasCargo = useRef<HTMLDivElement>(null);
   const hiddenRefs = {
     empresa: rEmpresa, inventarios: rInventarios, facturas: rFacturas,
     financiero: rFinanciero, hipoteca: rHipoteca, extraordinario: rExtraordinario,
     nominas: rNominas, ss: rSS, impuestos: rImpuestos, inmovilizado: rInmovilizado,
     socios: rSocios, balance_apertura: rApertura, cc_socios: rCCSocios,
     dividendos: rDividendos, bancos: rBancos, diario: rDiario, cronologia: rCronologia,
+    notas_cargo: rNotasCargo,
   };
 
   function buildActiveTabs(): PdfTab[] {
@@ -111,6 +117,7 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
     if (hasDividends) tabs.push({ id: "14_dividendos", label: "Dividendos", ref: hiddenRefs.dividendos });
     tabs.push({ id: "15_bancos", label: "Extracto Bancario", ref: hiddenRefs.bancos });
     tabs.push({ id: "16_diario", label: "Libro Diario", ref: hiddenRefs.diario });
+    if (hasBankDebitNotes) tabs.push({ id: "17_notas_cargo", label: "Notas de Cargo", ref: hiddenRefs.notas_cargo });
     tabs.push({ id: "00_cronologia", label: "Cronología", ref: hiddenRefs.cronologia });
     return tabs;
   }
@@ -123,6 +130,7 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
       nominas: "Nóminas", ss: "SS TC1", impuestos: "Impuestos", inmovilizado: "Inmovilizado",
       socios: "Socios", balance_apertura: "Balance Apertura", cc_socios: "CC Socios",
       dividendos: "Dividendos", bancos: "Extracto Bancario", diario: "Libro Diario",
+      notas_cargo: "Notas de Cargo",
     };
     const label = labels[activeTab] ?? activeTab;
     const safeName = companyName.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 25);
@@ -228,6 +236,14 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
         <div ref={hiddenRefs.cronologia} style={{ background: "#fff", padding: "32px" }}>
           <CronologiaView data={universe} />
         </div>
+        {hasBankDebitNotes && (
+          <div ref={hiddenRefs.notas_cargo} style={{ background: "#fff", padding: "32px" }}>
+            <BankDebitNotesView
+              notes={bankDebitNotes as Parameters<typeof BankDebitNotesView>[0]["notes"]}
+              company={universe.companyProfile}
+            />
+          </div>
+        )}
       </div>
 
       {/* Header */}
@@ -359,6 +375,11 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
             <TabsTrigger value="diario" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white rounded-lg gap-2 font-bold shadow-sm">
               <BookOpenText className="w-4 h-4" /> Libro Diario
             </TabsTrigger>
+            {hasBankDebitNotes && (
+              <TabsTrigger value="notas_cargo" className="data-[state=active]:bg-red-700 data-[state=active]:text-white rounded-lg gap-2 font-semibold">
+                <FileDown className="w-4 h-4" /> Notas de Cargo
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
@@ -430,6 +451,14 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
           <TabsContent value="diario" className="mt-0 outline-none">
             <JournalView entries={universe.journalEntries} />
           </TabsContent>
+          {hasBankDebitNotes && (
+            <TabsContent value="notas_cargo" className="mt-0 outline-none">
+              <BankDebitNotesView
+                notes={bankDebitNotes as Parameters<typeof BankDebitNotesView>[0]["notes"]}
+                company={universe.companyProfile}
+              />
+            </TabsContent>
+          )}
         </div>
       </Tabs>
     </div>
