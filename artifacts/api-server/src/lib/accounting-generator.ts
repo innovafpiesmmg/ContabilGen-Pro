@@ -325,55 +325,36 @@ async function generateMonthlyInvoices(
 ): Promise<{ invoices: unknown[] }> {
   const rates = TAX_RATES[params.taxRegime];
   const sectorCtx = getSectorContext(params.sector, params.taxRegime);
-  const sc = JSON.stringify({
-    companyName: scenario.companyName,
-    nif: scenario.nif,
-    suppliers: scenario.suppliers,
-    clients: scenario.clients,
-    sector: params.sector,
-  }, null, 0);
+
+  const sectorSaleHint = params.sector === "Servicios"
+    ? "servicios prestados (consultoría, diseño, formación…), cuenta 705"
+    : params.sector === "Industria"
+    ? "productos fabricados, cuenta 701"
+    : params.sector === "Hostelería"
+    ? "servicios de hostelería/restauración, cuenta 705"
+    : "mercaderías, cuenta 700";
+
+  const sectorBuyHint = params.sector === "Servicios"
+    ? "gastos de explotación: subcontratación, software, telefonía, oficina… cuentas 62x"
+    : params.sector === "Industria"
+    ? "materias primas o componentes, cuenta 601"
+    : "mercaderías o alimentos, cuenta 600";
 
   const nums = Array.from({ length: invoicesPerMonth }, (_, i) =>
     `F-${params.year}/${String(invoiceStartNum + i).padStart(3, "0")}`
-  ).join(", ");
+  );
 
-  const prompt = `Genera ${invoicesPerMonth} facturas del mes de ${monthLabel} para una empresa del sector ${params.sector}.
+  const prompt = `Genera ${invoicesPerMonth} facturas de ${monthLabel} para empresa "${scenario.companyName}" (${params.sector}, ${params.taxRegime}).
+Fechas: ${monthStart} a ${monthEnd}. IVA general ${rates.standard}%, reducido ${rates.reduced}%.
+Ventas: ${sectorSaleHint}. Compras: ${sectorBuyHint}.
+Mezcla compras y ventas. Números: ${nums.join(", ")}.
 
-EMPRESA: ${sc}
-MES: ${monthLabel} (fechas entre ${monthStart} y ${monthEnd})
-RÉGIMEN: ${params.taxRegime} (IVA general ${rates.standard}%, reducido ${rates.reduced}%)
-NÚMEROS DE FACTURA: ${nums}
+JSON exacto (sin texto extra):
+{"invoices":[{"invoiceNumber":"${nums[0]}","date":"${monthStart.slice(0,7)}-DD","type":"sale","partyName":"...","partyNif":"B12345678","lines":[{"description":"...","quantity":1,"unitPrice":500,"discount":0,"subtotal":500,"taxRate":${rates.standard},"taxAmount":${(rates.standard / 100 * 500).toFixed(2)},"total":${(500 * (1 + rates.standard / 100)).toFixed(2)}}],"subtotal":500,"taxBase":500,"taxAmount":${(rates.standard / 100 * 500).toFixed(2)},"total":${(500 * (1 + rates.standard / 100)).toFixed(2)},"paymentMethod":"transfer","dueDate":"${monthEnd}","accountDebits":[{"accountCode":"430","accountName":"Clientes","amount":${(500 * (1 + rates.standard / 100)).toFixed(2)},"description":"..."}],"accountCredits":[{"accountCode":"${sectorCtx.saleAccount.code}","accountName":"${sectorCtx.saleAccount.name}","amount":500,"description":"..."},{"accountCode":"477","accountName":"IVA repercutido","amount":${(rates.standard / 100 * 500).toFixed(2)},"description":"..."}]}]}
 
-${sectorCtx.invoiceNote}
+Genera exactamente ${invoicesPerMonth} objetos en el array. Importes variados y realistas.`;
 
-Genera exactamente este JSON:
-{"invoices": [
-  {
-    "invoiceNumber": "${`F-${params.year}/${String(invoiceStartNum).padStart(3, "0")}`}",
-    "date": "YYYY-MM-DD (en ${monthLabel})",
-    "type": "purchase o sale",
-    "partyName": "nombre proveedor/cliente",
-    "partyNif": "...",
-    "lines": [{"description": "descripción apropiada al sector", "quantity": 1, "unitPrice": 500.00, "discount": 0, "subtotal": 500.00, "taxRate": ${rates.standard}, "taxAmount": ${rates.standard * 5}, "total": ${500 + rates.standard * 5}}],
-    "subtotal": 500.00,
-    "taxBase": 500.00,
-    "taxAmount": ${rates.standard * 5},
-    "total": ${500 + rates.standard * 5},
-    "paymentMethod": "transfer",
-    "dueDate": "YYYY-MM-DD",
-    "journalNote": "Asiento: ${sectorCtx.saleAccount.code}/${sectorCtx.purchaseAccount.code} con IVA",
-    "accountDebits": [{"accountCode": "${sectorCtx.purchaseAccount.code}", "accountName": "${sectorCtx.purchaseAccount.name}", "amount": 500.00, "description": "..."}],
-    "accountCredits": [{"accountCode": "400", "accountName": "Proveedores", "amount": ${500 + rates.standard * 5}, "description": "..."}]
-  }
-]}
-
-REGLAS:
-- Genera exactamente ${invoicesPerMonth} facturas, mezcla compras y ventas (al menos 1 de cada tipo si ${invoicesPerMonth} >= 2)
-- Sector ${params.sector.toUpperCase()}: ventas → cta ${sectorCtx.saleAccount.code}, compras → cta ${sectorCtx.purchaseAccount.code}
-- Usa los números de factura asignados: ${nums}
-- Importes variados y realistas para el sector`;
-
-  return await callAI(client, model, prompt, 2000) as { invoices: unknown[] };
+  return await callAI(client, model, prompt, 2500) as { invoices: unknown[] };
 }
 
 // ─── CALL 2B: BANKING & INSURANCE BLOCK ───────────────────────────────────────
