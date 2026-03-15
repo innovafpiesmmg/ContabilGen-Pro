@@ -10,6 +10,34 @@ export interface PdfTab {
   ref: RefObject<HTMLDivElement | null>;
 }
 
+function lightnessToHex(l: number): string {
+  if (l >= 0.95) return "#ffffff";
+  if (l >= 0.85) return "#f8fafc";
+  if (l >= 0.75) return "#f1f5f9";
+  if (l >= 0.60) return "#cbd5e1";
+  if (l >= 0.45) return "#94a3b8";
+  if (l >= 0.30) return "#475569";
+  if (l >= 0.15) return "#1e293b";
+  return "#020817";
+}
+
+function replaceCSSColorFunctions(css: string): string {
+  // Replace oklch(L C H / alpha?) and oklab(L a b / alpha?) with safe hex colors
+  return css.replace(/oklch\(\s*([\d.]+)[^)]*\)/g, (_, l) =>
+    lightnessToHex(parseFloat(l))
+  ).replace(/oklab\(\s*([\d.]+)[^)]*\)/g, (_, l) =>
+    lightnessToHex(parseFloat(l))
+  );
+}
+
+function patchClonedDocument(doc: Document): void {
+  doc.querySelectorAll("style").forEach((style) => {
+    if (style.textContent) {
+      style.textContent = replaceCSSColorFunctions(style.textContent);
+    }
+  });
+}
+
 async function captureDivAsPdfBlob(
   el: HTMLElement,
   companyName: string,
@@ -26,6 +54,9 @@ async function captureDivAsPdfBlob(
     backgroundColor: "#ffffff",
     logging: false,
     windowWidth: 1100,
+    onclone: (_clonedDoc, _element) => {
+      patchClonedDocument(_clonedDoc);
+    },
   });
 
   const imgData = canvas.toDataURL("image/jpeg", 0.92);
@@ -98,6 +129,8 @@ async function captureDivAsPdfBlob(
       { align: "center" },
     );
   }
+
+  void contentHeightMM;
 
   return pdf.output("blob");
 }
