@@ -1,0 +1,13 @@
+packages:
+  "framer-motion": "For smooth page transitions and beautiful entry animations"
+  "date-fns": "For elegant and robust date formatting"
+  "@hookform/resolvers": "Required for zod validation in react-hook-form"
+  "react-hook-form": "For robust form state management"
+  "clsx": "Utility for conditionally joining classNames"
+  "tailwind-merge": "Utility to resolve Tailwind CSS class conflicts"
+
+images: []
+
+notes:
+  - "API hooks are directly imported from @workspace/api-client-react"
+  - "The API provides a fully fleshed out AccountingUniverse JSON, so the frontend focuses heavily on deeply structured data visualization"

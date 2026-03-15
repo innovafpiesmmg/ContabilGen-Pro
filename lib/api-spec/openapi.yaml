@@ -1,15 +1,18 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: ContabilGen Pro API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: accounting
+    description: Accounting universe generation
+  - name: generations
+    description: Saved generation management
 paths:
   /healthz:
     get:
@@ -24,6 +27,121 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /accounting/generate:
+    post:
+      operationId: generateAccountingUniverse
+      tags: [accounting]
+      summary: Generate a new accounting universe
+      description: Uses AI to generate a coherent accounting universe based on the given parameters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateUniverseRequest"
+      responses:
+        "200":
+          description: Generated accounting universe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountingUniverse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Generation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /accounting/generations:
+    get:
+      operationId: listGenerations
+      tags: [generations]
+      summary: List saved generations
+      responses:
+        "200":
+          description: List of saved generations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GenerationSummary"
+
+    post:
+      operationId: saveGeneration
+      tags: [generations]
+      summary: Save a generation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveGenerationRequest"
+      responses:
+        "201":
+          description: Generation saved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerationSummary"
+
+  /accounting/generations/{id}:
+    get:
+      operationId: getGeneration
+      tags: [generations]
+      summary: Get a saved generation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Generation detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerationDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+    delete:
+      operationId: deleteGeneration
+      tags: [generations]
+      summary: Delete a saved generation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +152,806 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    GenerateUniverseRequest:
+      type: object
+      properties:
+        taxRegime:
+          type: string
+          enum: [IVA, IGIC]
+          description: "IVA for Peninsula/Baleares, IGIC for Canarias"
+        sector:
+          type: string
+          enum: [Comercio, Servicios, Industria, Hostelería]
+        complexity:
+          type: string
+          enum: [Avanzado]
+        year:
+          type: integer
+          description: Fiscal year for the accounting universe
+        companyName:
+          type: ["string", "null"]
+          description: Optional company name (AI will generate one if not provided)
+      required:
+        - taxRegime
+        - sector
+        - complexity
+        - year
+
+    AccountingUniverse:
+      type: object
+      properties:
+        companyProfile:
+          $ref: "#/components/schemas/CompanyProfile"
+        inventory:
+          $ref: "#/components/schemas/Inventory"
+        suppliers:
+          type: array
+          items:
+            $ref: "#/components/schemas/Supplier"
+        clients:
+          type: array
+          items:
+            $ref: "#/components/schemas/Client"
+        invoices:
+          type: array
+          items:
+            $ref: "#/components/schemas/Invoice"
+        bankLoan:
+          $ref: "#/components/schemas/BankLoan"
+        creditPolicy:
+          $ref: "#/components/schemas/CreditPolicy"
+        creditCardStatement:
+          $ref: "#/components/schemas/CreditCardStatement"
+        insurancePolicies:
+          type: array
+          items:
+            $ref: "#/components/schemas/InsurancePolicy"
+        casualtyEvent:
+          $ref: "#/components/schemas/CasualtyEvent"
+        payroll:
+          $ref: "#/components/schemas/Payroll"
+        bankStatements:
+          type: array
+          items:
+            $ref: "#/components/schemas/BankStatement"
+        journalEntries:
+          type: array
+          items:
+            $ref: "#/components/schemas/JournalEntry"
+      required:
+        - companyProfile
+        - inventory
+        - suppliers
+        - clients
+        - invoices
+        - bankLoan
+        - creditPolicy
+        - creditCardStatement
+        - insurancePolicies
+        - casualtyEvent
+        - payroll
+        - bankStatements
+        - journalEntries
+
+    CompanyProfile:
+      type: object
+      properties:
+        name:
+          type: string
+        nif:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        sector:
+          type: string
+        taxRegime:
+          type: string
+        fiscalYear:
+          type: integer
+        description:
+          type: string
+      required:
+        - name
+        - nif
+        - address
+        - city
+        - sector
+        - taxRegime
+        - fiscalYear
+        - description
+
+    InventoryItem:
+      type: object
+      properties:
+        code:
+          type: string
+        description:
+          type: string
+        quantity:
+          type: number
+        unitCost:
+          type: number
+        totalCost:
+          type: number
+        accountCode:
+          type: string
+          description: "PGC account code (e.g. 300, 310)"
+      required:
+        - code
+        - description
+        - quantity
+        - unitCost
+        - totalCost
+        - accountCode
+
+    Inventory:
+      type: object
+      properties:
+        initialInventory:
+          type: array
+          items:
+            $ref: "#/components/schemas/InventoryItem"
+        finalInventory:
+          type: array
+          items:
+            $ref: "#/components/schemas/InventoryItem"
+        initialTotal:
+          type: number
+        finalTotal:
+          type: number
+        stockVariation:
+          type: number
+          description: "Variación de existencias (positive = increase, negative = decrease)"
+      required:
+        - initialInventory
+        - finalInventory
+        - initialTotal
+        - finalTotal
+        - stockVariation
+
+    Supplier:
+      type: object
+      properties:
+        name:
+          type: string
+        nif:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        accountCode:
+          type: string
+          description: "PGC account (400, 401)"
+      required:
+        - name
+        - nif
+        - address
+        - city
+        - accountCode
+
+    Client:
+      type: object
+      properties:
+        name:
+          type: string
+        nif:
+          type: string
+        address:
+          type: string
+        city:
+          type: string
+        accountCode:
+          type: string
+          description: "PGC account (430, 431)"
+      required:
+        - name
+        - nif
+        - address
+        - city
+        - accountCode
+
+    InvoiceLine:
+      type: object
+      properties:
+        description:
+          type: string
+        quantity:
+          type: number
+        unitPrice:
+          type: number
+        discount:
+          type: number
+        subtotal:
+          type: number
+        taxRate:
+          type: number
+        taxAmount:
+          type: number
+        total:
+          type: number
+      required:
+        - description
+        - quantity
+        - unitPrice
+        - discount
+        - subtotal
+        - taxRate
+        - taxAmount
+        - total
+
+    Invoice:
+      type: object
+      properties:
+        invoiceNumber:
+          type: string
+        date:
+          type: string
+        type:
+          type: string
+          enum: [purchase, sale, rectification]
+        partyName:
+          type: string
+        partyNif:
+          type: string
+        lines:
+          type: array
+          items:
+            $ref: "#/components/schemas/InvoiceLine"
+        subtotal:
+          type: number
+        taxBase:
+          type: number
+        taxAmount:
+          type: number
+        total:
+          type: number
+        paymentMethod:
+          type: string
+          enum: [cash, transfer, check, promissory_note, credit]
+        dueDate:
+          type: ["string", "null"]
+        journalNote:
+          type: string
+          description: "Explanation of accounting entries"
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - invoiceNumber
+        - date
+        - type
+        - partyName
+        - partyNif
+        - lines
+        - subtotal
+        - taxBase
+        - taxAmount
+        - total
+        - paymentMethod
+        - dueDate
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    AccountEntry:
+      type: object
+      properties:
+        accountCode:
+          type: string
+        accountName:
+          type: string
+        amount:
+          type: number
+        description:
+          type: string
+      required:
+        - accountCode
+        - accountName
+        - amount
+        - description
+
+    AmortizationRow:
+      type: object
+      properties:
+        period:
+          type: integer
+        date:
+          type: string
+        installment:
+          type: number
+        interest:
+          type: number
+        principal:
+          type: number
+        balance:
+          type: number
+      required:
+        - period
+        - date
+        - installment
+        - interest
+        - principal
+        - balance
+
+    BankLoan:
+      type: object
+      properties:
+        entity:
+          type: string
+        loanNumber:
+          type: string
+        principal:
+          type: number
+        annualRate:
+          type: number
+        termMonths:
+          type: integer
+        startDate:
+          type: string
+        monthlyInstallment:
+          type: number
+        amortizationTable:
+          type: array
+          items:
+            $ref: "#/components/schemas/AmortizationRow"
+        journalNote:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - entity
+        - loanNumber
+        - principal
+        - annualRate
+        - termMonths
+        - startDate
+        - monthlyInstallment
+        - amortizationTable
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    CreditPolicy:
+      type: object
+      properties:
+        entity:
+          type: string
+        policyNumber:
+          type: string
+        limit:
+          type: number
+        drawnAmount:
+          type: number
+        annualRate:
+          type: number
+        openingCommission:
+          type: number
+        unusedCommission:
+          type: number
+        startDate:
+          type: string
+        endDate:
+          type: string
+        interestAmount:
+          type: number
+        totalSettlement:
+          type: number
+        journalNote:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - entity
+        - policyNumber
+        - limit
+        - drawnAmount
+        - annualRate
+        - openingCommission
+        - unusedCommission
+        - startDate
+        - endDate
+        - interestAmount
+        - totalSettlement
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    CreditCardMovement:
+      type: object
+      properties:
+        date:
+          type: string
+        description:
+          type: string
+        amount:
+          type: number
+        category:
+          type: string
+        accountCode:
+          type: string
+        accountName:
+          type: string
+      required:
+        - date
+        - description
+        - amount
+        - category
+        - accountCode
+        - accountName
+
+    CreditCardStatement:
+      type: object
+      properties:
+        cardNumber:
+          type: string
+        entity:
+          type: string
+        statementPeriod:
+          type: string
+        movements:
+          type: array
+          items:
+            $ref: "#/components/schemas/CreditCardMovement"
+        totalCharges:
+          type: number
+        settlementDate:
+          type: string
+        journalNote:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - cardNumber
+        - entity
+        - statementPeriod
+        - movements
+        - totalCharges
+        - settlementDate
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    InsurancePolicy:
+      type: object
+      properties:
+        policyNumber:
+          type: string
+        insurer:
+          type: string
+        type:
+          type: string
+        annualPremium:
+          type: number
+        startDate:
+          type: string
+        endDate:
+          type: string
+        prepaidExpense:
+          type: number
+          description: "Amount to defer to next period (cuenta 480)"
+        journalNote:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - policyNumber
+        - insurer
+        - type
+        - annualPremium
+        - startDate
+        - endDate
+        - prepaidExpense
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    CasualtyEvent:
+      type: object
+      properties:
+        date:
+          type: string
+        description:
+          type: string
+        assetAffected:
+          type: string
+        bookValue:
+          type: number
+        insuranceCompensation:
+          type: number
+        netLoss:
+          type: number
+        journalNote:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - date
+        - description
+        - assetAffected
+        - bookValue
+        - insuranceCompensation
+        - netLoss
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    PayrollEmployee:
+      type: object
+      properties:
+        name:
+          type: string
+        naf:
+          type: string
+        category:
+          type: string
+        grossSalary:
+          type: number
+        irpfRate:
+          type: number
+        irpfAmount:
+          type: number
+        ssEmployeeRate:
+          type: number
+        ssEmployeeAmount:
+          type: number
+        netSalary:
+          type: number
+        ssEmployerRate:
+          type: number
+        ssEmployerAmount:
+          type: number
+      required:
+        - name
+        - naf
+        - category
+        - grossSalary
+        - irpfRate
+        - irpfAmount
+        - ssEmployeeRate
+        - ssEmployeeAmount
+        - netSalary
+        - ssEmployerRate
+        - ssEmployerAmount
+
+    Payroll:
+      type: object
+      properties:
+        month:
+          type: string
+        employees:
+          type: array
+          items:
+            $ref: "#/components/schemas/PayrollEmployee"
+        totalGross:
+          type: number
+        totalIrpf:
+          type: number
+        totalSsEmployee:
+          type: number
+        totalNetSalary:
+          type: number
+        totalSsEmployer:
+          type: number
+        totalLaborCost:
+          type: number
+        journalNote:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+      required:
+        - month
+        - employees
+        - totalGross
+        - totalIrpf
+        - totalSsEmployee
+        - totalNetSalary
+        - totalSsEmployer
+        - totalLaborCost
+        - journalNote
+        - accountDebits
+        - accountCredits
+
+    BankTransaction:
+      type: object
+      properties:
+        date:
+          type: string
+        concept:
+          type: string
+        debit:
+          type: ["number", "null"]
+        credit:
+          type: ["number", "null"]
+        balance:
+          type: number
+      required:
+        - date
+        - concept
+        - debit
+        - credit
+        - balance
+
+    BankStatement:
+      type: object
+      properties:
+        bank:
+          type: string
+        accountNumber:
+          type: string
+        period:
+          type: string
+        openingBalance:
+          type: number
+        closingBalance:
+          type: number
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/BankTransaction"
+      required:
+        - bank
+        - accountNumber
+        - period
+        - openingBalance
+        - closingBalance
+        - transactions
+
+    JournalEntry:
+      type: object
+      properties:
+        entryNumber:
+          type: string
+        date:
+          type: string
+        concept:
+          type: string
+        document:
+          type: string
+          description: "Reference document (invoice number, etc.)"
+        debits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        credits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        totalAmount:
+          type: number
+      required:
+        - entryNumber
+        - date
+        - concept
+        - document
+        - debits
+        - credits
+        - totalAmount
+
+    GenerationSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        companyName:
+          type: string
+        sector:
+          type: string
+        taxRegime:
+          type: string
+        fiscalYear:
+          type: integer
+        createdAt:
+          type: string
+      required:
+        - id
+        - companyName
+        - sector
+        - taxRegime
+        - fiscalYear
+        - createdAt
+
+    GenerationDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        companyName:
+          type: string
+        sector:
+          type: string
+        taxRegime:
+          type: string
+        fiscalYear:
+          type: integer
+        createdAt:
+          type: string
+        universeJson:
+          $ref: "#/components/schemas/AccountingUniverse"
+      required:
+        - id
+        - companyName
+        - sector
+        - taxRegime
+        - fiscalYear
+        - createdAt
+        - universeJson
+
+    SaveGenerationRequest:
+      type: object
+      properties:
+        companyName:
+          type: string
+        sector:
+          type: string
+        taxRegime:
+          type: string
+        fiscalYear:
+          type: integer
+        universeJson:
+          $ref: "#/components/schemas/AccountingUniverse"
+      required:
+        - companyName
+        - sector
+        - taxRegime
+        - fiscalYear
+        - universeJson
