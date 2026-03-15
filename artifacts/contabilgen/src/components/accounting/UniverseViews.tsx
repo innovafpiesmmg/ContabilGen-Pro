@@ -10,7 +10,7 @@ import {
   BankTransaction,
   JournalEntry
 } from "@workspace/api-client-react";
-import { formatEuro, formatDate, formatAccountCode } from "@/lib/utils";
+import { cn, formatEuro, formatDate, formatAccountCode } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
