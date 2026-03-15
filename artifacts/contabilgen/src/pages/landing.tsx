@@ -88,7 +88,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-xl text-white/75 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Genera universos contables completos para Grado Medio de Contabilidad. 
+            Genera universos contables completos para Grado Medio y Superior. 
             Documentos reales, datos coherentes, listos para imprimir en clase.
           </p>
 
@@ -140,7 +140,7 @@ export default function LandingPage() {
               Todo lo que necesitas para practicar contabilidad
             </h2>
             <p className="text-lg text-slate-500 max-w-2xl mx-auto">
-              Diseñado específicamente para el currículo de Grado Medio de Administración y Finanzas
+              Diseñado específicamente para el currículo de Grado Medio y Superior de Administración y Finanzas
             </p>
           </div>
 
