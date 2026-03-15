@@ -233,7 +233,7 @@ async function generateCommercialBlock(
   const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
   const sc = JSON.stringify(scenario, null, 0);
   const sectorCtx = getSectorContext(params.sector, params.taxRegime);
-  const invoiceCount = Math.min(Math.max(Math.ceil((params.operationsPerMonth ?? 8) * numMonths * 0.45), numMonths * 2), 20);
+  const invoiceCount = Math.min(Math.max(Math.ceil((params.operationsPerMonth ?? 8) * numMonths * 0.3), numMonths * 2), 12);
 
   const prompt = `Genera el BLOQUE COMERCIAL del universo contable usando este escenario:
 ${sc}
@@ -311,7 +311,7 @@ REGLAS CRÍTICAS:
 - Importes realistas para el sector ${params.sector}
 - Usa nombres/NIF exactos del escenario para proveedores y clientes`;
 
-  return await callAI(client, model, prompt, 4500) as Record<string, unknown>;
+  return await callAI(client, model, prompt, 6000) as Record<string, unknown>;
 }
 
 // ─── CALL 2B: BANKING & INSURANCE BLOCK ───────────────────────────────────────
