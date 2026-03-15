@@ -482,13 +482,34 @@ async function generateOperationsBlock(
   }
 
   if (withSS) {
-    sections.push(`"socialSecurityPayments": [{
-    "month": "...", "dueDate": "YYYY-MM-DD", "employeeCount": X,
-    "totalGross": X, "ssEmployeeAmount": X, "ssEmployerAmount": X, "totalPayment": X,
-    "journalNote": "Pago TC1: cancela deuda SS (476 al debe) contra banco (572 al haber).",
-    "accountDebits": [{"accountCode":"476","accountName":"Organismos SS acreedores","amount":X,"description":"Cuota SS mes"}],
-    "accountCredits": [{"accountCode":"572","accountName":"Bancos","amount":X,"description":"Pago domiciliado"}]
-  }]`);
+    // Build per-month SS schedule: SS for month N is paid by end of month N+1
+    const { periodStart, periodEnd } = getPeriodInfo(params);
+    const [sy, sm] = periodStart.split("-").map(Number);
+    const [ey, em] = periodEnd.split("-").map(Number);
+    const ssDates: Array<{ month: string; devengado: string; dueDate: string }> = [];
+    let y = sy, m = sm;
+    while (y < ey || (y === ey && m <= em)) {
+      const monthName = MONTHS_ES[m - 1];
+      // Due date: last day of month m+1
+      const dueMonth = m === 12 ? 1 : m + 1;
+      const dueYear = m === 12 ? y + 1 : y;
+      const lastDay = new Date(dueYear, dueMonth, 0).getDate(); // day 0 of next month = last day of dueMonth
+      const dueDateStr = `${dueYear}-${String(dueMonth).padStart(2, "0")}-${lastDay}`;
+      ssDates.push({
+        month: `${monthName} ${y}`,
+        devengado: `${y}-${String(m).padStart(2, "0")}-01`,
+        dueDate: dueDateStr,
+      });
+      if (m === 12) { m = 1; y++; } else { m++; }
+    }
+
+    const ssTemplate = ssDates.map(d =>
+      `{"month":"${d.month}","devengado":"${d.devengado}","dueDate":"${d.dueDate}","employeeCount":X,"totalGross":X,"ssEmployeeAmount":X,"ssEmployerAmount":X,"totalPayment":X,"journalNote":"Pago TC1 ${d.month}: 476 al debe, 572 al haber.","accountDebits":[{"accountCode":"476","accountName":"Organismos SS acreedores","amount":X,"description":"TC1 ${d.month}"}],"accountCredits":[{"accountCode":"572","accountName":"Bancos c/c","amount":X,"description":"Pago domiciliado SS ${d.month}"}]}`
+    ).join(",\n    ");
+
+    sections.push(`"socialSecurityPayments": [
+    ${ssTemplate}
+  ]`);
   } else {
     sections.push(`"socialSecurityPayments": []`);
   }
