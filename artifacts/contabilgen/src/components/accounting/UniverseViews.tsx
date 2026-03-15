@@ -1491,9 +1491,10 @@ export const ShareholderAccountsView = ({ data }: { data?: ShareholderAccounts |
 type EventKind =
   | "factura_venta" | "factura_compra" | "factura_rectif"
   | "asiento" | "banco" | "tarjeta"
-  | "prestamo" | "hipoteca"
+  | "prestamo" | "hipoteca" | "poliza_credito"
   | "ss" | "impuesto"
-  | "nomina" | "socio" | "dividendo" | "apertura" | "inmovilizado";
+  | "nomina" | "socio" | "dividendo" | "apertura" | "inmovilizado"
+  | "seguro" | "siniestro" | "nota_cargo";
 
 interface ChronoEvent {
   date: string;
@@ -1519,6 +1520,10 @@ const KIND_META: Record<EventKind, { color: string; bg: string; text: string; do
   dividendo:      { color: "text-yellow-700",  bg: "bg-yellow-50 border-yellow-200", text: "Dividendos",   dot: "bg-yellow-500" },
   apertura:       { color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", text: "Bal. apertura", dot: "bg-emerald-500" },
   inmovilizado:   { color: "text-gray-700",    bg: "bg-gray-50 border-gray-200",   text: "Inmovilizado",  dot: "bg-gray-500" },
+  seguro:         { color: "text-sky-700",     bg: "bg-sky-50 border-sky-200",     text: "Póliza seguro", dot: "bg-sky-500" },
+  siniestro:      { color: "text-rose-700",    bg: "bg-rose-50 border-rose-200",   text: "Siniestro",     dot: "bg-rose-500" },
+  nota_cargo:     { color: "text-amber-700",   bg: "bg-amber-50 border-amber-200", text: "Nota de cargo", dot: "bg-amber-500" },
+  poliza_credito: { color: "text-violet-700",  bg: "bg-violet-50 border-violet-200", text: "Póliza crédito", dot: "bg-violet-500" },
 };
 
 function parsePayrollDate(month: string, year: number): string {
@@ -1614,6 +1619,28 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
       label: `Alta: ${a.description}`, subtitle: `Cta. ${a.accountCode}`, amount: a.purchaseValue });
   });
 
+  (universe.insurancePolicies ?? []).forEach((ins: any) => {
+    if (ins.startDate) events.push({ date: ins.startDate, kind: "seguro",
+      label: `Póliza: ${ins.type || "Seguro"}`, subtitle: ins.insurer || "", amount: ins.annualPremium });
+  });
+
+  if (universe.casualtyEvent?.date) {
+    events.push({ date: universe.casualtyEvent.date, kind: "siniestro",
+      label: "Siniestro", subtitle: universe.casualtyEvent.description || "",
+      amount: universe.casualtyEvent.insuranceCompensation });
+  }
+
+  if (universe.creditPolicy?.startDate) {
+    events.push({ date: universe.creditPolicy.startDate, kind: "poliza_credito",
+      label: `Póliza crédito: ${universe.creditPolicy.policyNumber || ""}`,
+      subtitle: universe.creditPolicy.entity || "", amount: universe.creditPolicy.limit });
+  }
+
+  ((universe as any).bankDebitNotes ?? []).forEach((n: any) => {
+    if (n.date) events.push({ date: n.date, kind: "nota_cargo",
+      label: `Nota cargo: ${n.reference || ""}`, subtitle: n.concept || "", amount: n.amount });
+  });
+
   return events.filter(e => e.date && /^\d{4}-\d{2}-\d{2}/.test(e.date))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -1644,13 +1671,14 @@ export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data })
   const statGroups: { label: string; kinds: EventKind[]; color: string }[] = [
     { label: "Facturas", kinds: ["factura_compra","factura_venta","factura_rectif"], color: "text-orange-600" },
     { label: "Asientos", kinds: ["asiento"], color: "text-slate-600" },
-    { label: "Mov. bancarios", kinds: ["banco"], color: "text-green-600" },
-    { label: "Préstamo/Hipoteca", kinds: ["prestamo","hipoteca"], color: "text-teal-600" },
+    { label: "Mov. bancarios", kinds: ["banco","nota_cargo"], color: "text-green-600" },
+    { label: "Financiación", kinds: ["prestamo","hipoteca","poliza_credito"], color: "text-teal-600" },
     { label: "SS e Impuestos", kinds: ["ss","impuesto"], color: "text-red-600" },
     { label: "Nóminas", kinds: ["nomina"], color: "text-purple-600" },
     { label: "Tarjeta", kinds: ["tarjeta"], color: "text-indigo-600" },
     { label: "Socios/Dividendos", kinds: ["socio","dividendo"], color: "text-pink-600" },
     { label: "Apertura/Inmov.", kinds: ["apertura","inmovilizado"], color: "text-emerald-600" },
+    { label: "Seguros/Siniestro", kinds: ["seguro","siniestro"], color: "text-sky-600" },
   ];
 
   return (

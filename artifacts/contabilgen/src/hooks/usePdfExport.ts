@@ -3,6 +3,7 @@ import jsPDF from "jspdf";
 import { toJpeg } from "html-to-image";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
+import { buildAllDocuments } from "@/lib/pdfDocuments";
 
 export interface PdfTab {
   id: string;
@@ -20,8 +21,6 @@ async function captureDivAsPdfBlob(
   const MARGIN_MM = 10;
   const CONTENT_W_MM = A4_W_MM - MARGIN_MM * 2;
 
-  // html-to-image uses the browser's native renderer — no custom CSS parser,
-  // so oklch/oklab/color-mix all work without patching.
   const imgData = await toJpeg(el, {
     quality: 0.92,
     backgroundColor: "#ffffff",
@@ -33,7 +32,6 @@ async function captureDivAsPdfBlob(
     },
   });
 
-  // Calculate pixel dimensions from data URL
   const img = await new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image();
     image.onload = () => resolve(image);
@@ -50,7 +48,6 @@ async function captureDivAsPdfBlob(
 
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  // Slice and add each A4 page
   const offscreen = document.createElement("canvas");
   const ctx = offscreen.getContext("2d")!;
 
@@ -61,7 +58,6 @@ async function captureDivAsPdfBlob(
     const FOOTER_H = 8;
     const PRINT_H = A4_H_MM - MARGIN_MM * 2 - HEADER_H - FOOTER_H;
 
-    // Header band
     pdf.setFillColor(248, 250, 252);
     pdf.rect(0, 0, A4_W_MM, HEADER_H + MARGIN_MM, "F");
     pdf.setFontSize(9);
@@ -75,7 +71,6 @@ async function captureDivAsPdfBlob(
     pdf.setDrawColor(226, 232, 240);
     pdf.line(MARGIN_MM, MARGIN_MM + HEADER_H, A4_W_MM - MARGIN_MM, MARGIN_MM + HEADER_H);
 
-    // Slice the full image for this page
     const srcY = page * pageHeightPx;
     const srcH = Math.min(pageHeightPx, imgHeightPx - srcY);
 
@@ -90,7 +85,6 @@ async function captureDivAsPdfBlob(
 
     pdf.addImage(sliceData, "JPEG", MARGIN_MM, MARGIN_MM + HEADER_H, CONTENT_W_MM, sliceHeightMM);
 
-    // Footer page number
     pdf.setFontSize(8);
     pdf.setTextColor(148, 163, 184);
     pdf.text(`Página ${page + 1} de ${totalPages}`, A4_W_MM / 2, A4_H_MM - MARGIN_MM, { align: "center" });
@@ -117,38 +111,38 @@ export function usePdfExport() {
     }
   }
 
-  async function exportAllAsZip(tabs: PdfTab[], companyName: string) {
+  async function exportDocumentsAsZip(universe: any) {
     setExporting("zip");
-    const skipped: string[] = [];
     try {
-      const zip = new JSZip();
-      const folder =
-        zip.folder(companyName.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g, "").trim()) || zip;
+      const cp = universe.companyProfile || {};
+      const companyName = cp.name || "Empresa";
 
-      for (const tab of tabs) {
-        if (!tab.ref.current) {
-          skipped.push(tab.label);
-          continue;
-        }
-        try {
-          const blob = await captureDivAsPdfBlob(tab.ref.current, companyName, tab.label);
-          folder.file(`${tab.id}_${tab.label.replace(/[/\\?%*:|"<>]/g, "-")}.pdf`, blob);
-        } catch (tabErr: unknown) {
-          console.error(`[ZIP] Error en pestaña "${tab.label}":`, tabErr);
-          skipped.push(tab.label);
-        }
+      const docs = buildAllDocuments(universe, {
+        name: cp.name || "",
+        nif: cp.nif || cp.cif || "",
+        address: cp.address || "",
+        city: cp.city || "",
+        sector: cp.sector || "",
+        taxRegime: cp.taxRegime || "",
+        fiscalYear: cp.fiscalYear,
+        description: cp.description || "",
+      });
+
+      const zip = new JSZip();
+      const safeFolderName = companyName.replace(/[^a-zA-Z0-9áéíóúñÁÉÍÓÚÑ\s]/g, "").trim();
+      const root = zip.folder(safeFolderName) || zip;
+
+      for (const doc of docs) {
+        root.file(doc.filename, doc.blob);
       }
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
       const safeName = companyName.replace(/[^a-zA-Z0-9]/g, "_").substring(0, 30);
       saveAs(zipBlob, `ContabilGen_${safeName}.zip`);
-      if (skipped.length > 0) {
-        console.warn("[ZIP] Pestañas omitidas:", skipped.join(", "));
-      }
     } finally {
       setExporting(null);
     }
   }
 
-  return { exporting, exportTab, exportAllAsZip };
+  return { exporting, exportTab, exportDocumentsAsZip };
 }

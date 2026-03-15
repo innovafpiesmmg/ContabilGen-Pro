@@ -2,7 +2,7 @@
 
 ## Overview
 
-ContabilGen Pro es un generador de universos contables para prácticas de Grado Medio de Contabilidad. Utiliza IA (OpenAI gpt-5.2) para generar ecosistemas contables coherentes con documentos reales del Plan General Contable español.
+ContabilGen Pro es un generador de universos contables para prácticas de Grado Medio y Superior de Contabilidad (FP). Utiliza IA (DeepSeek) para generar ecosistemas contables coherentes con documentos reales del Plan General Contable español.
 
 ## Stack
 
