@@ -1,11 +1,12 @@
 import { ReactNode } from "react";
 import { Link, useLocation } from "wouter";
-import { Users, Mail, ChevronLeft, Shield } from "lucide-react";
+import { Users, Mail, ChevronLeft, Shield, Cpu } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { path: "/admin/users", label: "Usuarios", icon: Users },
   { path: "/admin/email", label: "Servidor de correo", icon: Mail },
+  { path: "/admin/ai", label: "IA compartida", icon: Cpu },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

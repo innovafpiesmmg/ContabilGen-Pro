@@ -134,4 +134,64 @@ router.delete("/admin/email-config/key", async (_req: Request, res: Response): P
   res.json({ success: true });
 });
 
+// ─── Shared DeepSeek Config ───────────────────────────────────────────────────
+
+const SHARED_DEEPSEEK_KEYS = [
+  "shared_deepseek_enabled",
+  "shared_deepseek_api_key",
+  "shared_deepseek_base_url",
+  "shared_deepseek_model",
+] as const;
+
+router.get("/admin/deepseek-config", async (_req: Request, res: Response): Promise<void> => {
+  const rows = await db.select().from(appSettingsTable);
+  const config: Record<string, string> = {};
+  for (const row of rows) {
+    if ((SHARED_DEEPSEEK_KEYS as readonly string[]).includes(row.key)) {
+      config[row.key] = row.value;
+    }
+  }
+  if (config.shared_deepseek_api_key) {
+    const key = config.shared_deepseek_api_key;
+    config.shared_deepseek_api_key_masked = key.length > 8
+      ? `${key.slice(0, 4)}${"•".repeat(key.length - 8)}${key.slice(-4)}`
+      : "•".repeat(key.length);
+    config.shared_deepseek_api_key_set = "true";
+    delete config.shared_deepseek_api_key;
+  }
+  res.json({ config });
+});
+
+router.put("/admin/deepseek-config", async (req: Request, res: Response): Promise<void> => {
+  const { enabled, api_key, base_url, model } = req.body ?? {};
+
+  const upsert = async (key: string, value: string) => {
+    await db
+      .insert(appSettingsTable)
+      .values({ key, value })
+      .onConflictDoUpdate({ target: appSettingsTable.key, set: { value } });
+  };
+
+  if (typeof enabled === "boolean") {
+    await upsert("shared_deepseek_enabled", enabled ? "true" : "false");
+  }
+  if (api_key && typeof api_key === "string") {
+    await upsert("shared_deepseek_api_key", api_key);
+  }
+  if (base_url && typeof base_url === "string") {
+    await upsert("shared_deepseek_base_url", base_url);
+  }
+  if (model && typeof model === "string") {
+    await upsert("shared_deepseek_model", model);
+  }
+
+  res.json({ success: true });
+});
+
+router.delete("/admin/deepseek-config/key", async (_req: Request, res: Response): Promise<void> => {
+  await db.delete(appSettingsTable).where(eq(appSettingsTable.key, "shared_deepseek_api_key"));
+  await db.delete(appSettingsTable).where(eq(appSettingsTable.key, "shared_deepseek_enabled"));
+  res.json({ success: true });
+});
+
 export default router;

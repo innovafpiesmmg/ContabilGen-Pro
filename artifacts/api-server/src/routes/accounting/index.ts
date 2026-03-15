@@ -8,7 +8,7 @@ import {
   DeleteGenerationParams,
 } from "@workspace/api-zod";
 import { generateAccountingUniverse } from "../../lib/accounting-generator.js";
-import { getSettingsForUser } from "../settings.js";
+import { getSettingsForUser, getSharedDeepseekConfig } from "../settings.js";
 
 const router: IRouter = Router();
 
@@ -27,12 +27,30 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
   const { taxRegime, sector, complexity, year, companyName } = parsed.data;
 
   const settings = await getSettingsForUser(req.user.id);
-  const aiConfig = {
-    provider: settings.provider ?? "openai",
-    deepseekApiKey: settings.deepseekApiKey ?? "",
-    deepseekBaseUrl: settings.deepseekBaseUrl ?? "https://api.deepseek.com",
-    deepseekModel: settings.deepseekModel ?? "deepseek-chat",
-  };
+  const provider = settings.provider ?? "openai";
+
+  let aiConfig: { provider: string; deepseekApiKey: string; deepseekBaseUrl: string; deepseekModel: string };
+
+  if (provider === "shared_deepseek") {
+    const shared = await getSharedDeepseekConfig();
+    if (!shared.enabled) {
+      res.status(400).json({ error: "La clave DeepSeek compartida no está disponible." });
+      return;
+    }
+    aiConfig = {
+      provider: "deepseek",
+      deepseekApiKey: shared.apiKey,
+      deepseekBaseUrl: shared.baseUrl,
+      deepseekModel: shared.model,
+    };
+  } else {
+    aiConfig = {
+      provider,
+      deepseekApiKey: settings.deepseekApiKey ?? "",
+      deepseekBaseUrl: settings.deepseekBaseUrl ?? "https://api.deepseek.com",
+      deepseekModel: settings.deepseekModel ?? "deepseek-chat",
+    };
+  }
 
   const universe = await generateAccountingUniverse(
     { taxRegime, sector, complexity, year, companyName: companyName ?? null },

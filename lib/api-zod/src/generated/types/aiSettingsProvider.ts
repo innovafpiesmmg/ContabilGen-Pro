@@ -15,4 +15,5 @@ export type AiSettingsProvider =
 export const AiSettingsProvider = {
   openai: "openai",
   deepseek: "deepseek",
+  shared_deepseek: "shared_deepseek",
 } as const;

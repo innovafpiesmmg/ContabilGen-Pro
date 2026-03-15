@@ -99,13 +99,21 @@ export const ResetPasswordResponse = zod.object({
  */
 export const GetSettingsResponse = zod.object({
   provider: zod
-    .enum(["openai", "deepseek"])
+    .enum(["openai", "deepseek", "shared_deepseek"])
     .describe("Which AI provider to use for generation"),
   deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
   deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
   deepseekModel: zod
     .string()
     .describe("DeepSeek model to use (e.g. deepseek-chat)"),
+  sharedDeepseekAvailable: zod
+    .boolean()
+    .optional()
+    .describe("Whether the admin has enabled the shared DeepSeek key"),
+  sharedDeepseekModel: zod
+    .string()
+    .nullish()
+    .describe("Model configured for the shared DeepSeek key"),
 });
 
 /**
@@ -113,24 +121,40 @@ export const GetSettingsResponse = zod.object({
  */
 export const UpdateSettingsBody = zod.object({
   provider: zod
-    .enum(["openai", "deepseek"])
+    .enum(["openai", "deepseek", "shared_deepseek"])
     .describe("Which AI provider to use for generation"),
   deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
   deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
   deepseekModel: zod
     .string()
     .describe("DeepSeek model to use (e.g. deepseek-chat)"),
+  sharedDeepseekAvailable: zod
+    .boolean()
+    .optional()
+    .describe("Whether the admin has enabled the shared DeepSeek key"),
+  sharedDeepseekModel: zod
+    .string()
+    .nullish()
+    .describe("Model configured for the shared DeepSeek key"),
 });
 
 export const UpdateSettingsResponse = zod.object({
   provider: zod
-    .enum(["openai", "deepseek"])
+    .enum(["openai", "deepseek", "shared_deepseek"])
     .describe("Which AI provider to use for generation"),
   deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
   deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
   deepseekModel: zod
     .string()
     .describe("DeepSeek model to use (e.g. deepseek-chat)"),
+  sharedDeepseekAvailable: zod
+    .boolean()
+    .optional()
+    .describe("Whether the admin has enabled the shared DeepSeek key"),
+  sharedDeepseekModel: zod
+    .string()
+    .nullish()
+    .describe("Model configured for the shared DeepSeek key"),
 });
 
 /**

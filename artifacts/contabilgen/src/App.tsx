@@ -17,6 +17,7 @@ import ForgotPasswordPage from "@/pages/forgot-password";
 import ResetPasswordPage from "@/pages/reset-password";
 import AdminUsersPage from "@/pages/admin/users";
 import AdminEmailConfigPage from "@/pages/admin/email-config";
+import AdminAiConfigPage from "@/pages/admin/ai-config";
 import LandingPage from "@/pages/landing";
 
 const queryClient = new QueryClient({
@@ -43,15 +44,14 @@ function AdminSection() {
   const { user } = useAuth();
   if (!user?.isAdmin) return <LoginPage />;
   return (
-    <AdminLayout>
-      <Switch>
-        <Route path="/admin/users" component={AdminUsersPage} />
-        <Route path="/admin/email" component={AdminEmailConfigPage} />
-        <Route>
-          <AdminUsersPage />
-        </Route>
-      </Switch>
-    </AdminLayout>
+    <Switch>
+      <Route path="/admin/users" component={AdminUsersPage} />
+      <Route path="/admin/email" component={AdminEmailConfigPage} />
+      <Route path="/admin/ai" component={AdminAiConfigPage} />
+      <Route>
+        <AdminUsersPage />
+      </Route>
+    </Switch>
   );
 }
 

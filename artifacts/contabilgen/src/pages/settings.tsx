@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion } from "framer-motion";
-import { useGetSettings, useUpdateSettings } from "@workspace/api-client-react";
+import { useGetSettings, useUpdateSettings, AiSettingsProvider } from "@workspace/api-client-react";
 import { useToast } from "@/hooks/use-toast";
 import { getGetSettingsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -21,10 +21,10 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Settings as SettingsIcon, Save, Bot, Cpu } from "lucide-react";
+import { Settings as SettingsIcon, Save, Bot, Cpu, Share2 } from "lucide-react";
 
 const settingsSchema = z.object({
-  provider: z.enum(["openai", "deepseek"]),
+  provider: z.enum(["openai", "deepseek", "shared_deepseek"]),
   deepseekApiKey: z.string().optional(),
   deepseekBaseUrl: z.string().min(1, "La URL base es requerida"),
   deepseekModel: z.string().min(1, "El modelo es requerido"),
@@ -32,7 +32,7 @@ const settingsSchema = z.object({
   if (data.provider === "deepseek" && !data.deepseekApiKey) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: "La API Key es requerida cuando se usa DeepSeek",
+      message: "La API Key es requerida cuando se usa DeepSeek propio",
       path: ["deepseekApiKey"],
     });
   }
@@ -45,6 +45,9 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { data: settings, isLoading } = useGetSettings();
   const updateSettings = useUpdateSettings();
+
+  const sharedAvailable = (settings as typeof settings & { sharedDeepseekAvailable?: boolean })?.sharedDeepseekAvailable ?? false;
+  const sharedModel = (settings as typeof settings & { sharedDeepseekModel?: string | null })?.sharedDeepseekModel;
 
   const form = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
@@ -59,7 +62,7 @@ export default function SettingsPage() {
   useEffect(() => {
     if (settings) {
       form.reset({
-        provider: settings.provider as "openai" | "deepseek",
+        provider: (settings.provider as AiSettingsProvider) ?? "openai",
         deepseekApiKey: settings.deepseekApiKey || "",
         deepseekBaseUrl: settings.deepseekBaseUrl || "https://api.deepseek.com",
         deepseekModel: settings.deepseekModel || "deepseek-chat",
@@ -73,7 +76,7 @@ export default function SettingsPage() {
     try {
       await updateSettings.mutateAsync({
         data: {
-          provider: data.provider as "openai" | "deepseek",
+          provider: data.provider as AiSettingsProvider,
           deepseekApiKey: data.deepseekApiKey || null,
           deepseekBaseUrl: data.deepseekBaseUrl,
           deepseekModel: data.deepseekModel,
@@ -86,13 +89,19 @@ export default function SettingsPage() {
         title: "Configuración guardada",
         description: "Los cambios se han guardado correctamente.",
       });
-    } catch (error) {
+    } catch {
       toast({
         variant: "destructive",
         title: "Error al guardar",
         description: "Hubo un problema al guardar la configuración.",
       });
     }
+  };
+
+  const getProviderLabel = () => {
+    if (provider === "openai") return "OpenAI";
+    if (provider === "shared_deepseek") return "DeepSeek compartido";
+    return "DeepSeek";
   };
 
   if (isLoading) {
@@ -138,9 +147,9 @@ export default function SettingsPage() {
             
             <CardHeader className="pb-6 relative">
               <div className="absolute right-6 top-6">
-                <Badge variant={settings?.provider === "openai" ? "default" : "secondary"} className="shadow-sm gap-1.5 px-3 py-1">
-                  {settings?.provider === "openai" ? <Bot className="w-3.5 h-3.5" /> : <Cpu className="w-3.5 h-3.5" />}
-                  Usando: {settings?.provider === "openai" ? "OpenAI" : "DeepSeek"} ✓
+                <Badge variant={provider === "openai" ? "default" : "secondary"} className="shadow-sm gap-1.5 px-3 py-1">
+                  {provider === "openai" ? <Bot className="w-3.5 h-3.5" /> : provider === "shared_deepseek" ? <Share2 className="w-3.5 h-3.5" /> : <Cpu className="w-3.5 h-3.5" />}
+                  Usando: {getProviderLabel()} ✓
                 </Badge>
               </div>
               <CardTitle className="text-xl">Configuración de IA</CardTitle>
@@ -154,8 +163,8 @@ export default function SettingsPage() {
                 <Label className="text-base font-semibold">Proveedor de IA</Label>
                 <RadioGroup 
                   value={provider} 
-                  onValueChange={(value) => form.setValue("provider", value as "openai" | "deepseek", { shouldValidate: true })}
-                  className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+                  onValueChange={(value) => form.setValue("provider", value as "openai" | "deepseek" | "shared_deepseek", { shouldValidate: true })}
+                  className={`grid gap-4 ${sharedAvailable ? "grid-cols-1 sm:grid-cols-3" : "grid-cols-1 sm:grid-cols-2"}`}
                 >
                   <div>
                     <RadioGroupItem value="openai" id="openai" className="peer sr-only" />
@@ -179,11 +188,32 @@ export default function SettingsPage() {
                     >
                       <Cpu className="mb-3 h-8 w-8" />
                       <div className="text-center">
-                        <div className="font-semibold">DeepSeek</div>
+                        <div className="font-semibold">DeepSeek propio</div>
                         <div className="text-xs text-muted-foreground mt-1">Requiere API Key propia</div>
                       </div>
                     </Label>
                   </div>
+
+                  {sharedAvailable && (
+                    <div>
+                      <RadioGroupItem value="shared_deepseek" id="shared_deepseek" className="peer sr-only" />
+                      <Label
+                        htmlFor="shared_deepseek"
+                        className="flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all relative"
+                      >
+                        <div className="absolute -top-2 -right-2">
+                          <Badge className="text-[10px] px-1.5 py-0.5 bg-green-500 hover:bg-green-500">Gratis</Badge>
+                        </div>
+                        <Share2 className="mb-3 h-8 w-8 text-green-600" />
+                        <div className="text-center">
+                          <div className="font-semibold">DeepSeek compartido</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {sharedModel ? `Modelo: ${sharedModel}` : "Proporcionado por el admin"}
+                          </div>
+                        </div>
+                      </Label>
+                    </div>
+                  )}
                 </RadioGroup>
               </div>
 
@@ -233,6 +263,24 @@ export default function SettingsPage() {
                         <p className="text-sm text-destructive font-medium">{form.formState.errors.deepseekModel.message}</p>
                       )}
                     </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {provider === "shared_deepseek" && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="flex items-start gap-3 p-4 bg-green-50 border border-green-200 rounded-xl"
+                >
+                  <Share2 className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-green-800">Usando la clave compartida del administrador</p>
+                    <p className="text-xs text-green-700 mt-0.5">
+                      No necesitas configurar ninguna API key. El administrador ha habilitado el acceso a DeepSeek para todos los usuarios.
+                      {sharedModel && ` Modelo activo: ${sharedModel}.`}
+                    </p>
                   </div>
                 </motion.div>
               )}

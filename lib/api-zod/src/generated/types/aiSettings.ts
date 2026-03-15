@@ -19,4 +19,11 @@ export interface AiSettings {
   deepseekBaseUrl: string;
   /** DeepSeek model to use (e.g. deepseek-chat) */
   deepseekModel: string;
+  /** Whether the admin has enabled the shared DeepSeek key */
+  sharedDeepseekAvailable?: boolean;
+  /**
+   * Model configured for the shared DeepSeek key
+   * @nullable
+   */
+  sharedDeepseekModel?: string | null;
 }

@@ -54,6 +54,7 @@ export type AiSettingsProvider =
 export const AiSettingsProvider = {
   openai: "openai",
   deepseek: "deepseek",
+  shared_deepseek: "shared_deepseek",
 } as const;
 
 export interface AiSettings {
@@ -68,6 +69,13 @@ export interface AiSettings {
   deepseekBaseUrl: string;
   /** DeepSeek model to use (e.g. deepseek-chat) */
   deepseekModel: string;
+  /** Whether the admin has enabled the shared DeepSeek key */
+  sharedDeepseekAvailable?: boolean;
+  /**
+   * Model configured for the shared DeepSeek key
+   * @nullable
+   */
+  sharedDeepseekModel?: string | null;
 }
 
 export interface ErrorResponse {
