@@ -254,6 +254,7 @@ export const InvoicePaymentMethod = {
   check: "check",
   promissory_note: "promissory_note",
   credit: "credit",
+  CARD: 'card',
 } as const;
 
 export interface AccountEntry {
@@ -368,7 +369,7 @@ export interface InsurancePolicy {
   startDate: string;
   endDate: string;
   /** Amount to defer to next period (cuenta 480) */
-  prepaidExpense: number;
+  prepaidExpense?: number;
   journalNote?: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
@@ -440,6 +441,7 @@ export const TaxLiquidationModel = {
   NUMBER_303: "303",
   NUMBER_420: "420",
   IS: "IS",
+  NUMBER_111: "111",
 } as const;
 
 export type TaxLiquidationPaymentType =
@@ -510,7 +512,7 @@ export interface Shareholder {
   /** Role in the company */
   role: ShareholderRole;
   /** Ownership percentage (0-100) */
-  participationPercentage: number;
+  participationPercentage?: number;
   /** Nominal value per share/participation */
   nominalValuePerShare: number;
   /** Number of shares or participations held */
@@ -574,7 +576,7 @@ export interface InitialBalanceSheet {
 export interface ShareholderAccountTransaction {
   date: string;
   concept: string;
-  shareholderName: string;
+  shareholderName?: string;
   /** 551 = Cuenta corriente con administradores, 553 = Cuenta corriente con socios */
   accountCode: string;
   accountName: string;
@@ -600,8 +602,8 @@ export interface ShareholderAccounts {
 }
 
 export interface DividendPerShareholder {
-  shareholderName: string;
-  participationPercentage: number;
+  shareholderName?: string;
+  participationPercentage?: number;
   grossDividend: number;
   irpfWithholdingRate: number;
   irpfWithholdingAmount: number;

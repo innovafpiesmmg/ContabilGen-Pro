@@ -350,6 +350,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         "check",
         "promissory_note",
         "credit",
+        "card",
       ]),
       dueDate: zod.string().nullable(),
       journalNote: zod.string().optional().describe("Explanation of accounting entries"),
@@ -528,7 +529,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         endDate: zod.string(),
         prepaidExpense: zod
           .number()
-          .describe("Amount to defer to next period (cuenta 480)"),
+          .optional()          .describe("Amount to defer to next period (cuenta 480)"),
         journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
@@ -659,7 +660,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
     .array(
       zod.object({
         model: zod
-          .enum(["303", "420", "IS"])
+          .enum(["303", "420", "IS", "111"])
           .describe("303=IVA, 420=IGIC, IS=Impuesto Sociedades"),
         period: zod.string().describe("T1, T2, T3, T4 or Annual"),
         dueDate: zod.string(),
@@ -883,7 +884,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         zod.object({
           date: zod.string(),
           concept: zod.string(),
-          shareholderName: zod.string(),
+          shareholderName: zod.string().optional(),
           accountCode: zod
             .string()
             .describe(
@@ -953,8 +954,8 @@ export const GenerateAccountingUniverseResponse = zod.object({
         .describe("IRPF withholding rate on dividends (typically 19%)"),
       perShareholder: zod.array(
         zod.object({
-          shareholderName: zod.string(),
-          participationPercentage: zod.number(),
+          shareholderName: zod.string().optional(),
+          participationPercentage: zod.number().optional(),
           grossDividend: zod.number(),
           irpfWithholdingRate: zod.number(),
           irpfWithholdingAmount: zod.number(),
@@ -1153,6 +1154,7 @@ export const SaveGenerationBody = zod.object({
           "check",
           "promissory_note",
           "credit",
+        "card",
         ]),
         dueDate: zod.string().nullable(),
         journalNote: zod.string().optional().describe("Explanation of accounting entries"),
@@ -1331,7 +1333,7 @@ export const SaveGenerationBody = zod.object({
           endDate: zod.string(),
           prepaidExpense: zod
             .number()
-            .describe("Amount to defer to next period (cuenta 480)"),
+          .optional()            .describe("Amount to defer to next period (cuenta 480)"),
           journalNote: zod.string().optional(),
           accountDebits: zod.array(
             zod.object({
@@ -1462,7 +1464,7 @@ export const SaveGenerationBody = zod.object({
       .array(
         zod.object({
           model: zod
-            .enum(["303", "420", "IS"])
+            .enum(["303", "420", "IS", "111"])
             .describe("303=IVA, 420=IGIC, IS=Impuesto Sociedades"),
           period: zod.string().describe("T1, T2, T3, T4 or Annual"),
           dueDate: zod.string(),
@@ -1688,7 +1690,7 @@ export const SaveGenerationBody = zod.object({
           zod.object({
             date: zod.string(),
             concept: zod.string(),
-            shareholderName: zod.string(),
+            shareholderName: zod.string().optional(),
             accountCode: zod
               .string()
               .describe(
@@ -1762,8 +1764,8 @@ export const SaveGenerationBody = zod.object({
           .describe("IRPF withholding rate on dividends (typically 19%)"),
         perShareholder: zod.array(
           zod.object({
-            shareholderName: zod.string(),
-            participationPercentage: zod.number(),
+            shareholderName: zod.string().optional(),
+            participationPercentage: zod.number().optional(),
             grossDividend: zod.number(),
             irpfWithholdingRate: zod.number(),
             irpfWithholdingAmount: zod.number(),
@@ -1956,6 +1958,7 @@ export const GetGenerationResponse = zod.object({
           "check",
           "promissory_note",
           "credit",
+        "card",
         ]),
         dueDate: zod.string().nullable(),
         journalNote: zod.string().optional().describe("Explanation of accounting entries"),
@@ -2134,7 +2137,7 @@ export const GetGenerationResponse = zod.object({
           endDate: zod.string(),
           prepaidExpense: zod
             .number()
-            .describe("Amount to defer to next period (cuenta 480)"),
+          .optional()            .describe("Amount to defer to next period (cuenta 480)"),
           journalNote: zod.string().optional(),
           accountDebits: zod.array(
             zod.object({
@@ -2265,7 +2268,7 @@ export const GetGenerationResponse = zod.object({
       .array(
         zod.object({
           model: zod
-            .enum(["303", "420", "IS"])
+            .enum(["303", "420", "IS", "111"])
             .describe("303=IVA, 420=IGIC, IS=Impuesto Sociedades"),
           period: zod.string().describe("T1, T2, T3, T4 or Annual"),
           dueDate: zod.string(),
@@ -2491,7 +2494,7 @@ export const GetGenerationResponse = zod.object({
           zod.object({
             date: zod.string(),
             concept: zod.string(),
-            shareholderName: zod.string(),
+            shareholderName: zod.string().optional(),
             accountCode: zod
               .string()
               .describe(
@@ -2565,8 +2568,8 @@ export const GetGenerationResponse = zod.object({
           .describe("IRPF withholding rate on dividends (typically 19%)"),
         perShareholder: zod.array(
           zod.object({
-            shareholderName: zod.string(),
-            participationPercentage: zod.number(),
+            shareholderName: zod.string().optional(),
+            participationPercentage: zod.number().optional(),
             grossDividend: zod.number(),
             irpfWithholdingRate: zod.number(),
             irpfWithholdingAmount: zod.number(),
