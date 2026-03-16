@@ -1119,7 +1119,7 @@ async function generateJournalBlock(
 ) {
   const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
   const opsPerMonth = params.operationsPerMonth ?? 8;
-  const targetEntries = Math.min(opsPerMonth * numMonths, 60);
+  const totalTarget = Math.min(opsPerMonth * numMonths, 60);
   const level = params.educationLevel ?? "Medio";
 
   const sc = JSON.stringify({
@@ -1145,10 +1145,33 @@ async function generateJournalBlock(
   enabledOps.push("gastos generales (suministros, seguros, servicios bancarios)");
   if (params.sector !== "Servicios") enabledOps.push("variación de existencias");
 
-  const prompt = `Genera el LIBRO DIARIO (journalEntries) del universo contable.
+  const needsSplit = totalTarget > 25;
+  const chunks: Array<{ start: string; end: string; count: number }> = [];
+
+  if (needsSplit) {
+    const startDate = new Date(periodStart);
+    const endDate = new Date(periodEnd);
+    const midDate = new Date(startDate);
+    midDate.setMonth(midDate.getMonth() + Math.ceil(numMonths / 2));
+    if (midDate > endDate) midDate.setTime(endDate.getTime());
+    const midMinusOne = new Date(midDate);
+    midMinusOne.setDate(midMinusOne.getDate() - 1);
+
+    const half1 = Math.ceil(totalTarget / 2);
+    const half2 = totalTarget - half1;
+    chunks.push(
+      { start: periodStart, end: midMinusOne.toISOString().slice(0, 10), count: half1 },
+      { start: midDate.toISOString().slice(0, 10), end: periodEnd, count: half2 },
+    );
+  } else {
+    chunks.push({ start: periodStart, end: periodEnd, count: totalTarget });
+  }
+
+  const basePrompt = (chunkStart: string, chunkEnd: string, count: number, startNum: number) =>
+    `Genera el LIBRO DIARIO (journalEntries) del universo contable.
 
 EMPRESA: ${sc}
-PERÍODO: ${periodStart} a ${periodEnd}
+PERÍODO DE ESTOS ASIENTOS: ${chunkStart} a ${chunkEnd}
 NIVEL: ${level === "Superior" ? "FP Grado Superior (incluye periodificaciones, ajustes de ejercicio)" : "FP Grado Medio"}
 
 SECTOR ${getActivityLabel(params).toUpperCase()} — CUENTAS OBLIGATORIAS:
@@ -1156,40 +1179,33 @@ SECTOR ${getActivityLabel(params).toUpperCase()} — CUENTAS OBLIGATORIAS:
 - Compras: cuenta ${sectorCtxJ.purchaseAccount.code} (${sectorCtxJ.purchaseAccount.name})
 ${params.sector === "Servicios" ? "- Esta empresa NO vende bienes físicos — los asientos de ventas deben reflejar servicios prestados (705)" : ""}
 
-OPERACIONES A INCLUIR: ${enabledOps.join(", ")}
+OPERACIONES: ${enabledOps.join(", ")}
 
-Genera exactamente ${targetEntries} asientos contables distribuidos a lo largo del período, cubriendo todas las operaciones listadas.
+Genera exactamente ${count} asientos del ${chunkStart} al ${chunkEnd}. Numera desde ${startNum}.
 
-Formato JSON:
-{
-  "journalEntries": [
-    {
-      "entryNumber": "1",
-      "date": "YYYY-MM-DD (dentro de ${periodStart}–${periodEnd})",
-      "concept": "Descripción clara del asiento",
-      "document": "Referencia del documento (F-2025/001, NOM-ENE, etc.)",
-      "debits": [
-        {"accountCode": "XXX", "accountName": "Nombre cuenta PGC", "amount": X.XX, "description": "..."}
-      ],
-      "credits": [
-        {"accountCode": "XXX", "accountName": "Nombre cuenta PGC", "amount": X.XX, "description": "..."}
-      ],
-      "totalAmount": X.XX
+JSON: {"journalEntries":[{"entryNumber":"${startNum}","date":"YYYY-MM-DD","concept":"Máx 6 palabras","document":"REF","debits":[{"accountCode":"XXX","accountName":"Cuenta PGC","amount":0.00}],"credits":[{"accountCode":"XXX","accountName":"Cuenta PGC","amount":0.00}],"totalAmount":0.00}]}
+
+REGLAS:
+- sum(débitos)=sum(créditos)=totalAmount en cada asiento
+- Orden cronológico, cuentas PGC 3-4 dígitos
+- Máx 2 líneas débito y 2 crédito por asiento
+- NO campo "description" — solo accountCode, accountName, amount
+- Conceptos breves (máx 6 palabras)`;
+
+  const allEntries: unknown[] = [];
+  let startNum = 1;
+
+  for (const chunk of chunks) {
+    console.log(`[journal] Generando lote: ${chunk.start} a ${chunk.end}, ${chunk.count} asientos (desde #${startNum})`);
+    const result = await callAI(client, model, basePrompt(chunk.start, chunk.end, chunk.count, startNum), 8192) as Record<string, unknown>;
+    const entries = (result as { journalEntries?: unknown[] }).journalEntries;
+    if (Array.isArray(entries)) {
+      allEntries.push(...entries);
+      startNum += entries.length;
     }
-  ]
-}
+  }
 
-REGLAS CRÍTICAS:
-- Cada asiento DEBE cuadrar: suma(débitos) = suma(créditos) = totalAmount
-- DISTRIBUCIÓN OBLIGATORIA: al menos ${Math.min(numMonths, targetEntries)} meses distintos deben tener asientos — no agrupes todos en los primeros meses
-- Asientos en orden cronológico estricto (date ascendente)
-- Cuentas PGC correctas (3 o 4 dígitos)
-- Conceptos claros y educativos (máximo 8 palabras)
-- Importes coherentes con los datos del escenario
-- SÉ CONCISO: description de cada línea en máximo 4 palabras
-- Máximo 3 líneas de débito y 3 de crédito por asiento`;
-
-  return await callAI(client, model, prompt, 8192) as Record<string, unknown>;
+  return { journalEntries: allEntries };
 }
 
 // ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
