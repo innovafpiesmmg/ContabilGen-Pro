@@ -1382,13 +1382,27 @@ REGLAS:
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
-    if (onProgress) onProgress(`Libro diario: lote ${i + 1} de ${chunks.length} (asientos ${startNum}–${startNum + chunk.count - 1})`);
-    console.log(`[journal] Lote ${i + 1}/${chunks.length}: ${chunk.start} a ${chunk.end}, ${chunk.count} asientos (desde #${startNum})`);
-    const result = await callAI(client, model, basePrompt(chunk.start, chunk.end, chunk.count, startNum), 8192) as Record<string, unknown>;
-    const entries = (result as { journalEntries?: unknown[] }).journalEntries;
-    if (Array.isArray(entries)) {
-      allEntries.push(...entries);
-      startNum += entries.length;
+    let remaining = chunk.count;
+    let chunkStart = chunk.start;
+    let attempt = 0;
+    const maxAttempts = 3;
+
+    while (remaining > 0 && attempt < maxAttempts) {
+      if (onProgress) onProgress(`Libro diario: lote ${i + 1} de ${chunks.length} (asientos ${startNum}–${startNum + remaining - 1})${attempt > 0 ? ` (reintento ${attempt})` : ''}`);
+      console.log(`[journal] Lote ${i + 1}/${chunks.length}: ${chunkStart} a ${chunk.end}, ${remaining} asientos (desde #${startNum})${attempt > 0 ? ` retry=${attempt}` : ''}`);
+      const result = await callAI(client, model, basePrompt(chunkStart, chunk.end, remaining, startNum), 8192) as Record<string, unknown>;
+      const entries = (result as { journalEntries?: unknown[] }).journalEntries;
+      if (Array.isArray(entries) && entries.length > 0) {
+        allEntries.push(...entries);
+        startNum += entries.length;
+        remaining -= entries.length;
+      } else {
+        break;
+      }
+      attempt++;
+    }
+    if (remaining > 0) {
+      console.warn(`[journal] Lote ${i + 1}: faltan ${remaining} asientos tras ${attempt} intentos`);
     }
   }
 
