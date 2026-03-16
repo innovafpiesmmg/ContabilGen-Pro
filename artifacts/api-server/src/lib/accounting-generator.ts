@@ -2365,11 +2365,9 @@ function buildDeterministicJournal(
     }
   }
 
-  const shareholdersInfo = universe.shareholdersInfo as Record<string, unknown> | undefined;
-  if (shareholdersInfo && shareholdersInfo.accountDebits) {
-    const date = String(shareholdersInfo.constitutionDate ?? `${params.year}-01-01`);
-    copyEntry(date, "Constitución capital social", "Capital social", shareholdersInfo);
-  }
+  // shareholdersInfo: NO genera asiento en el diario.
+  // Los datos de socios/capital social son informativos y se reflejan
+  // en el balance de apertura (initialBalanceSheet), no como asiento independiente.
 
   const initialBS = universe.initialBalanceSheet as Record<string, unknown> | undefined;
   if (initialBS && initialBS.accountDebits) {
@@ -2443,7 +2441,7 @@ function buildDeterministicJournal(
   if (entriesWithoutDoc.length > 0) {
     const filtered = entriesWithoutDoc.filter(e => {
       const doc = e.document;
-      return doc && !["Capital social", "Asiento apertura", "Dividendos", "Tarjeta-liquidación"].includes(doc)
+      return doc && !["Asiento apertura", "Dividendos", "Tarjeta-liquidación"].includes(doc)
         && !doc.startsWith("Amort-") && !doc.startsWith("Mod.") && !doc.startsWith("TC1-")
         && !doc.startsWith("Nómina") && !doc.startsWith("POL-") && !doc.startsWith("SEG-");
     });
