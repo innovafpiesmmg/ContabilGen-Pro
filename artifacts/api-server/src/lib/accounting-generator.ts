@@ -1912,216 +1912,406 @@ function addMissingDocumentEntries(
   return all;
 }
 
-async function generateJournalBlock(
+function buildDeterministicJournal(
+  universe: Record<string, unknown>,
   params: GenerateParams,
-  scenario: Record<string, unknown>,
-  client: OpenAI,
-  model: string,
-  onProgress?: (msg: string) => void,
-  documentContext?: string,
-  universe?: Record<string, unknown>,
-) {
-  const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
-  const opsPerMonth = params.operationsPerMonth ?? 8;
-  const totalTarget = opsPerMonth * numMonths;
-  const level = params.educationLevel ?? "Medio";
+): { journalEntries: unknown[] } {
+  interface JEntry {
+    entryNumber: string;
+    date: string;
+    concept: string;
+    document: string;
+    debits: Array<{ accountCode: string; accountName: string; amount: number }>;
+    credits: Array<{ accountCode: string; accountName: string; amount: number }>;
+    totalAmount: number;
+  }
+  const entries: JEntry[] = [];
+  const r2 = (n: number) => Math.round(n * 100) / 100;
 
-  const sc = JSON.stringify({
-    companyName: scenario.companyName,
-    sector: params.sector,
-    taxRegime: params.taxRegime,
-    year: params.year,
-    bankEntity: scenario.bankEntity,
-    bankAccount: scenario.bankAccount,
-  }, null, 0);
+  function addEntry(date: string, concept: string, doc: string,
+    debits: Array<{ accountCode: string; accountName: string; amount: number }>,
+    credits: Array<{ accountCode: string; accountName: string; amount: number }>) {
+    const roundedDebits = debits.map(d => ({ ...d, amount: r2(d.amount) }));
+    const roundedCredits = credits.map(c => ({ ...c, amount: r2(c.amount) }));
+    const totalD = r2(roundedDebits.reduce((s, d) => s + d.amount, 0));
+    const totalC = r2(roundedCredits.reduce((s, c) => s + c.amount, 0));
+    if (totalD <= 0 || Math.abs(totalD - totalC) > 0.02) {
+      console.warn(`[journal] Asiento descartado (descuadre): ${concept} [${doc}] D=${totalD} C=${totalC}`);
+      return;
+    }
+    entries.push({ entryNumber: "0", date, concept, document: doc,
+      debits: roundedDebits, credits: roundedCredits, totalAmount: totalD });
+  }
 
-  const sectorCtxJ = getSectorContext(params.sector, params.taxRegime, params.activity);
-  const enabledOps: string[] = [
-    "facturas de compra y venta",
-    "cobros y pagos a clientes/proveedores",
-  ];
-  if (params.includePayroll !== false) enabledOps.push("nóminas y SS (ver MODELO NÓMINAS abajo)");
-  if (params.includeTaxLiquidation !== false) enabledOps.push("liquidaciones trimestrales de " + params.taxRegime + " (Mod.303/420) y Mod.111 IRPF retenciones");
-  if (params.includeBankLoan !== false) enabledOps.push("cuotas del préstamo bancario: DEBE 5200 (capital amortizado CP) + 662 (intereses), HABER 572. Reclasificación 31/12: DEBE 170, HABER 5200");
-  if (params.includeMortgage) enabledOps.push("cuotas de hipoteca: DEBE 5200 (capital amortizado CP) + 662 (intereses), HABER 572. Reclasificación 31/12: DEBE 170, HABER 5200");
-  if (params.includeCreditPolicy !== false) enabledOps.push("disposición y liquidación de póliza de crédito");
-  if (params.includeFixedAssets !== false) enabledOps.push("amortizaciones de inmovilizado");
-  enabledOps.push("gastos generales (suministros, seguros, servicios bancarios)");
-  if (params.sector !== "Servicios") enabledOps.push("variación de existencias");
-
-  const ENTRIES_PER_CHUNK = 20;
-  const chunks: Array<{ start: string; end: string; count: number }> = [];
-
-  if (totalTarget <= ENTRIES_PER_CHUNK) {
-    chunks.push({ start: periodStart, end: periodEnd, count: totalTarget });
-  } else {
-    const numChunks = Math.ceil(totalTarget / ENTRIES_PER_CHUNK);
-    const monthsPerChunk = Math.max(1, Math.floor(numMonths / numChunks));
-    const startDate = new Date(periodStart);
-    const endDateFull = new Date(periodEnd);
-    let remaining = totalTarget;
-
-    for (let i = 0; i < numChunks; i++) {
-      const chunkStart = new Date(startDate);
-      chunkStart.setMonth(chunkStart.getMonth() + i * monthsPerChunk);
-      if (chunkStart > endDateFull) break;
-
-      let chunkEnd: Date;
-      if (i === numChunks - 1) {
-        chunkEnd = endDateFull;
-      } else {
-        chunkEnd = new Date(startDate);
-        chunkEnd.setMonth(chunkEnd.getMonth() + (i + 1) * monthsPerChunk);
-        chunkEnd.setDate(chunkEnd.getDate() - 1);
-        if (chunkEnd > endDateFull) chunkEnd = endDateFull;
-      }
-
-      const chunkCount = (i === numChunks - 1)
-        ? remaining
-        : Math.min(ENTRIES_PER_CHUNK, remaining);
-      remaining -= chunkCount;
-
-      chunks.push({
-        start: chunkStart.toISOString().slice(0, 10),
-        end: chunkEnd.toISOString().slice(0, 10),
-        count: chunkCount,
-      });
+  function copyEntry(date: string, concept: string, doc: string, src: Record<string, unknown>) {
+    const debits = Array.isArray(src.accountDebits) ? (src.accountDebits as any[]).map((d: any) => ({
+      accountCode: String(d.accountCode ?? ""), accountName: String(d.accountName ?? ""), amount: Number(d.amount ?? 0)
+    })) : [];
+    const credits = Array.isArray(src.accountCredits) ? (src.accountCredits as any[]).map((c: any) => ({
+      accountCode: String(c.accountCode ?? ""), accountName: String(c.accountName ?? ""), amount: Number(c.amount ?? 0)
+    })) : [];
+    if (debits.length > 0 && credits.length > 0) {
+      addEntry(date, concept, doc, debits, credits);
     }
   }
 
-  console.log(`[journal] Total: ${totalTarget} asientos en ${chunks.length} lotes`);
+  const taxRegime = String((universe.companyProfile as any)?.taxRegime ?? "IVA");
+  const taxAcctRep = taxRegime === "IGIC" ? "477" : "477";
+  const taxAcctSop = taxRegime === "IGIC" ? "472" : "472";
+  const taxName = taxRegime;
 
-  const payrollInstructions = params.includePayroll !== false ? `
-MODELO NÓMINAS — ASIENTOS OBLIGATORIOS CADA MES (PGC):
-A) Devengo nómina (último día del mes):
-   DEBE: 640 "Sueldos y salarios" (bruto total)
-   DEBE: 642 "SS a cargo de la empresa" (cuota patronal ≈30.40% del bruto)
-   HABER: 476 "Organismos SS acreedores" (cuota obrera 6.35% + cuota patronal 30.40%)
-   HABER: 4751 "HP acreedora retenciones IRPF" (retención IRPF según tipo del trabajador)
-   HABER: 465 "Remuneraciones pendientes de pago" (salario neto = bruto − SS obrera − IRPF)
-B) Pago nómina (mismo día o primero del mes siguiente):
-   DEBE: 465 "Remuneraciones pendientes de pago" (neto)
-   HABER: 572 "Bancos c/c" (neto transferido)
-C) Pago TC1 Seguridad Social (mes siguiente al devengo):
-   DEBE: 476 "Organismos SS acreedores" (cuota obrera + patronal)
-   HABER: 572 "Bancos c/c" (adeudo TGSS)
-D) Pago Mod.111 retenciones IRPF (trimestral: 20 abril, julio, octubre, enero):
-   DEBE: 4751 "HP acreedora retenciones IRPF" (acumulado trimestre)
-   HABER: 572 "Bancos c/c"
-IMPORTANTE: La cuenta 476 recoge TODA la cuota (obrera+patronal). La 4751 recoge las retenciones de IRPF practicadas. NO mezcles estas cuentas.` : "";
+  const invoices = Array.isArray(universe.invoices) ? universe.invoices as Record<string, unknown>[] : [];
+  for (const inv of invoices) {
+    const ref = String(inv.invoiceNumber ?? "");
+    const date = String(inv.date ?? "");
+    const isSale = inv.type === "sale";
 
-  const taxInstructions = params.includeTaxLiquidation !== false ? `
-MODELO LIQUIDACIÓN ${params.taxRegime} (Mod.${params.taxRegime === "IGIC" ? "420" : "303"}) — TRIMESTRAL:
-   DEBE: 477 "${params.taxRegime} repercutido" (total del trimestre)
-   HABER: 472 "${params.taxRegime} soportado" (total del trimestre)
-   HABER: 4750 "HP acreedora por ${params.taxRegime}" (diferencia 477−472 si positiva)
-   Pago: DEBE 4750, HABER 572` : "";
+    if (Array.isArray(inv.accountDebits) && Array.isArray(inv.accountCredits)) {
+      copyEntry(date, isSale ? `Venta ${String(inv.partyName ?? "").substring(0, 25)}` : `Compra ${String(inv.partyName ?? "").substring(0, 25)}`, ref, inv);
+    } else {
+      const total = Number(inv.total ?? 0);
+      const taxBase = Number(inv.taxBase ?? 0);
+      const taxAmount = Number(inv.taxAmount ?? 0);
+      const irpfAmount = Number(inv.irpfAmount ?? 0);
+      const party = String(inv.partyName ?? "");
+      const partyAcct = isSale ? "430" : "400";
 
-  const docCtx = documentContext || "";
-
-  const basePrompt = (chunkStart: string, chunkEnd: string, count: number, startNum: number, validRefsList: string) =>
-    `Genera el LIBRO DIARIO (journalEntries) del universo contable.
-
-EMPRESA: ${sc}
-PERÍODO DE ESTOS ASIENTOS: ${chunkStart} a ${chunkEnd}
-NIVEL: ${level === "Superior" ? "FP Grado Superior (incluye periodificaciones, ajustes de ejercicio)" : "FP Grado Medio"}
-
-SECTOR ${getActivityLabel(params).toUpperCase()} — CUENTAS OBLIGATORIAS:
-- Ventas: cuenta ${sectorCtxJ.saleAccount.code} (${sectorCtxJ.saleAccount.name}) — NO usar 700 si el sector es Servicios o Hostelería
-- Compras: cuenta ${sectorCtxJ.purchaseAccount.code} (${sectorCtxJ.purchaseAccount.name})
-${params.sector === "Servicios" ? "- Esta empresa NO vende bienes físicos — los asientos de ventas deben reflejar servicios prestados (705)" : ""}
-
-OPERACIONES: ${enabledOps.join(", ")}
-${payrollInstructions}${taxInstructions}
-${docCtx}${validRefsList}
-
-Genera EXACTAMENTE ${count} asientos del ${chunkStart} al ${chunkEnd}. Numera desde ${startNum}.
-
-⚠️ REGLA CRÍTICA: CADA asiento DEBE corresponder a un documento REAL de los listados arriba.
-El campo "document" DEBE contener una referencia EXACTA de la lista de REFERENCIAS VÁLIDAS.
-NO inventes documentos, facturas, nóminas, recibos u operaciones que NO estén en la lista.
-Si necesitas más asientos, repite operaciones del mismo documento con fechas distintas (ej: pago parcial, devengo, cobro).
-
-JSON: {"journalEntries":[{"entryNumber":"${startNum}","date":"YYYY-MM-DD","concept":"Máx 6 palabras","document":"REF-del-documento","debits":[{"accountCode":"XXX","accountName":"Cuenta PGC","amount":0.00}],"credits":[{"accountCode":"XXX","accountName":"Cuenta PGC","amount":0.00}],"totalAmount":0.00}]}
-
-REGLAS:
-- sum(débitos)=sum(créditos)=totalAmount en cada asiento
-- Orden cronológico, cuentas PGC ${params.accountDigits && params.accountDigits > 4 ? `${params.accountDigits} dígitos (subcuentas). Si conoces la subcuenta usa el código largo, si no usa 3-4 dígitos base del PGC` : '3-4 dígitos'}
-- Nóminas: SIEMPRE 2 líneas al debe (640+642) y 3 al haber (476+4751+465). Pago nómina: 465 debe, 572 haber
-- Otros asientos: máx 3 líneas débito y 3 crédito
-- NO campo "description" — solo accountCode, accountName, amount
-- Conceptos breves (máx 6 palabras)
-- PROHIBIDO inventar documentos — usar SOLO referencias de la lista proporcionada`;
-
-  const validRefs = universe ? buildValidDocumentRefs(universe) : new Set<string>();
-  const validRefsList = universe ? buildValidRefsList(universe) : "";
-
-  const allEntries: unknown[] = [];
-  let startNum = 1;
-
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-    let remaining = chunk.count;
-    let chunkStart = chunk.start;
-    let attempt = 0;
-    const maxAttempts = 3;
-
-    while (remaining > 0 && attempt < maxAttempts) {
-      if (onProgress) onProgress(`Libro diario: lote ${i + 1} de ${chunks.length} (asientos ${startNum}–${startNum + remaining - 1})${attempt > 0 ? ` (reintento ${attempt})` : ''}`);
-      console.log(`[journal] Lote ${i + 1}/${chunks.length}: ${chunkStart} a ${chunk.end}, ${remaining} asientos (desde #${startNum})${attempt > 0 ? ` retry=${attempt}` : ''}`);
-      const result = await callAI(client, model, basePrompt(chunkStart, chunk.end, remaining, startNum, validRefsList), 8192) as Record<string, unknown>;
-      const entries = (result as { journalEntries?: unknown[] }).journalEntries;
-      if (Array.isArray(entries) && entries.length > 0) {
-        for (const e of entries) {
-          const entry = e as Record<string, unknown>;
-          const sanitizeLines = (lines: unknown) => {
-            if (!Array.isArray(lines)) return [];
-            for (const l of lines) {
-              const line = l as Record<string, unknown>;
-              if (!line.accountCode || line.accountCode === "undefined") line.accountCode = "";
-              if (!line.accountName || line.accountName === "undefined") line.accountName = "";
-              line.accountCode = String(line.accountCode);
-              line.accountName = String(line.accountName);
-              line.amount = Number(line.amount ?? 0);
-            }
-            return lines;
-          };
-          entry.debits = sanitizeLines(entry.debits);
-          entry.credits = sanitizeLines(entry.credits);
-          if (!entry.concept || entry.concept === "undefined") entry.concept = "";
-          if (!entry.document || entry.document === "undefined") entry.document = "";
-        }
-        const filtered = entries.filter(e => {
-          const entry = e as Record<string, unknown>;
-          return entryMatchesDocument(entry, validRefs);
-        });
-        const dropped = entries.length - filtered.length;
-        if (dropped > 0) {
-          console.warn(`[journal] Lote ${i + 1}: descartados ${dropped} asientos con documentos inventados`);
-        }
-        allEntries.push(...filtered);
-        startNum += filtered.length;
-        remaining -= filtered.length;
+      if (isSale) {
+        addEntry(date, `Venta ${party}`.substring(0, 40), ref,
+          [{ accountCode: partyAcct, accountName: "Clientes", amount: total }],
+          [
+            { accountCode: "700", accountName: "Ventas de mercaderías", amount: taxBase },
+            ...(taxAmount > 0 ? [{ accountCode: taxAcctRep, accountName: `${taxName} repercutido`, amount: taxAmount }] : []),
+          ]);
       } else {
-        break;
+        addEntry(date, `Compra ${party}`.substring(0, 40), ref,
+          [
+            { accountCode: "600", accountName: "Compras de mercaderías", amount: taxBase },
+            ...(taxAmount > 0 ? [{ accountCode: taxAcctSop, accountName: `${taxName} soportado`, amount: taxAmount }] : []),
+          ],
+          [
+            { accountCode: partyAcct, accountName: "Proveedores", amount: total - irpfAmount },
+            ...(irpfAmount > 0 ? [{ accountCode: "4751", accountName: "HP acreedora retenciones IRPF", amount: irpfAmount }] : []),
+          ]);
       }
-      attempt++;
-    }
-    if (remaining > 0) {
-      console.warn(`[journal] Lote ${i + 1}: faltan ${remaining} asientos tras ${attempt} intentos`);
     }
   }
 
+  const paymentReceipts = Array.isArray(universe.paymentReceipts) ? universe.paymentReceipts as Record<string, unknown>[] : [];
+  for (const pr of paymentReceipts) {
+    const ref = String(pr.receiptNumber ?? "");
+    const date = String(pr.date ?? "");
+    const type = String(pr.type ?? "cobro");
+    const party = String(pr.partyName ?? "");
+    const amount = Number(pr.amount ?? 0);
+
+    if (Array.isArray(pr.accountDebits) && Array.isArray(pr.accountCredits)) {
+      copyEntry(date, type === "cobro" ? `Cobro ${party}`.substring(0, 40) : `Pago ${party}`.substring(0, 40), ref, pr);
+    } else {
+      if (type === "cobro") {
+        addEntry(date, `Cobro ${party}`.substring(0, 40), ref,
+          [{ accountCode: "572", accountName: "Bancos c/c", amount }],
+          [{ accountCode: "430", accountName: "Clientes", amount }]);
+      } else {
+        addEntry(date, `Pago ${party}`.substring(0, 40), ref,
+          [{ accountCode: "400", accountName: "Proveedores", amount }],
+          [{ accountCode: "572", accountName: "Bancos c/c", amount }]);
+      }
+    }
+  }
+
+  const svcInvoices = Array.isArray(universe.serviceInvoices) ? universe.serviceInvoices as Record<string, unknown>[] : [];
+  for (const si of svcInvoices) {
+    const ref = String(si.invoiceNumber ?? "");
+    const date = String(si.date ?? "");
+    const provider = String(si.provider ?? "");
+    copyEntry(date, `Gasto ${provider}`.substring(0, 40), ref, si);
+  }
+
+  const insurance = Array.isArray(universe.insurancePolicies) ? universe.insurancePolicies as Record<string, unknown>[] : [];
+  for (const pol of insurance) {
+    const ref = String(pol.policyNumber ?? "");
+    const date = String(pol.startDate ?? "");
+    copyEntry(date, `Seguro ${String(pol.type ?? "")}`.substring(0, 40), ref, pol);
+  }
+
+  const casualty = universe.casualtyEvent as Record<string, unknown> | undefined;
+  if (casualty && casualty.date) {
+    copyEntry(String(casualty.date), "Siniestro", "Siniestro", casualty);
+  }
+
+  const extraordinary = Array.isArray(universe.extraordinaryExpenses) ? universe.extraordinaryExpenses as Record<string, unknown>[] : [];
+  for (const ex of extraordinary) {
+    const ref = `${ex.type}-${ex.date}`;
+    const date = String(ex.date ?? "");
+    copyEntry(date, String(ex.concept ?? ex.type ?? "Gasto extraordinario").substring(0, 40), ref, ex);
+  }
+
+  const payroll = universe.payroll as Record<string, unknown> | undefined;
+  if (payroll) {
+    const monthLabel = String(payroll.month ?? "");
+    const totalGross = Number(payroll.totalGross ?? 0);
+    const ssEmployer = Number(payroll.totalSsEmployer ?? payroll.ssEmployerAmount ?? 0);
+    const ssEmployee = Number(payroll.totalSsEmployee ?? payroll.ssEmployeeAmount ?? 0);
+    const irpfTotal = Number(payroll.totalIrpf ?? payroll.irpfAmount ?? 0);
+    const netPay = Number(payroll.totalNetSalary ?? payroll.netPay ?? payroll.totalNet ?? 0);
+    const ssTotal = r2(ssEmployee + ssEmployer);
+    const paymentDate = String(payroll.paymentDate ?? "");
+
+    if (totalGross > 0) {
+      const devDate = paymentDate || `${params.year}-01-28`;
+      const payDate = (() => {
+        if (paymentDate) return paymentDate;
+        try {
+          const d = new Date(devDate);
+          d.setMonth(d.getMonth() + 1);
+          d.setDate(1);
+          return d.toISOString().slice(0, 10);
+        } catch { return devDate; }
+      })();
+
+      addEntry(devDate, `Devengo nómina ${monthLabel}`, `Nómina ${monthLabel}`,
+        [
+          { accountCode: "640", accountName: "Sueldos y salarios", amount: totalGross },
+          { accountCode: "642", accountName: "SS a cargo de la empresa", amount: ssEmployer },
+        ],
+        [
+          { accountCode: "476", accountName: "Organismos SS acreedores", amount: ssTotal },
+          ...(irpfTotal > 0 ? [{ accountCode: "4751", accountName: "HP acreedora retenciones IRPF", amount: irpfTotal }] : []),
+          { accountCode: "465", accountName: "Remuneraciones pendientes de pago", amount: netPay },
+        ]);
+
+      addEntry(payDate, `Pago nómina ${monthLabel}`, `Nómina ${monthLabel}`,
+        [{ accountCode: "465", accountName: "Remuneraciones pendientes de pago", amount: netPay }],
+        [{ accountCode: "572", accountName: "Bancos c/c", amount: netPay }]);
+    }
+  }
+
+  const ssPayments = Array.isArray(universe.socialSecurityPayments) ? universe.socialSecurityPayments as Record<string, unknown>[] : [];
+  for (const ss of ssPayments) {
+    const ref = `TC1-${ss.month}`;
+    const date = String(ss.dueDate ?? "");
+    const total = Number(ss.totalPayment ?? 0);
+    if (total > 0 && date) {
+      if (Array.isArray(ss.accountDebits) && Array.isArray(ss.accountCredits)) {
+        copyEntry(date, `Pago TC1 ${ss.month}`, ref, ss);
+      } else {
+        addEntry(date, `Pago TC1 ${ss.month}`, ref,
+          [{ accountCode: "476", accountName: "Organismos SS acreedores", amount: total }],
+          [{ accountCode: "572", accountName: "Bancos c/c", amount: total }]);
+      }
+    }
+  }
+
+  const taxLiq = Array.isArray(universe.taxLiquidations) ? universe.taxLiquidations as Record<string, unknown>[] : [];
+  for (const tx of taxLiq) {
+    const model = String(tx.model ?? "303");
+    const period = String(tx.period ?? "");
+    const ref = `Mod.${model}-${period}`;
+    const date = String(tx.dueDate ?? tx.paymentDate ?? "");
+    const taxCollected = Number(tx.taxCollected ?? tx.ivaRepercutido ?? 0);
+    const taxDeducted = Number(tx.taxDeducted ?? tx.ivaSoportado ?? 0);
+    const result = r2(taxCollected - taxDeducted);
+
+    if (taxCollected > 0 || taxDeducted > 0) {
+      if (result > 0) {
+        addEntry(date, `Liquidación ${taxName} ${period}`, ref,
+          [{ accountCode: "477", accountName: `${taxName} repercutido`, amount: taxCollected }],
+          [
+            { accountCode: "472", accountName: `${taxName} soportado`, amount: taxDeducted },
+            { accountCode: "4750", accountName: `HP acreedora por ${taxName}`, amount: result },
+          ]);
+        const payDate = (() => {
+          const d = new Date(date);
+          d.setDate(d.getDate() + 5);
+          return d.toISOString().slice(0, 10);
+        })();
+        addEntry(payDate, `Pago ${taxName} ${period}`, ref,
+          [{ accountCode: "4750", accountName: `HP acreedora por ${taxName}`, amount: result }],
+          [{ accountCode: "572", accountName: "Bancos c/c", amount: result }]);
+      } else {
+        addEntry(date, `Liquidación ${taxName} ${period}`, ref,
+          [
+            { accountCode: "477", accountName: `${taxName} repercutido`, amount: taxCollected },
+            { accountCode: "4700", accountName: `HP deudora por ${taxName}`, amount: Math.abs(result) },
+          ],
+          [{ accountCode: "472", accountName: `${taxName} soportado`, amount: taxDeducted }]);
+      }
+    }
+
+    if (model === "111") {
+      const irpfAmount = Number(tx.irpfAmount ?? tx.totalIrpf ?? tx.amount ?? 0);
+      if (irpfAmount > 0) {
+        addEntry(date, `Liquidación IRPF ${period}`, ref,
+          [{ accountCode: "4751", accountName: "HP acreedora retenciones IRPF", amount: irpfAmount }],
+          [{ accountCode: "572", accountName: "Bancos c/c", amount: irpfAmount }]);
+      }
+    }
+  }
+
+  const loan = universe.bankLoan as Record<string, unknown> | undefined;
+  if (loan) {
+    const loanNum = String(loan.loanNumber ?? "");
+    if (loan.formalizationEntry && typeof loan.formalizationEntry === "object") {
+      const fe = loan.formalizationEntry as Record<string, unknown>;
+      const feDate = String(fe.date ?? loan.startDate ?? "");
+      copyEntry(feDate, "Formalización préstamo", loanNum, fe);
+    }
+    if (loan.installmentEntry && typeof loan.installmentEntry === "object") {
+      const ie = loan.installmentEntry as Record<string, unknown>;
+      const amortTable = Array.isArray(loan.amortizationTable) ? loan.amortizationTable as Record<string, unknown>[] : [];
+      if (amortTable.length > 0) {
+        for (const cuota of amortTable) {
+          const date = String(cuota.date ?? cuota.paymentDate ?? "");
+          const principal = Number(cuota.principal ?? 0);
+          const interest = Number(cuota.interest ?? 0);
+          const total = r2(principal + interest);
+          if (date && total > 0) {
+            addEntry(date, "Cuota préstamo", loanNum,
+              [
+                { accountCode: "5200", accountName: "Préstamos a CP de entidades de crédito", amount: principal },
+                { accountCode: "662", accountName: "Intereses de deudas", amount: interest },
+              ],
+              [{ accountCode: "572", accountName: "Bancos c/c", amount: total }]);
+          }
+        }
+      } else {
+        const ieDate = String(ie.date ?? "");
+        copyEntry(ieDate, "Cuota préstamo", loanNum, ie);
+      }
+    }
+    if (loan.reclassificationEntry && typeof loan.reclassificationEntry === "object") {
+      const re = loan.reclassificationEntry as Record<string, unknown>;
+      const reDate = String(re.date ?? `${params.year}-12-31`);
+      copyEntry(reDate, "Reclasificación LP→CP préstamo", loanNum, re);
+    }
+  }
+
+  const mortgage = universe.mortgage as Record<string, unknown> | undefined;
+  if (mortgage) {
+    const mortNum = String(mortgage.loanNumber ?? "");
+    const mortFormEntry = (mortgage.acquisitionEntry ?? mortgage.formalizationEntry) as Record<string, unknown> | undefined;
+    if (mortFormEntry && typeof mortFormEntry === "object") {
+      copyEntry(String(mortFormEntry.date ?? mortgage.startDate ?? ""), "Adquisición con hipoteca", mortNum, mortFormEntry);
+    }
+    const mortAmort = Array.isArray(mortgage.amortizationTable) ? mortgage.amortizationTable as Record<string, unknown>[] : [];
+    if (mortAmort.length > 0) {
+      for (const cuota of mortAmort) {
+        const date = String(cuota.date ?? cuota.paymentDate ?? "");
+        const principal = Number(cuota.principal ?? 0);
+        const interest = Number(cuota.interest ?? 0);
+        const total = r2(principal + interest);
+        if (date && total > 0) {
+          addEntry(date, "Cuota hipoteca", mortNum,
+            [
+              { accountCode: "5200", accountName: "Préstamos a CP de entidades de crédito", amount: principal },
+              { accountCode: "662", accountName: "Intereses de deudas", amount: interest },
+            ],
+            [{ accountCode: "572", accountName: "Bancos c/c", amount: total }]);
+        }
+      }
+    } else if (mortgage.installmentEntry && typeof mortgage.installmentEntry === "object") {
+      copyEntry(String((mortgage.installmentEntry as any).date ?? ""), "Cuota hipoteca", mortNum, mortgage.installmentEntry as Record<string, unknown>);
+    }
+    if (mortgage.reclassificationEntry && typeof mortgage.reclassificationEntry === "object") {
+      const re = mortgage.reclassificationEntry as Record<string, unknown>;
+      copyEntry(String(re.date ?? `${params.year}-12-31`), "Reclasificación LP→CP hipoteca", mortNum, re);
+    }
+  }
+
+  const creditPolicy = universe.creditPolicy as Record<string, unknown> | undefined;
+  if (creditPolicy) {
+    const cpRef = String(creditPolicy.policyNumber ?? "");
+    const drawn = Number(creditPolicy.drawnAmount ?? creditPolicy.drawn ?? 0);
+    const intRate = Number(creditPolicy.interestRate ?? 0);
+    const startDate = String(creditPolicy.startDate ?? `${params.year}-01-15`);
+    if (drawn > 0) {
+      addEntry(startDate, "Disposición póliza crédito", cpRef,
+        [{ accountCode: "572", accountName: "Bancos c/c", amount: drawn }],
+        [{ accountCode: "5201", accountName: "Deudas a c/p por crédito dispuesto", amount: drawn }]);
+      const interest = r2(drawn * (intRate / 100) * 0.25);
+      const fee = r2(drawn * 0.0025);
+      if (interest > 0 || fee > 0) {
+        const liqDate = (() => {
+          const d = new Date(startDate);
+          d.setMonth(d.getMonth() + 3);
+          return d.toISOString().slice(0, 10);
+        })();
+        addEntry(liqDate, "Liquidación intereses póliza", cpRef,
+          [
+            { accountCode: "662", accountName: "Intereses de deudas", amount: interest },
+            ...(fee > 0 ? [{ accountCode: "626", accountName: "Servicios bancarios", amount: fee }] : []),
+          ],
+          [{ accountCode: "572", accountName: "Bancos c/c", amount: r2(interest + fee) }]);
+      }
+    }
+  }
+
+  const fixedAssets = Array.isArray(universe.fixedAssets) ? universe.fixedAssets as Record<string, unknown>[] : [];
+  for (const fa of fixedAssets) {
+    const code = String(fa.code ?? "");
+    const ref = `Amort-${code}`;
+    if (Array.isArray(fa.accountDebits) && Array.isArray(fa.accountCredits)) {
+      copyEntry(`${params.year}-12-31`, `Amortización ${code}`, ref, fa);
+    } else {
+      const annualAmort = Number(fa.annualAmortization ?? fa.periodAmortization ?? 0);
+      if (annualAmort > 0) {
+        addEntry(`${params.year}-12-31`, `Amortización ${code}`, ref,
+          [{ accountCode: "681", accountName: "Amortización inmovilizado material", amount: annualAmort }],
+          [{ accountCode: String(fa.amortAccountCode ?? "281"), accountName: String(fa.amortAccountName ?? "Amort. acum. inmov. material"), amount: annualAmort }]);
+      }
+    }
+  }
+
+  const card = universe.creditCardStatement as Record<string, unknown> | undefined;
+  if (card) {
+    const movements = Array.isArray(card.movements) ? card.movements as Record<string, unknown>[] : [];
+    for (const mov of movements) {
+      const date = String(mov.date ?? "");
+      const amount = Number(mov.amount ?? 0);
+      const desc = String(mov.description ?? mov.category ?? "Gasto tarjeta");
+      const acctCode = String(mov.accountCode ?? "629");
+      const acctName = String(mov.accountName ?? "Otros servicios");
+      if (amount > 0 && date) {
+        addEntry(date, desc.substring(0, 40), "Tarjeta-liquidación",
+          [{ accountCode: acctCode, accountName: acctName, amount }],
+          [{ accountCode: "410", accountName: "Acreedores por prestaciones de servicios", amount }]);
+      }
+    }
+    const totalCharges = Number(card.totalCharges ?? 0);
+    const settlementDate = String(card.settlementDate ?? `${params.year}-12-31`);
+    if (totalCharges > 0) {
+      addEntry(settlementDate, "Liquidación tarjeta bancaria", "Tarjeta-liquidación",
+        [{ accountCode: "410", accountName: "Acreedores por prestaciones de servicios", amount: totalCharges }],
+        [{ accountCode: "572", accountName: "Bancos c/c", amount: totalCharges }]);
+    }
+  }
+
+  const shareholdersInfo = universe.shareholdersInfo as Record<string, unknown> | undefined;
+  if (shareholdersInfo && shareholdersInfo.accountDebits) {
+    const date = String(shareholdersInfo.constitutionDate ?? `${params.year}-01-01`);
+    copyEntry(date, "Constitución capital social", "Capital social", shareholdersInfo);
+  }
+
+  const initialBS = universe.initialBalanceSheet as Record<string, unknown> | undefined;
+  if (initialBS && initialBS.accountDebits) {
+    copyEntry(`${params.year}-01-01`, "Asiento de apertura", "Asiento apertura", initialBS);
+  }
+
+  const dividends = universe.dividendDistribution as Record<string, unknown> | undefined;
+  if (dividends && dividends.accountDebits) {
+    const date = String(dividends.date ?? dividends.approvalDate ?? `${params.year}-06-30`);
+    copyEntry(date, "Distribución dividendos", "Dividendos", dividends);
+  }
+
+  entries.sort((a, b) => a.date.localeCompare(b.date));
   let num = 1;
-  for (const entry of allEntries) {
-    (entry as Record<string, unknown>).entryNumber = String(num);
-    num++;
+  for (const e of entries) {
+    e.entryNumber = String(num++);
   }
 
-  const finalEntries = universe ? addMissingDocumentEntries(allEntries, universe) : allEntries;
-
-  console.log(`[journal] Total generados: ${finalEntries.length} asientos (${finalEntries.length - allEntries.length} añadidos por documentos sin asiento)`);
-  return { journalEntries: finalEntries };
+  console.log(`[journal] Diario determinista: ${entries.length} asientos generados desde documentos reales`);
+  return { journalEntries: entries };
 }
 
 // ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
@@ -2240,13 +2430,12 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
   universe.paymentReceipts = buildPaymentReceipts(universe, scenario);
   universe.bankStatements = buildBankStatements(universe, scenario, params);
 
-  progress("Generando libro diario (basado en documentos reales)...");
-  const documentContext = buildDocumentSummary(universe);
-  console.log(`[journal] Contexto de documentos: ${documentContext.length} chars`);
-  const journalBlock = await generateJournalBlock(params, scenario, client, model, progress, documentContext, universe);
+  progress("Construyendo libro diario desde documentos...");
+  const journalBlock = buildDeterministicJournal(universe, params);
   if (journalBlock && typeof journalBlock === "object") {
     Object.assign(universe, journalBlock);
   }
+  console.log(`[journal] Diario completado: ${(journalBlock.journalEntries || []).length} asientos`);
   progress("Libro diario completado");
 
   // Compute warehouse cards (fichas de almacén) from invoices + inventory
