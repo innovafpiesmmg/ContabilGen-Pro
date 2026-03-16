@@ -378,7 +378,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -386,7 +386,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     }),
@@ -416,7 +416,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -424,7 +424,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     })
@@ -456,7 +456,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -464,7 +464,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     })
@@ -488,7 +488,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -496,7 +496,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     })
@@ -524,7 +524,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -532,7 +532,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     })
@@ -555,7 +555,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -563,7 +563,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       }),
@@ -583,7 +583,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -591,7 +591,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     })
@@ -626,7 +626,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -634,7 +634,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     })
@@ -661,7 +661,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -669,7 +669,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       }),
@@ -694,7 +694,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -702,7 +702,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       }),
@@ -735,7 +735,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -743,7 +743,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       }),
@@ -799,7 +799,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -807,7 +807,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     })
@@ -878,7 +878,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -886,7 +886,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     })
@@ -929,7 +929,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -937,7 +937,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     })
@@ -988,7 +988,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       accountCredits: zod.array(
@@ -996,7 +996,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
     })
@@ -1033,7 +1033,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       credits: zod.array(
@@ -1041,7 +1041,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string(),
+          description: zod.string().optional(),
         }),
       ),
       totalAmount: zod.number(),
@@ -1177,7 +1177,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1185,7 +1185,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       }),
@@ -1215,7 +1215,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1223,7 +1223,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -1255,7 +1255,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1263,7 +1263,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -1287,7 +1287,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1295,7 +1295,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -1323,7 +1323,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1331,7 +1331,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -1354,7 +1354,7 @@ export const SaveGenerationBody = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
           accountCredits: zod.array(
@@ -1362,7 +1362,7 @@ export const SaveGenerationBody = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
         }),
@@ -1382,7 +1382,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1390,7 +1390,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -1425,7 +1425,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1433,7 +1433,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -1460,7 +1460,7 @@ export const SaveGenerationBody = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
           accountCredits: zod.array(
@@ -1468,7 +1468,7 @@ export const SaveGenerationBody = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
         }),
@@ -1493,7 +1493,7 @@ export const SaveGenerationBody = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
           accountCredits: zod.array(
@@ -1501,7 +1501,7 @@ export const SaveGenerationBody = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
         }),
@@ -1534,7 +1534,7 @@ export const SaveGenerationBody = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
           accountCredits: zod.array(
@@ -1542,7 +1542,7 @@ export const SaveGenerationBody = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
         }),
@@ -1598,7 +1598,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1606,7 +1606,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -1679,7 +1679,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1687,7 +1687,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -1730,7 +1730,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1738,7 +1738,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -1793,7 +1793,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1801,7 +1801,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -1838,7 +1838,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         credits: zod.array(
@@ -1846,7 +1846,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         totalAmount: zod.number(),
@@ -1976,7 +1976,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -1984,7 +1984,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       }),
@@ -2014,7 +2014,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -2022,7 +2022,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -2054,7 +2054,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -2062,7 +2062,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -2086,7 +2086,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -2094,7 +2094,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -2122,7 +2122,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -2130,7 +2130,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -2153,7 +2153,7 @@ export const GetGenerationResponse = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
           accountCredits: zod.array(
@@ -2161,7 +2161,7 @@ export const GetGenerationResponse = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
         }),
@@ -2181,7 +2181,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -2189,7 +2189,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -2224,7 +2224,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -2232,7 +2232,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -2259,7 +2259,7 @@ export const GetGenerationResponse = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
           accountCredits: zod.array(
@@ -2267,7 +2267,7 @@ export const GetGenerationResponse = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
         }),
@@ -2292,7 +2292,7 @@ export const GetGenerationResponse = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
           accountCredits: zod.array(
@@ -2300,7 +2300,7 @@ export const GetGenerationResponse = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
         }),
@@ -2333,7 +2333,7 @@ export const GetGenerationResponse = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
           accountCredits: zod.array(
@@ -2341,7 +2341,7 @@ export const GetGenerationResponse = zod.object({
               accountCode: zod.string(),
               accountName: zod.string(),
               amount: zod.number(),
-              description: zod.string(),
+              description: zod.string().optional(),
             }),
           ),
         }),
@@ -2397,7 +2397,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -2405,7 +2405,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -2478,7 +2478,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -2486,7 +2486,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -2529,7 +2529,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -2537,7 +2537,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -2592,7 +2592,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         accountCredits: zod.array(
@@ -2600,7 +2600,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
       })
@@ -2637,7 +2637,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         credits: zod.array(
@@ -2645,7 +2645,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string(),
+            description: zod.string().optional(),
           }),
         ),
         totalAmount: zod.number(),
