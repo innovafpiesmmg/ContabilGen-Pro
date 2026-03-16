@@ -1815,7 +1815,9 @@ function parsePayrollDate(month: string, year: number): string {
     january:"01", february:"02", march:"03", april:"04", may:"05", june:"06",
     july:"07", august:"08", september:"09", october:"10", november:"11", december:"12",
   };
-  const lower = month.toLowerCase();
+  const lower = month.toLowerCase().trim();
+  const yymm = lower.match(/^(\d{4})-(\d{2})$/);
+  if (yymm) return `${yymm[1]}-${yymm[2]}-28`;
   for (const [name, num] of Object.entries(meses)) {
     if (lower.includes(name)) {
       const yr = lower.match(/\d{4}/)?.[0] ?? String(year);
@@ -1896,35 +1898,43 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
       journalEntry: findJournalEntry(jLookup, inv.invoiceNumber, inv.date) });
   });
 
-  (universe.journalEntries ?? []).forEach((e) => {
-    events.push({ date: e.date, kind: "asiento", label: `Asiento ${e.entryNumber}`,
-      subtitle: e.concept, amount: e.totalAmount });
-  });
-
   (universe.bankStatements ?? []).forEach((bs) => {
-    (bs.transactions ?? []).forEach((t) => {
-      events.push({ date: t.date, kind: "banco", label: bs.bank,
-        subtitle: t.concept, amount: t.debit ?? t.credit ?? undefined,
+    const txs = bs.transactions ?? [];
+    if (txs.length > 0) {
+      const firstDate = txs.reduce((d, t) => t.date < d ? t.date : d, txs[0].date);
+      const totalMov = txs.reduce((s, t) => s + (t.debit ?? 0) + (t.credit ?? 0), 0);
+      events.push({ date: firstDate, kind: "banco",
+        label: `Extracto ${bs.bank || ""}`,
+        subtitle: `${bs.period || ""} — ${txs.length} movimientos`,
+        amount: totalMov,
         pdfGenerator: () => generateBankStatementPdf(bs, cp),
         pdfFilename: `Extracto_${safe(bs.bank || bs.period || "")}.pdf` });
-    });
+    }
   });
 
   if (universe.creditCardStatement) {
     const card = universe.creditCardStatement;
-    (card.movements ?? []).forEach((m) => {
-      events.push({ date: m.date, kind: "tarjeta", label: "Tarjeta crédito",
-        subtitle: m.description, amount: m.amount,
+    const movs = card.movements ?? [];
+    if (movs.length > 0) {
+      const firstDate = movs.reduce((d, m) => m.date < d ? m.date : d, movs[0].date);
+      const totalMov = movs.reduce((s, m) => s + (m.amount ?? 0), 0);
+      events.push({ date: firstDate, kind: "tarjeta",
+        label: "Extracto tarjeta crédito",
+        subtitle: `${card.statementPeriod || ""} — ${movs.length} cargos`,
+        amount: totalMov,
         pdfGenerator: () => generateCreditCardStatementPdf(card, cp),
         pdfFilename: `Extracto_Tarjeta_${safe(card.statementPeriod || "")}.pdf` });
-    });
+    }
   }
 
   if (universe.bankLoan) {
     const loan = universe.bankLoan;
-    (loan.amortizationTable ?? []).forEach((r) => {
+    const cuotas = loan.amortizationTable ?? [];
+    cuotas.forEach((r) => {
       events.push({ date: r.date, kind: "prestamo",
-        label: `Cuota ${r.period} préstamo`, subtitle: loan.entity, amount: r.installment,
+        label: `Cuota ${r.period} — ${loan.loanNumber || "Préstamo"}`,
+        subtitle: `${loan.entity} — Capital: ${formatEuro(r.principal ?? 0)} + Int: ${formatEuro(r.interest ?? 0)}`,
+        amount: r.installment,
         pdfGenerator: () => generateBankLoanPdf(loan, cp),
         pdfFilename: `Prestamo_${safe(loan.loanNumber || "")}.pdf` });
     });
@@ -1932,9 +1942,12 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
 
   if (universe.mortgage) {
     const mort = universe.mortgage;
-    (mort.amortizationTable ?? []).forEach((r) => {
+    const cuotas = mort.amortizationTable ?? [];
+    cuotas.forEach((r) => {
       events.push({ date: r.date, kind: "hipoteca",
-        label: `Cuota ${r.period} hipoteca`, subtitle: mort.entity, amount: r.installment,
+        label: `Cuota ${r.period} — ${mort.loanNumber || "Hipoteca"}`,
+        subtitle: `${mort.entity} — Capital: ${formatEuro(r.principal ?? 0)} + Int: ${formatEuro(r.interest ?? 0)}`,
+        amount: r.installment,
         pdfGenerator: () => generateMortgagePdf(mort, cp),
         pdfFilename: `Hipoteca_${safe(mort.loanNumber || "")}.pdf` });
     });
@@ -1954,10 +1967,19 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
       pdfFilename: `Mod${t.model || "303"}_${safe(t.period || "")}.pdf` });
   });
 
-  if (universe.payroll?.month) {
-    const yr = (universe.companyProfile?.fiscalYear as number) ?? new Date().getFullYear();
+  const yr = (universe.companyProfile?.fiscalYear as number) ?? new Date().getFullYear();
+  const monthlyPayrolls = (universe as any).monthlyPayrolls as Array<typeof universe.payroll> | undefined;
+  if (monthlyPayrolls?.length) {
+    monthlyPayrolls.forEach((pay) => {
+      if (!pay?.month) return;
+      events.push({ date: parsePayrollDate(pay.month, yr), kind: "nomina",
+        label: `Nómina ${pay.month}`, subtitle: `Bruto: ${formatEuro(pay.totalGross ?? 0)}`, amount: pay.totalGross,
+        pdfGenerator: () => generatePayrollPdf(pay, cp),
+        pdfFilename: `Nomina_${safe(pay.month || "")}.pdf` });
+    });
+  } else if (universe.payroll?.month) {
     events.push({ date: parsePayrollDate(universe.payroll.month, yr), kind: "nomina",
-      label: "Nómina", subtitle: universe.payroll.month, amount: universe.payroll.totalGross,
+      label: `Nómina ${universe.payroll.month}`, subtitle: `Bruto: ${formatEuro(universe.payroll.totalGross ?? 0)}`, amount: universe.payroll.totalGross,
       pdfGenerator: () => generatePayrollPdf(universe.payroll!, cp),
       pdfFilename: `Nomina_${safe(universe.payroll!.month || "")}.pdf` });
   }
@@ -2057,12 +2079,16 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
   });
 
   const journalEntries = universe.journalEntries ?? [];
+  const matchedEntryNumbers = new Set<string>();
+
+  const markMatched = (je: JournalEntry) => matchedEntryNumbers.add(String(je.entryNumber));
+
   events.forEach(ev => {
-    if (ev.kind === "asiento" || ev.journalEntry) return;
+    if (ev.journalEntry) { markMatched(ev.journalEntry); return; }
     const je = findJournalEntry(jLookup, ev.label, ev.date);
-    if (je) { ev.journalEntry = je; return; }
+    if (je) { ev.journalEntry = je; markMatched(je); return; }
     const byDate = journalEntries.filter(j => j.date === ev.date);
-    if (byDate.length === 1) { ev.journalEntry = byDate[0]; return; }
+    if (byDate.length === 1) { ev.journalEntry = byDate[0]; markMatched(byDate[0]); return; }
     const evLabel = (ev.label || "").toLowerCase();
     const conceptMatch = byDate.find(j => {
       if (evLabel && (j.concept || "").toLowerCase().includes(evLabel)) return true;
@@ -2070,8 +2096,45 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
       if (jDoc && evLabel && evLabel.includes(jDoc)) return true;
       return false;
     });
-    if (conceptMatch) ev.journalEntry = conceptMatch;
+    if (conceptMatch) { ev.journalEntry = conceptMatch; markMatched(conceptMatch); }
   });
+
+  const consolidatedKinds = new Set<EventKind>(["banco", "tarjeta"]);
+  journalEntries.forEach(je => {
+    if (matchedEntryNumbers.has(String(je.entryNumber))) return;
+    const concept = (je.concept || "").toLowerCase();
+    const doc = (je.document || "").toLowerCase();
+    for (const ev of events) {
+      if (!consolidatedKinds.has(ev.kind)) continue;
+      if (ev.kind === "banco") {
+        if (concept.includes("banco") || concept.includes("extracto") || concept.includes("572") ||
+            doc.includes("extracto") || /\b572\b/.test(concept)) {
+          markMatched(je);
+          return;
+        }
+      }
+      if (ev.kind === "tarjeta") {
+        if (concept.includes("tarjeta") || doc.includes("tarjeta") ||
+            concept.includes("liquidaci") || /\b410\b/.test(concept)) {
+          markMatched(je);
+          return;
+        }
+      }
+    }
+  });
+
+  journalEntries
+    .filter(je => !matchedEntryNumbers.has(String(je.entryNumber)))
+    .forEach(je => {
+      events.push({
+        date: je.date,
+        kind: "asiento",
+        label: `Asiento ${je.entryNumber}`,
+        subtitle: je.concept,
+        amount: je.totalAmount,
+        journalEntry: je,
+      });
+    });
 
   return events.filter(e => e.date && /^\d{4}-\d{2}-\d{2}/.test(e.date))
     .sort((a, b) => a.date.localeCompare(b.date));
@@ -2111,7 +2174,8 @@ export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data })
 
   const statGroups: { label: string; kinds: EventKind[]; color: string }[] = [
     { label: "Facturas", kinds: ["factura_compra","factura_venta","factura_rectif"], color: "text-orange-600" },
-    { label: "Asientos", kinds: ["asiento"], color: "text-slate-600" },
+    { label: "Cobros/Pagos", kinds: ["cobro","pago"], color: "text-blue-600" },
+    { label: "Suministros", kinds: ["suministro"], color: "text-lime-600" },
     { label: "Mov. bancarios", kinds: ["banco","nota_cargo"], color: "text-green-600" },
     { label: "Financiación", kinds: ["prestamo","hipoteca","poliza_credito"], color: "text-teal-600" },
     { label: "SS e Impuestos", kinds: ["ss","impuesto"], color: "text-red-600" },
@@ -2126,8 +2190,8 @@ export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data })
   return (
     <div className="space-y-6">
       <SectionTitle
-        title="Cronología de documentos"
-        description={`${events.length} documentos generados en ${months.length} mes${months.length !== 1 ? "es" : ""} — ordenados cronológicamente`}
+        title="Cronología del ejercicio"
+        description={`${events.length} operaciones en ${months.length} mes${months.length !== 1 ? "es" : ""} — cada documento incluye su asiento contable`}
       />
 
       {/* ── Summary stats ── */}
