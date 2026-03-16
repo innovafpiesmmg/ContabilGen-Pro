@@ -5,6 +5,40 @@ const A4H = 297;
 const M = 15;
 const CW = A4W - M * 2;
 
+type RGB = [number, number, number];
+
+const DOC_COLORS: Record<string, RGB> = {
+  comercial:     [34, 120, 74],
+  bancario:      [41, 65, 122],
+  laboral:       [180, 95, 20],
+  fiscal:        [160, 45, 45],
+  financiacion:  [90, 50, 130],
+  seguros:       [20, 115, 130],
+  patrimonio:    [140, 100, 30],
+  inmovilizado:  [70, 90, 110],
+  almacen:       [85, 110, 50],
+  diario:        [25, 50, 95],
+  extraordinario:[185, 70, 40],
+};
+
+let _activeColor: RGB = DOC_COLORS.bancario;
+
+function setDocColor(category: string) {
+  _activeColor = DOC_COLORS[category] ?? DOC_COLORS.bancario;
+}
+
+function getColor(): RGB {
+  return _activeColor;
+}
+
+function lightenColor(c: RGB, factor = 0.92): RGB {
+  return [
+    Math.round(c[0] + (255 - c[0]) * factor),
+    Math.round(c[1] + (255 - c[1]) * factor),
+    Math.round(c[2] + (255 - c[2]) * factor),
+  ];
+}
+
 interface CP {
   name: string;
   nif?: string;
@@ -35,8 +69,9 @@ function drawLine(doc: jsPDF, y: number) {
 }
 
 function headerBlock(doc: jsPDF, title: string, subtitle: string, cp: CP): number {
+  const c = getColor();
   let y = M;
-  doc.setFillColor(41, 65, 122);
+  doc.setFillColor(c[0], c[1], c[2]);
   doc.rect(0, 0, A4W, 32, "F");
 
   doc.setFont("helvetica", "bold");
@@ -64,9 +99,10 @@ function footer(doc: jsPDF, page: number, total: number) {
 }
 
 function sectionTitle(doc: jsPDF, y: number, text: string): number {
+  const c = getColor();
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  gray(doc, 41, 65, 122);
+  gray(doc, c[0], c[1], c[2]);
   doc.text(text, M, y);
   drawLine(doc, y + 2);
   return y + 8;
@@ -105,7 +141,8 @@ function fixupFooters(doc: jsPDF) {
 }
 
 function tableHeader(doc: jsPDF, y: number, cols: { label: string; x: number; w: number; align?: "left" | "right" | "center" }[]): number {
-  doc.setFillColor(41, 65, 122);
+  const c = getColor();
+  doc.setFillColor(c[0], c[1], c[2]);
   doc.rect(M, y - 4, CW, 7, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(7.5);
@@ -136,6 +173,7 @@ function tableRow(doc: jsPDF, y: number, cols: { x: number; w: number; align?: "
 }
 
 export function generateInvoicePdf(inv: any, cp: CP): Blob {
+  setDocColor("comercial");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const isSale = inv.type === "sale";
   const pageNum = { n: 1 };
@@ -188,7 +226,8 @@ export function generateInvoicePdf(inv: any, cp: CP): Blob {
   y = labelValue(doc, y, "Base Imponible:", fmt(inv.taxBase), summaryX, 30);
   y = labelValue(doc, y, "Impuesto:", fmt(inv.taxAmount), summaryX, 30);
 
-  doc.setFillColor(41, 65, 122);
+  const ic = getColor();
+  doc.setFillColor(ic[0], ic[1], ic[2]);
   doc.rect(summaryX - 2, y - 4, CW - summaryX + M + 2, 8, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
@@ -220,6 +259,7 @@ function translatePayment(m: string | undefined): string {
 }
 
 export function generateBankStatementPdf(stmt: any, cp: CP): Blob {
+  setDocColor("bancario");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageNum = { n: 1 };
 
@@ -256,7 +296,8 @@ export function generateBankStatementPdf(stmt: any, cp: CP): Blob {
 
   y += 6;
   drawLine(doc, y); y += 5;
-  doc.setFillColor(41, 65, 122);
+  const bsc = getColor();
+  doc.setFillColor(bsc[0], bsc[1], bsc[2]);
   doc.rect(M + 100, y - 4, CW - 100, 8, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
@@ -269,6 +310,7 @@ export function generateBankStatementPdf(stmt: any, cp: CP): Blob {
 }
 
 export function generatePayrollPdf(payroll: any, cp: CP): Blob {
+  setDocColor("laboral");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   let y = headerBlock(doc, "NÓMINA", payroll.month || "", cp);
@@ -299,7 +341,8 @@ export function generatePayrollPdf(payroll: any, cp: CP): Blob {
     y += 3;
     drawLine(doc, y); y += 5;
 
-    doc.setFillColor(41, 65, 122);
+    const pc = getColor();
+    doc.setFillColor(pc[0], pc[1], pc[2]);
     doc.rect(M, y - 4, CW, 10, "F");
     doc.setFont("helvetica", "bold"); doc.setFontSize(13);
     doc.setTextColor(255, 255, 255);
@@ -333,6 +376,7 @@ export function generatePayrollPdf(payroll: any, cp: CP): Blob {
 }
 
 export function generateSSPaymentPdf(ss: any, cp: CP): Blob {
+  setDocColor("laboral");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   let y = headerBlock(doc, "RECIBO TC1 — SEGURIDAD SOCIAL", ss.month || "", cp);
@@ -350,7 +394,8 @@ export function generateSSPaymentPdf(ss: any, cp: CP): Blob {
   y += 3;
 
   drawLine(doc, y); y += 5;
-  doc.setFillColor(41, 65, 122);
+  const sc = getColor();
+  doc.setFillColor(sc[0], sc[1], sc[2]);
   doc.rect(M, y - 4, CW, 10, "F");
   doc.setFont("helvetica", "bold"); doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
@@ -366,6 +411,7 @@ export function generateSSPaymentPdf(ss: any, cp: CP): Blob {
 }
 
 export function generateTaxLiquidationPdf(liq: any, cp: CP): Blob {
+  setDocColor("fiscal");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const model = liq.model || "303";
   const modelLabel = model === "IS" ? "Mod. 200 — Impuesto sobre Sociedades"
@@ -422,6 +468,7 @@ function translatePaymentType(t: string | undefined): string {
 }
 
 export function generateBankLoanPdf(loan: any, cp: CP): Blob {
+  setDocColor("financiacion");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageNum = { n: 1 };
 
@@ -467,6 +514,7 @@ export function generateBankLoanPdf(loan: any, cp: CP): Blob {
 }
 
 export function generateMortgagePdf(mortgage: any, cp: CP): Blob {
+  setDocColor("financiacion");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageNum = { n: 1 };
 
@@ -514,6 +562,7 @@ export function generateMortgagePdf(mortgage: any, cp: CP): Blob {
 }
 
 export function generateCreditPolicyPdf(policy: any, cp: CP): Blob {
+  setDocColor("financiacion");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   let y = headerBlock(doc, "PÓLIZA DE CRÉDITO", policy.policyNumber || "", cp);
@@ -536,7 +585,8 @@ export function generateCreditPolicyPdf(policy: any, cp: CP): Blob {
   y += 3;
 
   drawLine(doc, y); y += 5;
-  doc.setFillColor(41, 65, 122);
+  const cpc = getColor();
+  doc.setFillColor(cpc[0], cpc[1], cpc[2]);
   doc.rect(M, y - 4, CW, 10, "F");
   doc.setFont("helvetica", "bold"); doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
@@ -548,6 +598,7 @@ export function generateCreditPolicyPdf(policy: any, cp: CP): Blob {
 }
 
 export function generateCreditCardStatementPdf(card: any, cp: CP): Blob {
+  setDocColor("bancario");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageNum = { n: 1 };
 
@@ -583,7 +634,8 @@ export function generateCreditCardStatementPdf(card: any, cp: CP): Blob {
 
   y += 6;
   drawLine(doc, y); y += 5;
-  doc.setFillColor(41, 65, 122);
+  const ccc = getColor();
+  doc.setFillColor(ccc[0], ccc[1], ccc[2]);
   doc.rect(M + 100, y - 4, CW - 100, 8, "F");
   doc.setFont("helvetica", "bold"); doc.setFontSize(11);
   doc.setTextColor(255, 255, 255);
@@ -598,6 +650,7 @@ export function generateCreditCardStatementPdf(card: any, cp: CP): Blob {
 }
 
 export function generateInsurancePolicyPdf(ins: any, cp: CP): Blob {
+  setDocColor("seguros");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   let y = headerBlock(doc, "PÓLIZA DE SEGURO", ins.policyNumber || "", cp);
@@ -630,6 +683,7 @@ export function generateInsurancePolicyPdf(ins: any, cp: CP): Blob {
 }
 
 export function generateCasualtyReportPdf(cas: any, cp: CP): Blob {
+  setDocColor("seguros");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   let y = headerBlock(doc, "PARTE DE SINIESTRO", cas.date || "", cp);
@@ -662,6 +716,7 @@ export function generateCasualtyReportPdf(cas: any, cp: CP): Blob {
 }
 
 export function generateFixedAssetCardPdf(asset: any, cp: CP): Blob {
+  setDocColor("inmovilizado");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   let y = headerBlock(doc, "FICHA DE INMOVILIZADO", asset.code || "", cp);
@@ -689,7 +744,8 @@ export function generateFixedAssetCardPdf(asset: any, cp: CP): Blob {
   y += 3;
 
   drawLine(doc, y); y += 5;
-  doc.setFillColor(41, 65, 122);
+  const fac = getColor();
+  doc.setFillColor(fac[0], fac[1], fac[2]);
   doc.rect(M, y - 4, CW, 10, "F");
   doc.setFont("helvetica", "bold"); doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
@@ -701,6 +757,7 @@ export function generateFixedAssetCardPdf(asset: any, cp: CP): Blob {
 }
 
 export function generateBankDebitNotePdf(note: any, cp: CP): Blob {
+  setDocColor("bancario");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   let y = headerBlock(doc, "NOTA DE CARGO BANCARIO", note.reference || "", cp);
@@ -714,7 +771,8 @@ export function generateBankDebitNotePdf(note: any, cp: CP): Blob {
   y += 4;
 
   drawLine(doc, y); y += 5;
-  doc.setFillColor(41, 65, 122);
+  const dnc = getColor();
+  doc.setFillColor(dnc[0], dnc[1], dnc[2]);
   doc.rect(M, y - 4, CW, 10, "F");
   doc.setFont("helvetica", "bold"); doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
@@ -735,6 +793,7 @@ export function generateBankDebitNotePdf(note: any, cp: CP): Blob {
 }
 
 export function generateDividendDistributionPdf(div: any, cp: CP): Blob {
+  setDocColor("patrimonio");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   let y = headerBlock(doc, "ACTA DE DISTRIBUCIÓN DE DIVIDENDOS", `Ejercicio ${div.fiscalYear || ""}`, cp);
@@ -782,6 +841,7 @@ export function generateDividendDistributionPdf(div: any, cp: CP): Blob {
 }
 
 export function generateShareholdersInfoPdf(info: any, cp: CP): Blob {
+  setDocColor("patrimonio");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
 
   let y = headerBlock(doc, "LIBRO DE SOCIOS / ACCIONISTAS", cp.name || "", cp);
@@ -832,6 +892,7 @@ function translateRole(r: string | undefined): string {
 }
 
 export function generateInitialBalancePdf(bal: any, cp: CP): Blob {
+  setDocColor("patrimonio");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageNum = { n: 1 };
 
@@ -870,8 +931,9 @@ export function generateInitialBalancePdf(bal: any, cp: CP): Blob {
 
   y = checkPage(doc, y, 20, pageNum);
   drawLine(doc, y); y += 5;
+  const blc = getColor();
   doc.setFont("helvetica", "bold"); doc.setFontSize(10);
-  gray(doc, 41, 65, 122);
+  gray(doc, blc[0], blc[1], blc[2]);
   doc.text("Total Activo:", M, y);
   doc.text(fmt(bal.totalAssets), M + 80, y, { align: "right" });
   y += 6;
@@ -883,6 +945,7 @@ export function generateInitialBalancePdf(bal: any, cp: CP): Blob {
 }
 
 export function generateJournalEntriesPdf(entries: any[], cp: CP): Blob {
+  setDocColor("diario");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageNum = { n: 1 };
 
@@ -894,8 +957,9 @@ export function generateJournalEntriesPdf(entries: any[], cp: CP): Blob {
 
     doc.setFillColor(240, 243, 248);
     doc.rect(M, y - 3.5, CW, 6, "F");
+    const jc = getColor();
     doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-    gray(doc, 41, 65, 122);
+    gray(doc, jc[0], jc[1], jc[2]);
     doc.text(`Asiento ${e.entryNumber || i + 1}`, M + 2, y);
     doc.text(e.date || "", M + 30, y);
     doc.setFont("helvetica", "normal");
@@ -926,8 +990,9 @@ export function generateJournalEntriesPdf(entries: any[], cp: CP): Blob {
       y += 4.5;
     }
 
+    const jtc = getColor();
     doc.setFont("helvetica", "bold"); doc.setFontSize(7);
-    gray(doc, 41, 65, 122);
+    gray(doc, jtc[0], jtc[1], jtc[2]);
     doc.text(`Total: ${fmt(e.totalAmount)}`, A4W - M, y, { align: "right" });
     y += 3;
     drawLine(doc, y);
@@ -939,6 +1004,7 @@ export function generateJournalEntriesPdf(entries: any[], cp: CP): Blob {
 }
 
 export function generateShareholderAccountsPdf(acc: any, cp: CP): Blob {
+  setDocColor("patrimonio");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageNum = { n: 1 };
 
@@ -1013,6 +1079,7 @@ function extractDate(dateStr: string | undefined | null, fallback: string): stri
 }
 
 export function generateExtraordinaryExpensePdf(exp: any, cp: CP): Blob {
+  setDocColor("extraordinario");
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const typeLabels: Record<string, string> = {
     multa: "Multa / Sanción", donacion: "Donación",
@@ -1058,13 +1125,15 @@ export function generateExtraordinaryExpensePdf(exp: any, cp: CP): Blob {
 }
 
 export function generateWarehouseCardPdf(card: any, cp: CP): Blob {
+  setDocColor("almacen");
   const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "landscape" });
   const LW = 297;
   const LH = 210;
   const LM = 10;
 
   let y = LM;
-  doc.setFillColor(41, 65, 122);
+  const wc = getColor();
+  doc.setFillColor(wc[0], wc[1], wc[2]);
   doc.rect(0, 0, LW, 26, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);

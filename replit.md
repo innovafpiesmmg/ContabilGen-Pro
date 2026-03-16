@@ -144,6 +144,23 @@ Per plangeneralcontable.com, loans use accounts 170 (LP) and 5200 (CP):
 - **Retribución administradores**: 640 (Sueldos y salarios). NO usar 651 (no existe en PGC)
 - **Siniestro**: 671 (pérdida inmovilizado) + 440 (Deudores varios). NO usar 678 ni 430
 
+## PDF Color Coding by Document Type
+
+PDFs use color-coded headers/tables/totals to visually distinguish document categories:
+- **Comercial** (facturas): verde `[34, 120, 74]`
+- **Bancario** (extractos, tarjeta, notas cargo): azul `[41, 65, 122]`
+- **Laboral** (nóminas, TC1 SS): naranja `[180, 95, 20]`
+- **Fiscal** (liquidaciones IVA/IRPF/IS): rojo `[160, 45, 45]`
+- **Financiación** (préstamo, hipoteca, póliza crédito): morado `[90, 50, 130]`
+- **Seguros** (póliza seguro, siniestro): teal `[20, 115, 130]`
+- **Patrimonio** (socios, dividendos, balance, cta socios): dorado `[140, 100, 30]`
+- **Inmovilizado** (fichas activo): gris azulado `[70, 90, 110]`
+- **Almacén** (fichas almacén): verde oliva `[85, 110, 50]`
+- **Libro Diario**: azul marino `[25, 50, 95]`
+- **Extraordinario** (multas, donaciones, etc.): naranja rojizo `[185, 70, 40]`
+
+Implementation: `setDocColor(category)` sets `_activeColor` used by `headerBlock()`, `tableHeader()`, `sectionTitle()`, and summary boxes.
+
 ## Self-Hosted Deployment (Ubuntu)
 
 - **Installer**: `install.sh` in repo root — unattended installer for Ubuntu 22.04/24.04/25.04
