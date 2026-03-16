@@ -2310,6 +2310,88 @@ function buildDeterministicJournal(
     e.entryNumber = String(num++);
   }
 
+  const entryDocs = new Set(entries.map(e => e.document).filter(Boolean));
+  const allDocRefs: Array<{ ref: string; type: string; date: string }> = [];
+
+  const addDocRefs = (items: unknown[] | undefined, type: string, refField: string, dateField: string) => {
+    if (!Array.isArray(items)) return;
+    for (const item of items) {
+      const i = item as Record<string, unknown>;
+      const ref = String(i[refField] ?? "");
+      const date = String(i[dateField] ?? "");
+      if (ref) allDocRefs.push({ ref, type, date });
+    }
+  };
+  addDocRefs(universe.invoices as unknown[] | undefined, "factura", "invoiceNumber", "date");
+  addDocRefs(universe.paymentReceipts as unknown[] | undefined, "recibo", "receiptNumber", "date");
+  addDocRefs(universe.serviceInvoices as unknown[] | undefined, "servicio", "invoiceNumber", "date");
+  addDocRefs(universe.socialSecurityPayments as unknown[] | undefined, "TC1", "month", "dueDate");
+  addDocRefs(universe.taxLiquidations as unknown[] | undefined, "liquidación", "model", "dueDate");
+
+  const docsWithoutEntry = allDocRefs.filter(d => {
+    if (entryDocs.has(d.ref)) return false;
+    for (const eDoc of entryDocs) {
+      if (eDoc.includes(d.ref) || d.ref.includes(eDoc)) return false;
+    }
+    return true;
+  });
+
+  const entriesWithoutDoc = entries.filter(e => {
+    if (!e.document) return true;
+    const found = allDocRefs.some(d => d.ref === e.document || e.document.includes(d.ref) || d.ref.includes(e.document));
+    return !found;
+  });
+
+  if (docsWithoutEntry.length > 0) {
+    console.log(`[cobertura] ${docsWithoutEntry.length} documentos SIN asiento:`);
+    const byType = new Map<string, number>();
+    for (const d of docsWithoutEntry) {
+      byType.set(d.type, (byType.get(d.type) ?? 0) + 1);
+    }
+    for (const [type, count] of byType) {
+      console.log(`  - ${type}: ${count} docs sin asiento`);
+      const examples = docsWithoutEntry.filter(d => d.type === type).slice(0, 3);
+      for (const ex of examples) console.log(`    → ${ex.ref} (${ex.date})`);
+    }
+  }
+
+  if (entriesWithoutDoc.length > 0) {
+    const filtered = entriesWithoutDoc.filter(e => {
+      const doc = e.document;
+      return doc && !["Capital social", "Asiento apertura", "Dividendos", "Tarjeta-liquidación"].includes(doc)
+        && !doc.startsWith("Amort-") && !doc.startsWith("Mod.") && !doc.startsWith("TC1-")
+        && !doc.startsWith("Nómina") && !doc.startsWith("POL-") && !doc.startsWith("SEG-");
+    });
+    if (filtered.length > 0) {
+      console.log(`[cobertura] ${filtered.length} asientos SIN documento identificado:`);
+      for (const e of filtered.slice(0, 10)) {
+        console.log(`  - #${e.entryNumber} "${e.concept}" doc="${e.document}" (${e.date})`);
+      }
+    }
+  }
+
+  const monthlyMap = new Map<string, { docs: number; entries: number }>();
+  for (const d of allDocRefs) {
+    const m = d.date.slice(0, 7);
+    if (!m) continue;
+    const v = monthlyMap.get(m) ?? { docs: 0, entries: 0 };
+    v.docs++;
+    monthlyMap.set(m, v);
+  }
+  for (const e of entries) {
+    const m = e.date.slice(0, 7);
+    if (!m) continue;
+    const v = monthlyMap.get(m) ?? { docs: 0, entries: 0 };
+    v.entries++;
+    monthlyMap.set(m, v);
+  }
+  const sortedMonths = [...monthlyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  console.log(`[cobertura] Cobertura mensual (docs/asientos):`);
+  for (const [month, { docs, entries: ents }] of sortedMonths) {
+    const status = docs === 0 && ents > 0 ? " ⚠️ asientos sin docs" : ents === 0 && docs > 0 ? " ⚠️ docs sin asientos" : "";
+    console.log(`  ${month}: ${docs} docs → ${ents} asientos${status}`);
+  }
+
   console.log(`[journal] Diario determinista: ${entries.length} asientos generados desde documentos reales`);
   return { journalEntries: entries };
 }
