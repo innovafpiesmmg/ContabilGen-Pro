@@ -125,12 +125,14 @@ function repairTruncatedJson(raw: string): unknown | null {
 }
 
 async function callAI(client: OpenAI, model: string, prompt: string, maxTokens: number): Promise<unknown> {
-  const tokenParam = model.startsWith("gpt-5") || model.startsWith("o1") || model.startsWith("o3") || model.startsWith("o4")
+  const isNewModel = model.startsWith("gpt-5") || model.startsWith("o1") || model.startsWith("o3") || model.startsWith("o4");
+  const tokenParam = isNewModel
     ? { max_completion_tokens: maxTokens }
     : { max_tokens: maxTokens };
   const response = await client.chat.completions.create({
     model,
     ...tokenParam,
+    response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
@@ -146,6 +148,7 @@ async function callAI(client: OpenAI, model: string, prompt: string, maxTokens: 
   console.log(`[callAI] model=${model}, finish_reason=${finishReason}, content_length=${content?.length ?? 0}, refusal=${(choice?.message as any)?.refusal ?? 'none'}`);
   if (!content) {
     const refusal = (choice?.message as any)?.refusal;
+    console.error(`[callAI] Empty content. Full response:`, JSON.stringify(response, null, 2).slice(0, 1000));
     throw new Error(refusal ? `La IA rechazó la solicitud: ${refusal}` : "La IA no devolvió contenido. Verifica tu API key y modelo.");
   }
 
