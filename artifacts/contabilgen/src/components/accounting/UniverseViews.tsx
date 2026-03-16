@@ -2083,44 +2083,61 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
 
   const markMatched = (je: JournalEntry) => matchedEntryNumbers.add(String(je.entryNumber));
 
+  const jeByDate = new Map<string, JournalEntry[]>();
+  journalEntries.forEach(je => {
+    const arr = jeByDate.get(je.date) ?? [];
+    arr.push(je);
+    jeByDate.set(je.date, arr);
+  });
+
   events.forEach(ev => {
     if (ev.journalEntry) { markMatched(ev.journalEntry); return; }
     const je = findJournalEntry(jLookup, ev.label, ev.date);
     if (je) { ev.journalEntry = je; markMatched(je); return; }
-    const byDate = journalEntries.filter(j => j.date === ev.date);
-    if (byDate.length === 1) { ev.journalEntry = byDate[0]; markMatched(byDate[0]); return; }
+  });
+
+  const kindKeywords: Partial<Record<EventKind, string[]>> = {
+    prestamo:       ["préstamo", "prestamo", "cuota préstamo", "170", "5200"],
+    hipoteca:       ["hipoteca", "cuota hipoteca"],
+    ss:             ["tc1", "seguridad social", "cuota obrera", "476"],
+    impuesto:       ["iva", "irpf", "modelo", "liquidación", "4750", "475", "4751"],
+    nomina:         ["nómina", "nomina", "salario", "640", "642"],
+    apertura:       ["apertura", "asiento apertura"],
+    dividendo:      ["dividendo", "reparto", "beneficio", "526", "557"],
+    socio:          ["socio", "551", "retribución administrador", "640"],
+    seguro:         ["seguro", "póliza seguro", "prima", "625"],
+    siniestro:      ["siniestro", "671", "indemnización"],
+    poliza_credito: ["póliza crédito", "poliza credito", "5201"],
+    inmovilizado:   ["inmovilizado", "amortización", "alta activo", "281", "211", "213", "217", "218"],
+    gasto_extra:    ["extraordinario", "gasto extraordinario", "671", "678"],
+    ingreso_extra:  ["extraordinario", "ingreso extraordinario", "771", "778"],
+  };
+
+  events.forEach(ev => {
+    if (ev.journalEntry) return;
+    const kws = kindKeywords[ev.kind];
+    const candidates = jeByDate.get(ev.date)?.filter(j => !matchedEntryNumbers.has(String(j.entryNumber))) ?? [];
+    if (candidates.length === 0) return;
+
+    if (kws) {
+      const match = candidates.find(j => {
+        const c = (j.concept || "").toLowerCase();
+        const d = (j.document || "").toLowerCase();
+        return kws.some(kw => c.includes(kw) || d.includes(kw));
+      });
+      if (match) { ev.journalEntry = match; markMatched(match); return; }
+    }
+
     const evLabel = (ev.label || "").toLowerCase();
-    const conceptMatch = byDate.find(j => {
+    const conceptMatch = candidates.find(j => {
       if (evLabel && (j.concept || "").toLowerCase().includes(evLabel)) return true;
       const jDoc = (j.document || "").toLowerCase();
       if (jDoc && evLabel && evLabel.includes(jDoc)) return true;
       return false;
     });
-    if (conceptMatch) { ev.journalEntry = conceptMatch; markMatched(conceptMatch); }
-  });
+    if (conceptMatch) { ev.journalEntry = conceptMatch; markMatched(conceptMatch); return; }
 
-  const consolidatedKinds = new Set<EventKind>(["banco", "tarjeta"]);
-  journalEntries.forEach(je => {
-    if (matchedEntryNumbers.has(String(je.entryNumber))) return;
-    const concept = (je.concept || "").toLowerCase();
-    const doc = (je.document || "").toLowerCase();
-    for (const ev of events) {
-      if (!consolidatedKinds.has(ev.kind)) continue;
-      if (ev.kind === "banco") {
-        if (concept.includes("banco") || concept.includes("extracto") || concept.includes("572") ||
-            doc.includes("extracto") || /\b572\b/.test(concept)) {
-          markMatched(je);
-          return;
-        }
-      }
-      if (ev.kind === "tarjeta") {
-        if (concept.includes("tarjeta") || doc.includes("tarjeta") ||
-            concept.includes("liquidaci") || /\b410\b/.test(concept)) {
-          markMatched(je);
-          return;
-        }
-      }
-    }
+    if (candidates.length === 1) { ev.journalEntry = candidates[0]; markMatched(candidates[0]); }
   });
 
   journalEntries
