@@ -792,13 +792,77 @@ export const getGenerateAccountingUniverseUrl = () => {
 
 export const generateAccountingUniverse = async (
   generateUniverseRequest: GenerateUniverseRequest,
-  options?: RequestInit,
+  _options?: RequestInit,
 ): Promise<AccountingUniverse> => {
-  return customFetch<AccountingUniverse>(getGenerateAccountingUniverseUrl(), {
-    ...options,
+  const response = await fetch(getGenerateAccountingUniverseUrl(), {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "text/event-stream",
+    },
     body: JSON.stringify(generateUniverseRequest),
+    credentials: "include",
+  });
+
+  if (!response.ok) {
+    let errorMsg = `HTTP ${response.status}`;
+    try {
+      const errBody = await response.json();
+      errorMsg = errBody.error || errBody.message || errorMsg;
+    } catch { /* ignore */ }
+    throw new Error(errorMsg);
+  }
+
+  const contentType = response.headers.get("content-type") || "";
+  if (!contentType.includes("text/event-stream")) {
+    return (await response.json()) as AccountingUniverse;
+  }
+
+  return new Promise<AccountingUniverse>((resolve, reject) => {
+    const reader = response.body?.getReader();
+    if (!reader) { reject(new Error("No se pudo leer la respuesta")); return; }
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    const processLines = () => {
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      let currentEvent = "";
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          try {
+            const parsed = JSON.parse(data);
+            if (currentEvent === "result") {
+              resolve(parsed as AccountingUniverse);
+              reader.cancel();
+              return true;
+            } else if (currentEvent === "error") {
+              reject(new Error(parsed.error || "Error en la generación"));
+              reader.cancel();
+              return true;
+            }
+          } catch { /* ignore parse errors for progress/keepalive */ }
+        }
+      }
+      return false;
+    };
+
+    const read = (): void => {
+      reader.read().then(({ done, value }) => {
+        if (done) {
+          if (buffer.length > 0) processLines();
+          reject(new Error("La conexión se cerró antes de completar la generación"));
+          return;
+        }
+        buffer += decoder.decode(value, { stream: true });
+        if (!processLines()) read();
+      }).catch(reject);
+    };
+    read();
   });
 };
 

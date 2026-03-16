@@ -52,42 +52,76 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
     };
   }
 
-  try {
-    const universe = await generateAccountingUniverse(
-      {
-        taxRegime: d.taxRegime,
-        sector: d.sector,
-        activity: d.activity ?? null,
-        complexity: d.complexity,
-        year: d.year,
-        companyName: d.companyName ?? null,
-        educationLevel: d.educationLevel ?? null,
-        operationsPerMonth: d.operationsPerMonth ?? null,
-        includePayroll: d.includePayroll ?? null,
-        includeSocialSecurity: d.includeSocialSecurity ?? null,
-        includeTaxLiquidation: d.includeTaxLiquidation ?? null,
-        includeBankLoan: d.includeBankLoan ?? null,
-        includeMortgage: d.includeMortgage ?? null,
-        includeCreditPolicy: d.includeCreditPolicy ?? null,
-        includeFixedAssets: d.includeFixedAssets ?? null,
-        includeShareholdersInfo: d.includeShareholdersInfo ?? null,
-        isNewCompany: d.isNewCompany ?? null,
-        includeInitialBalance: d.includeInitialBalance ?? null,
-        includeShareholderAccounts: d.includeShareholderAccounts ?? null,
-        includeDividends: d.includeDividends ?? null,
-        includeWarehouse: d.includeWarehouse ?? null,
-        includeExtraordinary: d.includeExtraordinary ?? null,
-        startDate: d.startDate ?? null,
-        endDate: d.endDate ?? null,
-      },
-      aiConfig,
-    );
+  const useSSE = req.headers.accept === "text/event-stream";
 
-    res.json(universe);
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Error desconocido durante la generación";
-    console.error("[generate] Error:", message);
-    res.status(500).json({ error: message });
+  if (useSSE) {
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.flushHeaders();
+
+    const sendEvent = (event: string, data: unknown) => {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    };
+
+    const keepAlive = setInterval(() => {
+      res.write(": keepalive\n\n");
+    }, 15000);
+
+    try {
+      const universe = await generateAccountingUniverse(
+        {
+          taxRegime: d.taxRegime, sector: d.sector, activity: d.activity ?? null,
+          complexity: d.complexity, year: d.year, companyName: d.companyName ?? null,
+          educationLevel: d.educationLevel ?? null, operationsPerMonth: d.operationsPerMonth ?? null,
+          includePayroll: d.includePayroll ?? null, includeSocialSecurity: d.includeSocialSecurity ?? null,
+          includeTaxLiquidation: d.includeTaxLiquidation ?? null, includeBankLoan: d.includeBankLoan ?? null,
+          includeMortgage: d.includeMortgage ?? null, includeCreditPolicy: d.includeCreditPolicy ?? null,
+          includeFixedAssets: d.includeFixedAssets ?? null, includeShareholdersInfo: d.includeShareholdersInfo ?? null,
+          isNewCompany: d.isNewCompany ?? null, includeInitialBalance: d.includeInitialBalance ?? null,
+          includeShareholderAccounts: d.includeShareholderAccounts ?? null, includeDividends: d.includeDividends ?? null,
+          includeWarehouse: d.includeWarehouse ?? null, includeExtraordinary: d.includeExtraordinary ?? null,
+          startDate: d.startDate ?? null, endDate: d.endDate ?? null,
+        },
+        aiConfig,
+        (message: string) => sendEvent("progress", { message }),
+      );
+
+      sendEvent("result", universe);
+      res.write("event: done\ndata: {}\n\n");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error desconocido durante la generación";
+      console.error("[generate] Error:", message);
+      sendEvent("error", { error: message });
+    } finally {
+      clearInterval(keepAlive);
+      res.end();
+    }
+  } else {
+    try {
+      const universe = await generateAccountingUniverse(
+        {
+          taxRegime: d.taxRegime, sector: d.sector, activity: d.activity ?? null,
+          complexity: d.complexity, year: d.year, companyName: d.companyName ?? null,
+          educationLevel: d.educationLevel ?? null, operationsPerMonth: d.operationsPerMonth ?? null,
+          includePayroll: d.includePayroll ?? null, includeSocialSecurity: d.includeSocialSecurity ?? null,
+          includeTaxLiquidation: d.includeTaxLiquidation ?? null, includeBankLoan: d.includeBankLoan ?? null,
+          includeMortgage: d.includeMortgage ?? null, includeCreditPolicy: d.includeCreditPolicy ?? null,
+          includeFixedAssets: d.includeFixedAssets ?? null, includeShareholdersInfo: d.includeShareholdersInfo ?? null,
+          isNewCompany: d.isNewCompany ?? null, includeInitialBalance: d.includeInitialBalance ?? null,
+          includeShareholderAccounts: d.includeShareholderAccounts ?? null, includeDividends: d.includeDividends ?? null,
+          includeWarehouse: d.includeWarehouse ?? null, includeExtraordinary: d.includeExtraordinary ?? null,
+          startDate: d.startDate ?? null, endDate: d.endDate ?? null,
+        },
+        aiConfig,
+      );
+      res.json(universe);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Error desconocido durante la generación";
+      console.error("[generate] Error:", message);
+      res.status(500).json({ error: message });
+    }
   }
 });
 

@@ -1207,52 +1207,53 @@ function getModel(config: AiConfig): string {
   return config.deepseekModel || "deepseek-chat";
 }
 
-export async function generateAccountingUniverse(params: GenerateParams, aiConfig: AiConfig): Promise<unknown> {
+export type ProgressCallback = (message: string) => void;
+
+export async function generateAccountingUniverse(params: GenerateParams, aiConfig: AiConfig, onProgress?: ProgressCallback): Promise<unknown> {
   const client = getClient(aiConfig);
   const model = getModel(aiConfig);
+  const progress = onProgress ?? (() => {});
 
-  // Phase 1: Planning — generates consistent scenario blueprint
+  progress("Generando escenario inicial...");
   const scenario = await generateScenario(params, client, model);
+  progress("Escenario creado. Generando bloques contables...");
 
-  // Phase 2: Generate all blocks in parallel (each independent, all use scenario context)
   const withEquity =
     params.includeShareholdersInfo !== false ||
     (params.includeInitialBalance !== false && params.isNewCompany !== true) ||
     params.includeShareholderAccounts !== false ||
     (params.includeDividends !== false && params.isNewCompany !== true);
 
-  // Compute per-month invoice count (2–4 based on operationsPerMonth)
   const opsPerMonth = params.operationsPerMonth ?? 8;
   const invoicesPerMonth = Math.max(2, Math.min(Math.ceil(opsPerMonth * 0.3), 4));
 
-  // Build monthly bundle promises — each month: invoices + bank statement + card moves
   const months = getMonthsInPeriod(params);
   let invoiceNum = 1;
-  let rollingBalance = 20000; // starting bank balance; each month passes closing to next
+  let rollingBalance = 20000;
   const monthlyBundlePromises = months.map((m) => {
     const startNum = invoiceNum;
     invoiceNum += invoicesPerMonth;
     const balance = rollingBalance;
-    rollingBalance += Math.floor(Math.random() * 4000) - 1000; // estimated delta
+    rollingBalance += Math.floor(Math.random() * 4000) - 1000;
     return generateMonthlyBundle(
       params, scenario, client, model,
       m.start, m.end, m.label,
       invoicesPerMonth, startNum, balance,
-    );
+    ).then((r) => { progress(`Facturas ${m.label} completadas`); return r; });
   });
 
+  const blockNames = ["Perfil comercial", "Seguros", "Extraordinarios", "Operaciones", "Libro diario"];
   const blockPromises: Promise<Record<string, unknown>>[] = [
-    generateCommercialBlock(params, scenario, client, model),
-    generateInsuranceCasualty(params, scenario, client, model),
-    generateExtraordinaryExpenses(params, scenario, client, model),
-    generateOperationsBlock(params, scenario, client, model),
-    generateJournalBlock(params, scenario, client, model),
+    generateCommercialBlock(params, scenario, client, model).then((r) => { progress("Perfil comercial completado"); return r; }),
+    generateInsuranceCasualty(params, scenario, client, model).then((r) => { progress("Seguros completados"); return r; }),
+    generateExtraordinaryExpenses(params, scenario, client, model).then((r) => { progress("Extraordinarios completados"); return r; }),
+    generateOperationsBlock(params, scenario, client, model).then((r) => { progress("Operaciones completadas"); return r; }),
+    generateJournalBlock(params, scenario, client, model).then((r) => { progress("Libro diario completado"); return r; }),
   ];
   if (withEquity) {
-    blockPromises.push(generateEquityBlock(params, scenario, client, model));
+    blockPromises.push(generateEquityBlock(params, scenario, client, model).then((r) => { progress("Capital y socios completado"); return r; }));
   }
 
-  // Run all blocks + all monthly bundles in parallel
   const [blocks, monthlyResults] = await Promise.all([
     Promise.all(blockPromises),
     Promise.all(monthlyBundlePromises),
