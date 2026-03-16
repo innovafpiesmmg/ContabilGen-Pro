@@ -66,7 +66,7 @@ export default function SettingsPage() {
       deepseekBaseUrl: "https://api.deepseek.com",
       deepseekModel: "deepseek-chat",
       openaiApiKey: "",
-      openaiModel: "gpt-4.1-mini",
+      openaiModel: "gpt-5-mini",
     },
   });
 
@@ -80,7 +80,7 @@ export default function SettingsPage() {
         deepseekBaseUrl: settings.deepseekBaseUrl || "https://api.deepseek.com",
         deepseekModel: settings.deepseekModel || "deepseek-chat",
         openaiApiKey: (settings as any).openaiApiKey || "",
-        openaiModel: (settings as any).openaiModel || "gpt-4.1-mini",
+        openaiModel: (settings as any).openaiModel || "gpt-5-mini",
       });
     }
   }, [settings, form]);
@@ -301,10 +301,10 @@ export default function SettingsPage() {
                     <Label htmlFor="openaiModel">Modelo</Label>
                     <Input 
                       id="openaiModel"
-                      placeholder="gpt-4.1-mini"
+                      placeholder="gpt-5-mini"
                       {...form.register("openaiModel")}
                     />
-                    <p className="text-xs text-muted-foreground">Disponibles: gpt-4.1-mini (recomendado), gpt-4.1-nano (más barato), gpt-4o-mini, gpt-4o</p>
+                    <p className="text-xs text-muted-foreground">Disponibles: gpt-5-mini (recomendado, barato), gpt-4.1-mini, gpt-4.1-nano (más barato aún), gpt-4o</p>
                     {form.formState.errors.openaiModel && (
                       <p className="text-sm text-destructive font-medium">{form.formState.errors.openaiModel.message}</p>
                     )}

@@ -1406,7 +1406,7 @@ function getClient(config: AiConfig): OpenAI {
 
 function getModel(config: AiConfig): string {
   if (config.provider === "openai") {
-    return config.model || "gpt-4.1-mini";
+    return config.model || "gpt-5-mini";
   }
   return config.deepseekModel || "deepseek-chat";
 }

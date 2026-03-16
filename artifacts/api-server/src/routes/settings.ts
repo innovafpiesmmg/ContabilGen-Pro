@@ -15,7 +15,7 @@ const DEFAULTS: Record<string, string> = {
   deepseekBaseUrl: "https://api.deepseek.com",
   deepseekModel: "deepseek-chat",
   openaiApiKey: "",
-  openaiModel: "gpt-4.1-mini",
+  openaiModel: "gpt-5-mini",
 };
 
 async function getSharedDeepseekConfig(): Promise<{ enabled: boolean; apiKey: string; baseUrl: string; model: string }> {
@@ -54,7 +54,7 @@ router.get("/settings", wrap(async (req, res): Promise<void> => {
     deepseekBaseUrl: settings.deepseekBaseUrl,
     deepseekModel: settings.deepseekModel,
     openaiApiKey: settings.openaiApiKey || null,
-    openaiModel: settings.openaiModel || "gpt-4.1-mini",
+    openaiModel: settings.openaiModel || "gpt-5-mini",
     sharedDeepseekAvailable: shared.enabled,
     sharedDeepseekModel: shared.enabled ? shared.model : null,
   });
