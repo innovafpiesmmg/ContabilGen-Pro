@@ -64,7 +64,7 @@ function resolveAiConfig(settings: any, shared?: any) {
       provider: "openai",
       apiKey: settings.openaiApiKey ?? "",
       baseUrl: "https://api.openai.com/v1",
-      model: settings.openaiModel ?? "gpt-4o-mini",
+      model: settings.openaiModel ?? "gpt-4.1-mini",
     };
   }
   return {

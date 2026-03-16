@@ -13,7 +13,7 @@ ContabilGen Pro es un generador de universos contables para prácticas de Grado 
 - **Frontend**: React + Vite + Tailwind CSS (artifacts/contabilgen)
 - **API framework**: Express 5 (artifacts/api-server)
 - **Database**: PostgreSQL + Drizzle ORM
-- **AI**: DeepSeek (deepseek-chat) u OpenAI (gpt-4o-mini) — seleccionable por usuario
+- **AI**: DeepSeek (deepseek-chat) u OpenAI (gpt-4.1-mini) — seleccionable por usuario
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec) — CAUTION: `generateAccountingUniverse` in `lib/api-client-react/src/generated/api.ts` has CUSTOM polling logic (jobId → poll status). Must be re-applied after every `orval` regeneration.
 - **Build**: esbuild (CJS bundle)

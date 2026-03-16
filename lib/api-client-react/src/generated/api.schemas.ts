@@ -74,7 +74,7 @@ export interface AiSettings {
    * @nullable
    */
   openaiApiKey: string | null;
-  /** OpenAI model to use (e.g. gpt-4o-mini) */
+  /** OpenAI model to use (e.g. gpt-4.1-mini) */
   openaiModel: string;
   /** Whether the admin has enabled the shared DeepSeek key */
   sharedDeepseekAvailable?: boolean;

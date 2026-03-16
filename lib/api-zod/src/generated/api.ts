@@ -107,7 +107,7 @@ export const GetSettingsResponse = zod.object({
     .string()
     .describe("DeepSeek model to use (e.g. deepseek-chat)"),
   openaiApiKey: zod.string().nullable().describe("OpenAI API key"),
-  openaiModel: zod.string().describe("OpenAI model to use (e.g. gpt-4o-mini)"),
+  openaiModel: zod.string().describe("OpenAI model to use (e.g. gpt-4.1-mini)"),
   sharedDeepseekAvailable: zod
     .boolean()
     .optional()
@@ -131,7 +131,7 @@ export const UpdateSettingsBody = zod.object({
     .string()
     .describe("DeepSeek model to use (e.g. deepseek-chat)"),
   openaiApiKey: zod.string().nullable().describe("OpenAI API key"),
-  openaiModel: zod.string().describe("OpenAI model to use (e.g. gpt-4o-mini)"),
+  openaiModel: zod.string().describe("OpenAI model to use (e.g. gpt-4.1-mini)"),
   sharedDeepseekAvailable: zod
     .boolean()
     .optional()
@@ -152,7 +152,7 @@ export const UpdateSettingsResponse = zod.object({
     .string()
     .describe("DeepSeek model to use (e.g. deepseek-chat)"),
   openaiApiKey: zod.string().nullable().describe("OpenAI API key"),
-  openaiModel: zod.string().describe("OpenAI model to use (e.g. gpt-4o-mini)"),
+  openaiModel: zod.string().describe("OpenAI model to use (e.g. gpt-4.1-mini)"),
   sharedDeepseekAvailable: zod
     .boolean()
     .optional()

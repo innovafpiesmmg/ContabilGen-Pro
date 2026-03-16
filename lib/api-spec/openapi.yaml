@@ -413,7 +413,7 @@ components:
           description: "OpenAI API key"
         openaiModel:
           type: string
-          description: "OpenAI model to use (e.g. gpt-4o-mini)"
+          description: "OpenAI model to use (e.g. gpt-4.1-mini)"
         sharedDeepseekAvailable:
           type: boolean
           description: "Whether the admin has enabled the shared DeepSeek key"
