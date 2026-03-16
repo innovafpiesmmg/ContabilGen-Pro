@@ -41,6 +41,13 @@ ContabilGen Pro es un generador de universos contables para prácticas de Grado 
    - Facturas de servicios (alquiler, electricidad, agua, teléfono, internet, gestoría)
    - Cuadro de subcuentas (5-8 dígitos, asignación automática)
    - Libro diario (asientos contables)
+   - **Cierre de ejercicio** (todo determinístico desde el diario):
+     - Libro Mayor (todas las cuentas con movimientos, sumas y saldos)
+     - Balance de Comprobación de Sumas y Saldos
+     - Asientos de regularización (cierre grupos 6 y 7 → cuenta 129)
+     - Cuenta de Pérdidas y Ganancias (desglose por naturaleza PGC)
+     - Balance de Situación Final (Activo / PN+Pasivo)
+     - Asiento de Cierre (todos los saldos a cero)
 
 ## Structure
 

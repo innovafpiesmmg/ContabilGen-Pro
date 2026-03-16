@@ -745,6 +745,7 @@ export interface AccountingUniverse {
   paymentReceipts?: PaymentReceipt[];
   subAccounts?: SubAccountEntry[];
   accountDigits?: number;
+  yearEndClosing?: any;
 }
 
 export interface SubAccountEntry {

@@ -2572,3 +2572,392 @@ export const SubAccountsView = ({ data }: { data: AccountingUniverse }) => {
     </div>
   );
 };
+
+// ─── YEAR-END CLOSING VIEWS ──────────────────────────────────────────────────
+
+type YearEndData = {
+  ledger: Array<{
+    accountCode: string; accountName: string;
+    movements: Array<{ entryNumber: string; date: string; concept: string; debit: number; credit: number; balance: number }>;
+    totalDebit: number; totalCredit: number; balance: number; balanceSide: string;
+  }>;
+  trialBalance: Array<{ accountCode: string; accountName: string; sumDebit: number; sumCredit: number; balanceDebit: number; balanceCredit: number }>;
+  regularizationEntries: Array<{
+    entryNumber: string; date: string; concept: string;
+    debits: Array<{ accountCode: string; accountName: string; amount: number }>;
+    credits: Array<{ accountCode: string; accountName: string; amount: number }>;
+    totalAmount: number;
+  }>;
+  profitAndLoss: {
+    income: Array<{ title: string; accounts: Array<{ accountCode: string; accountName: string; amount: number }>; subtotal: number }>;
+    expenses: Array<{ title: string; accounts: Array<{ accountCode: string; accountName: string; amount: number }>; subtotal: number }>;
+    totalIncome: number; totalExpenses: number; netResult: number; resultType: string;
+  };
+  finalBalanceSheet: {
+    assets: Array<{ title: string; items: Array<{ accountCode: string; accountName: string; amount: number }>; subtotal: number }>;
+    totalAssets: number;
+    equity: Array<{ title: string; items: Array<{ accountCode: string; accountName: string; amount: number }>; subtotal: number }>;
+    liabilities: Array<{ title: string; items: Array<{ accountCode: string; accountName: string; amount: number }>; subtotal: number }>;
+    totalEquityAndLiabilities: number;
+  };
+  closingEntry: {
+    entryNumber: string; date: string; concept: string;
+    debits: Array<{ accountCode: string; accountName: string; amount: number }>;
+    credits: Array<{ accountCode: string; accountName: string; amount: number }>;
+    totalAmount: number;
+  };
+};
+
+export const LedgerView = ({ data }: { data: YearEndData }) => {
+  const [openAccount, setOpenAccount] = React.useState<string | null>(null);
+  return (
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle
+        title="Libro Mayor"
+        description="Cada cuenta con todos sus movimientos del ejercicio, sumas y saldo final."
+      />
+      {data.ledger.map((acc) => (
+        <Card key={acc.accountCode} className="rounded-xl shadow-sm border-border/50 overflow-hidden">
+          <button
+            className="w-full text-left px-4 py-3 flex items-center justify-between bg-slate-800 hover:bg-slate-700 transition-colors"
+            onClick={() => setOpenAccount(openAccount === acc.accountCode ? null : acc.accountCode)}
+          >
+            <div className="flex items-center gap-3">
+              <span className="font-mono font-bold text-white text-sm">{formatAccountCode(acc.accountCode)}</span>
+              <span className="text-slate-200 text-sm">{acc.accountName}</span>
+              <Badge variant="outline" className="text-xs text-slate-300 border-slate-500">{acc.movements.length} mov.</Badge>
+            </div>
+            <div className="flex items-center gap-4 text-sm">
+              <span className="text-red-300 font-mono">{formatEuro(acc.totalDebit)}</span>
+              <span className="text-emerald-300 font-mono">{formatEuro(acc.totalCredit)}</span>
+              <Badge className={cn("font-mono text-xs", acc.balanceSide === "deudor" ? "bg-amber-100 text-amber-800" : "bg-blue-100 text-blue-800")}>
+                S{acc.balanceSide === "deudor" ? "d" : "a"} {formatEuro(acc.balance)}
+              </Badge>
+              <span className="text-slate-400">{openAccount === acc.accountCode ? "▲" : "▼"}</span>
+            </div>
+          </button>
+          {openAccount === acc.accountCode && (
+            <CardContent className="p-0">
+              <Table className="text-sm">
+                <TableHeader className="bg-slate-50">
+                  <TableRow>
+                    <TableHead className="w-16">Nº</TableHead>
+                    <TableHead className="w-24">Fecha</TableHead>
+                    <TableHead>Concepto</TableHead>
+                    <TableHead className="text-right w-28">Debe</TableHead>
+                    <TableHead className="text-right w-28">Haber</TableHead>
+                    <TableHead className="text-right w-28">Saldo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {acc.movements.map((m, i) => (
+                    <TableRow key={i} className="hover:bg-slate-50">
+                      <TableCell className="font-mono text-xs text-muted-foreground">{m.entryNumber}</TableCell>
+                      <TableCell className="text-xs">{formatDate(m.date)}</TableCell>
+                      <TableCell className="text-xs max-w-xs truncate">{m.concept}</TableCell>
+                      <TableCell className="text-right font-mono text-destructive">{m.debit ? formatEuro(m.debit) : ""}</TableCell>
+                      <TableCell className="text-right font-mono text-emerald-600">{m.credit ? formatEuro(m.credit) : ""}</TableCell>
+                      <TableCell className="text-right font-mono font-medium">{formatEuro(m.balance)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="bg-slate-100 border-t-2">
+                    <TableCell colSpan={3} className="text-right font-bold text-slate-600">TOTALES</TableCell>
+                    <TableCell className="text-right font-mono font-bold text-destructive">{formatEuro(acc.totalDebit)}</TableCell>
+                    <TableCell className="text-right font-mono font-bold text-emerald-600">{formatEuro(acc.totalCredit)}</TableCell>
+                    <TableCell className="text-right font-mono font-bold">{formatEuro(acc.balance)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </CardContent>
+          )}
+        </Card>
+      ))}
+    </div>
+  );
+};
+
+export const TrialBalanceView = ({ data }: { data: YearEndData }) => {
+  const totals = useMemo(() => {
+    let sd = 0, sc = 0, bd = 0, bc = 0;
+    for (const r of data.trialBalance) { sd += r.sumDebit; sc += r.sumCredit; bd += r.balanceDebit; bc += r.balanceCredit; }
+    return { sd: Math.round(sd * 100) / 100, sc: Math.round(sc * 100) / 100, bd: Math.round(bd * 100) / 100, bc: Math.round(bc * 100) / 100 };
+  }, [data.trialBalance]);
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle
+        title="Balance de Comprobación de Sumas y Saldos"
+        description="Resumen de las sumas deudoras y acreedoras de cada cuenta, con el saldo resultante."
+      />
+      <Card className="rounded-2xl shadow-md border-border/50 overflow-hidden">
+        <CardContent className="p-0">
+          <Table className="text-sm">
+            <TableHeader className="bg-slate-800 text-white">
+              <TableRow className="hover:bg-slate-800">
+                <TableHead className="text-slate-300 w-24">Cuenta</TableHead>
+                <TableHead className="text-slate-300">Denominación</TableHead>
+                <TableHead className="text-slate-300 text-right w-28" colSpan={1}>Sumas Debe</TableHead>
+                <TableHead className="text-slate-300 text-right w-28" colSpan={1}>Sumas Haber</TableHead>
+                <TableHead className="text-slate-300 text-right w-28">Saldo Deudor</TableHead>
+                <TableHead className="text-slate-300 text-right w-28">Saldo Acreedor</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data.trialBalance.map((row, i) => (
+                <TableRow key={i} className="hover:bg-slate-50">
+                  <TableCell className="font-mono font-semibold text-primary">{formatAccountCode(row.accountCode)}</TableCell>
+                  <TableCell>{row.accountName}</TableCell>
+                  <TableCell className="text-right font-mono">{formatEuro(row.sumDebit)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatEuro(row.sumCredit)}</TableCell>
+                  <TableCell className="text-right font-mono text-amber-700">{row.balanceDebit ? formatEuro(row.balanceDebit) : ""}</TableCell>
+                  <TableCell className="text-right font-mono text-blue-700">{row.balanceCredit ? formatEuro(row.balanceCredit) : ""}</TableCell>
+                </TableRow>
+              ))}
+              <TableRow className="bg-slate-200 border-t-4 border-slate-300 font-bold">
+                <TableCell colSpan={2} className="text-right">TOTALES</TableCell>
+                <TableCell className="text-right font-mono">{formatEuro(totals.sd)}</TableCell>
+                <TableCell className="text-right font-mono">{formatEuro(totals.sc)}</TableCell>
+                <TableCell className="text-right font-mono text-amber-700">{formatEuro(totals.bd)}</TableCell>
+                <TableCell className="text-right font-mono text-blue-700">{formatEuro(totals.bc)}</TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+const ClosingEntryTable = ({ entry }: { entry: YearEndData["closingEntry"] }) => (
+  <Card className="rounded-2xl shadow-md border-border/50 overflow-hidden">
+    <div className="bg-slate-800 px-5 py-3">
+      <div className="flex items-center justify-between">
+        <span className="text-white font-semibold">Asiento Nº {entry.entryNumber} — {formatDate(entry.date)}</span>
+        <Badge className="bg-amber-200 text-amber-900 text-xs">{formatEuro(entry.totalAmount)}</Badge>
+      </div>
+      <p className="text-slate-300 text-xs mt-1">{entry.concept}</p>
+    </div>
+    <CardContent className="p-0">
+      <Table className="text-sm">
+        <TableHeader className="bg-slate-50">
+          <TableRow>
+            <TableHead className="w-24">Cuenta</TableHead>
+            <TableHead>Concepto</TableHead>
+            <TableHead className="text-right w-28">Debe</TableHead>
+            <TableHead className="text-right w-28">Haber</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {entry.debits.map((d, i) => (
+            <TableRow key={`d-${i}`} className="hover:bg-slate-50">
+              <TableCell className="font-mono font-semibold text-primary">{formatAccountCode(d.accountCode)}</TableCell>
+              <TableCell>{d.accountName}</TableCell>
+              <TableCell className="text-right font-mono font-semibold text-destructive">{formatEuro(d.amount)}</TableCell>
+              <TableCell></TableCell>
+            </TableRow>
+          ))}
+          {entry.credits.map((c, i) => (
+            <TableRow key={`c-${i}`} className="hover:bg-slate-50">
+              <TableCell className="font-mono font-semibold text-primary">{formatAccountCode(c.accountCode)}</TableCell>
+              <TableCell className="pl-8">{c.accountName}</TableCell>
+              <TableCell></TableCell>
+              <TableCell className="text-right font-mono font-semibold text-emerald-600">{formatEuro(c.amount)}</TableCell>
+            </TableRow>
+          ))}
+          <TableRow className="bg-slate-100 border-t-2">
+            <TableCell colSpan={2} className="text-right font-bold">TOTALES</TableCell>
+            <TableCell className="text-right font-mono font-bold text-destructive">{formatEuro(entry.debits.reduce((s, d) => s + d.amount, 0))}</TableCell>
+            <TableCell className="text-right font-mono font-bold text-emerald-600">{formatEuro(entry.credits.reduce((s, c) => s + c.amount, 0))}</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    </CardContent>
+  </Card>
+);
+
+export const RegularizationView = ({ data }: { data: YearEndData }) => (
+  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <SectionTitle
+      title="Asientos de Regularización"
+      description="Cierre de las cuentas de gastos (grupo 6) e ingresos (grupo 7), traspasando sus saldos a la cuenta 129 — Resultado del ejercicio."
+    />
+    {data.regularizationEntries.map((entry, i) => (
+      <ClosingEntryTable key={i} entry={entry} />
+    ))}
+    {data.regularizationEntries.length === 0 && (
+      <div className="text-center py-16 text-muted-foreground">No se han generado asientos de regularización.</div>
+    )}
+  </div>
+);
+
+export const ProfitAndLossView = ({ data }: { data: YearEndData }) => {
+  const pl = data.profitAndLoss;
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle
+        title="Cuenta de Pérdidas y Ganancias"
+        description="Resultado del ejercicio desglosado por naturaleza de gastos e ingresos según el PGC."
+      />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="rounded-2xl shadow-md border-red-200 overflow-hidden">
+          <div className="bg-red-700 px-5 py-3">
+            <p className="text-white font-bold text-lg">GASTOS</p>
+          </div>
+          <CardContent className="p-0">
+            {pl.expenses.map((sec, si) => (
+              <div key={si} className="border-b border-slate-100 last:border-0">
+                <div className="bg-red-50 px-4 py-2 flex justify-between items-center">
+                  <span className="text-sm font-semibold text-red-800">{sec.title}</span>
+                  <span className="font-mono font-bold text-red-700 text-sm">{formatEuro(sec.subtotal)}</span>
+                </div>
+                {sec.accounts.map((a, ai) => (
+                  <div key={ai} className="flex justify-between px-4 py-1.5 text-sm hover:bg-red-50/50">
+                    <span><span className="font-mono text-xs text-muted-foreground mr-2">{formatAccountCode(a.accountCode)}</span>{a.accountName}</span>
+                    <span className="font-mono">{formatEuro(a.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div className="bg-red-100 px-4 py-3 flex justify-between items-center border-t-2 border-red-300">
+              <span className="font-bold text-red-900">TOTAL GASTOS</span>
+              <span className="font-mono font-bold text-red-900 text-lg">{formatEuro(pl.totalExpenses)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl shadow-md border-emerald-200 overflow-hidden">
+          <div className="bg-emerald-700 px-5 py-3">
+            <p className="text-white font-bold text-lg">INGRESOS</p>
+          </div>
+          <CardContent className="p-0">
+            {pl.income.map((sec, si) => (
+              <div key={si} className="border-b border-slate-100 last:border-0">
+                <div className="bg-emerald-50 px-4 py-2 flex justify-between items-center">
+                  <span className="text-sm font-semibold text-emerald-800">{sec.title}</span>
+                  <span className="font-mono font-bold text-emerald-700 text-sm">{formatEuro(sec.subtotal)}</span>
+                </div>
+                {sec.accounts.map((a, ai) => (
+                  <div key={ai} className="flex justify-between px-4 py-1.5 text-sm hover:bg-emerald-50/50">
+                    <span><span className="font-mono text-xs text-muted-foreground mr-2">{formatAccountCode(a.accountCode)}</span>{a.accountName}</span>
+                    <span className="font-mono">{formatEuro(a.amount)}</span>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <div className="bg-emerald-100 px-4 py-3 flex justify-between items-center border-t-2 border-emerald-300">
+              <span className="font-bold text-emerald-900">TOTAL INGRESOS</span>
+              <span className="font-mono font-bold text-emerald-900 text-lg">{formatEuro(pl.totalIncome)}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className={cn("rounded-2xl shadow-lg overflow-hidden", pl.resultType === "Beneficio" ? "border-emerald-300" : "border-red-300")}>
+        <div className={cn("px-6 py-5 flex items-center justify-between", pl.resultType === "Beneficio" ? "bg-emerald-600" : "bg-red-600")}>
+          <div>
+            <p className="text-white text-sm font-medium uppercase tracking-wider">Resultado del Ejercicio</p>
+            <p className="text-white/80 text-xs mt-1">Cuenta 129 — {pl.resultType}</p>
+          </div>
+          <span className="text-white font-mono font-bold text-3xl">{pl.netResult >= 0 ? "+" : ""}{formatEuro(pl.netResult)}</span>
+        </div>
+      </Card>
+    </div>
+  );
+};
+
+export const FinalBalanceSheetView = ({ data }: { data: YearEndData }) => {
+  const bs = data.finalBalanceSheet;
+  const colorMap: Record<string, { bg: string; textTitle: string; textAmount: string }> = {
+    blue: { bg: "bg-blue-50", textTitle: "text-blue-800", textAmount: "text-blue-700" },
+    violet: { bg: "bg-violet-50", textTitle: "text-violet-800", textAmount: "text-violet-700" },
+    orange: { bg: "bg-orange-50", textTitle: "text-orange-800", textAmount: "text-orange-700" },
+  };
+  const BalanceSection = ({ sections, color }: { sections: typeof bs.assets; color: string }) => {
+    const c = colorMap[color] ?? colorMap.blue;
+    return (
+      <>
+        {sections.map((sec, si) => (
+          <div key={si} className="mb-3">
+            <div className={`px-4 py-2 rounded-lg ${c.bg} flex justify-between items-center`}>
+              <span className={`text-sm font-semibold ${c.textTitle}`}>{sec.title}</span>
+              <span className={`font-mono font-bold ${c.textAmount} text-sm`}>{formatEuro(sec.subtotal)}</span>
+            </div>
+            {sec.items.map((item, ii) => (
+              <div key={ii} className="flex justify-between px-4 py-1.5 text-sm hover:bg-slate-50">
+                <span><span className="font-mono text-xs text-muted-foreground mr-2">{formatAccountCode(item.accountCode)}</span>{item.accountName}</span>
+                <span className={cn("font-mono", item.amount < 0 && "text-red-600")}>{formatEuro(item.amount)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </>
+    );
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle
+        title="Balance de Situación Final"
+        description="Patrimonio de la empresa al cierre del ejercicio — activo, patrimonio neto y pasivo."
+      />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card className="rounded-2xl shadow-md border-blue-200 overflow-hidden">
+          <div className="bg-blue-700 px-5 py-3">
+            <p className="text-white font-bold text-lg">ACTIVO</p>
+          </div>
+          <CardContent className="pt-4">
+            <BalanceSection sections={bs.assets} color="blue" />
+            <div className="bg-blue-100 px-4 py-3 flex justify-between items-center border-t-2 border-blue-300 rounded-lg mt-2">
+              <span className="font-bold text-blue-900">TOTAL ACTIVO</span>
+              <span className="font-mono font-bold text-blue-900 text-lg">{formatEuro(bs.totalAssets)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-2xl shadow-md border-violet-200 overflow-hidden">
+          <div className="bg-violet-700 px-5 py-3">
+            <p className="text-white font-bold text-lg">PATRIMONIO NETO Y PASIVO</p>
+          </div>
+          <CardContent className="pt-4">
+            {bs.equity.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-xs font-bold text-violet-600 uppercase tracking-wider mb-2 px-4">Patrimonio Neto</h4>
+                <BalanceSection sections={bs.equity} color="violet" />
+              </div>
+            )}
+            {bs.liabilities.length > 0 && (
+              <div className="mb-4">
+                <h4 className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-2 px-4">Pasivo</h4>
+                <BalanceSection sections={bs.liabilities} color="orange" />
+              </div>
+            )}
+            <div className="bg-violet-100 px-4 py-3 flex justify-between items-center border-t-2 border-violet-300 rounded-lg mt-2">
+              <span className="font-bold text-violet-900">TOTAL PN + PASIVO</span>
+              <span className="font-mono font-bold text-violet-900 text-lg">{formatEuro(bs.totalEquityAndLiabilities)}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {Math.abs(bs.totalAssets - bs.totalEquityAndLiabilities) < 0.02 ? (
+        <div className="text-center py-3 text-emerald-600 font-semibold text-sm">
+          El balance cuadra: Activo ({formatEuro(bs.totalAssets)}) = PN + Pasivo ({formatEuro(bs.totalEquityAndLiabilities)})
+        </div>
+      ) : (
+        <div className="text-center py-3 text-amber-600 font-semibold text-sm">
+          Diferencia de cuadre: {formatEuro(Math.abs(bs.totalAssets - bs.totalEquityAndLiabilities))} (Activo: {formatEuro(bs.totalAssets)} vs PN+Pasivo: {formatEuro(bs.totalEquityAndLiabilities)})
+        </div>
+      )}
+    </div>
+  );
+};
+
+export const ClosingEntryView = ({ data }: { data: YearEndData }) => (
+  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <SectionTitle
+      title="Asiento de Cierre"
+      description="Se cierran todas las cuentas de balance (grupos 1 a 5) dejando todos los saldos a cero para el inicio del nuevo ejercicio."
+    />
+    <ClosingEntryTable entry={data.closingEntry} />
+  </div>
+);

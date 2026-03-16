@@ -1753,6 +1753,10 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     progress("Subcuentas asignadas");
   }
 
+  progress("Calculando cierre de ejercicio...");
+  universe.yearEndClosing = computeYearEndClosing(universe);
+  progress("Cierre de ejercicio completado");
+
   return universe;
 }
 
@@ -2698,4 +2702,447 @@ function buildBankDebitNotes(
   notes.sort((a, b) => a.date.localeCompare(b.date));
 
   return notes;
+}
+
+// ─── YEAR-END CLOSING (deterministic from journal) ───────────────────────────
+
+interface LedgerMovement {
+  entryNumber: string;
+  date: string;
+  concept: string;
+  debit: number;
+  credit: number;
+  balance: number;
+}
+
+interface LedgerAccount {
+  accountCode: string;
+  accountName: string;
+  movements: LedgerMovement[];
+  totalDebit: number;
+  totalCredit: number;
+  balance: number;
+  balanceSide: "deudor" | "acreedor";
+}
+
+interface TrialBalanceRow {
+  accountCode: string;
+  accountName: string;
+  sumDebit: number;
+  sumCredit: number;
+  balanceDebit: number;
+  balanceCredit: number;
+}
+
+interface RegularizationEntry {
+  entryNumber: string;
+  date: string;
+  concept: string;
+  debits: Array<{ accountCode: string; accountName: string; amount: number }>;
+  credits: Array<{ accountCode: string; accountName: string; amount: number }>;
+  totalAmount: number;
+}
+
+interface ProfitLossSection {
+  title: string;
+  accounts: Array<{ accountCode: string; accountName: string; amount: number }>;
+  subtotal: number;
+}
+
+interface BalanceSheetItem {
+  accountCode: string;
+  accountName: string;
+  amount: number;
+}
+
+interface BalanceSheetSection {
+  title: string;
+  items: BalanceSheetItem[];
+  subtotal: number;
+}
+
+interface YearEndClosing {
+  ledger: LedgerAccount[];
+  trialBalance: TrialBalanceRow[];
+  regularizationEntries: RegularizationEntry[];
+  profitAndLoss: {
+    income: ProfitLossSection[];
+    expenses: ProfitLossSection[];
+    totalIncome: number;
+    totalExpenses: number;
+    netResult: number;
+    resultType: "Beneficio" | "Pérdida";
+  };
+  finalBalanceSheet: {
+    assets: BalanceSheetSection[];
+    totalAssets: number;
+    equity: BalanceSheetSection[];
+    liabilities: BalanceSheetSection[];
+    totalEquityAndLiabilities: number;
+  };
+  closingEntry: RegularizationEntry;
+}
+
+const PGC_ACCOUNT_GROUPS: Record<string, string> = {
+  "1": "Financiación básica",
+  "2": "Activo no corriente",
+  "3": "Existencias",
+  "4": "Acreedores y deudores por operaciones comerciales",
+  "5": "Cuentas financieras",
+  "6": "Compras y gastos",
+  "7": "Ventas e ingresos",
+};
+
+const EXPENSE_SECTIONS: Record<string, string> = {
+  "60": "Compras",
+  "61": "Variación de existencias",
+  "62": "Servicios exteriores",
+  "63": "Tributos",
+  "64": "Gastos de personal",
+  "65": "Otros gastos de gestión",
+  "66": "Gastos financieros",
+  "67": "Pérdidas procedentes de activos no corrientes y gastos excepcionales",
+  "68": "Dotaciones para amortizaciones",
+  "69": "Pérdidas por deterioro y otras dotaciones",
+};
+
+const INCOME_SECTIONS: Record<string, string> = {
+  "70": "Ventas de mercaderías, de producción propia, de servicios, etc.",
+  "71": "Variación de existencias de productos terminados y en curso",
+  "73": "Trabajos realizados para la empresa",
+  "74": "Subvenciones, donaciones y legados",
+  "75": "Otros ingresos de gestión",
+  "76": "Ingresos financieros",
+  "77": "Beneficios procedentes de activos no corrientes e ingresos excepcionales",
+  "79": "Excesos y aplicaciones de provisiones y de pérdidas por deterioro",
+};
+
+function computeYearEndClosing(universe: Record<string, unknown>): YearEndClosing {
+  const entries = Array.isArray(universe.journalEntries) ? universe.journalEntries : [];
+
+  const accountMap = new Map<string, { name: string; movements: LedgerMovement[]; totalDebit: number; totalCredit: number }>();
+
+  function getAccount(code: string, name: string) {
+    if (!accountMap.has(code)) {
+      accountMap.set(code, { name, movements: [], totalDebit: 0, totalCredit: 0 });
+    }
+    const acc = accountMap.get(code)!;
+    if (!acc.name || acc.name === code) acc.name = name;
+    return acc;
+  }
+
+  for (const entry of entries) {
+    const e = entry as Record<string, unknown>;
+    const entryNum = String(e.entryNumber ?? "");
+    const date = String(e.date ?? "");
+    const concept = String(e.concept ?? "");
+
+    const debits = Array.isArray(e.debits) ? e.debits : [];
+    for (const d of debits) {
+      const dd = d as Record<string, unknown>;
+      const code = String(dd.accountCode ?? "");
+      const name = String(dd.accountName ?? code);
+      const amount = Number(dd.amount ?? 0);
+      if (!code || !amount) continue;
+      const acc = getAccount(code, name);
+      acc.totalDebit += amount;
+      const runBal = acc.totalDebit - acc.totalCredit;
+      acc.movements.push({ entryNumber: entryNum, date, concept, debit: amount, credit: 0, balance: Math.round(runBal * 100) / 100 });
+    }
+
+    const credits = Array.isArray(e.credits) ? e.credits : [];
+    for (const c of credits) {
+      const cc = c as Record<string, unknown>;
+      const code = String(cc.accountCode ?? "");
+      const name = String(cc.accountName ?? code);
+      const amount = Number(cc.amount ?? 0);
+      if (!code || !amount) continue;
+      const acc = getAccount(code, name);
+      acc.totalCredit += amount;
+      const runBal = acc.totalDebit - acc.totalCredit;
+      acc.movements.push({ entryNumber: entryNum, date, concept, debit: 0, credit: amount, balance: Math.round(runBal * 100) / 100 });
+    }
+  }
+
+  const ledger: LedgerAccount[] = [];
+  for (const [code, data] of accountMap) {
+    const td = Math.round(data.totalDebit * 100) / 100;
+    const tc = Math.round(data.totalCredit * 100) / 100;
+    const bal = Math.round((td - tc) * 100) / 100;
+    ledger.push({
+      accountCode: code,
+      accountName: data.name,
+      movements: data.movements,
+      totalDebit: td,
+      totalCredit: tc,
+      balance: Math.abs(bal),
+      balanceSide: bal >= 0 ? "deudor" : "acreedor",
+    });
+  }
+  ledger.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+
+  const trialBalance: TrialBalanceRow[] = ledger.map((a) => ({
+    accountCode: a.accountCode,
+    accountName: a.accountName,
+    sumDebit: a.totalDebit,
+    sumCredit: a.totalCredit,
+    balanceDebit: a.balanceSide === "deudor" ? a.balance : 0,
+    balanceCredit: a.balanceSide === "acreedor" ? a.balance : 0,
+  }));
+
+  const expenseAccounts = ledger.filter((a) => a.accountCode.startsWith("6"));
+  const incomeAccounts = ledger.filter((a) => a.accountCode.startsWith("7"));
+
+  const regEntries: RegularizationEntry[] = [];
+  const lastDate = (() => {
+    let maxDate = "";
+    for (const e of entries) {
+      const d = String((e as Record<string, unknown>).date ?? "");
+      if (d > maxDate) maxDate = d;
+    }
+    const year = maxDate.slice(0, 4) || "2025";
+    return `${year}-12-31`;
+  })();
+
+  const nextEntryNum = (() => {
+    let max = 0;
+    for (const e of entries) {
+      const n = parseInt(String((e as Record<string, unknown>).entryNumber ?? "0").replace(/\D/g, ""), 10);
+      if (n > max) max = n;
+    }
+    return max + 1;
+  })();
+
+  let totalExpenses = 0;
+  let totalIncome = 0;
+
+  const regExpenseDebits: Array<{ accountCode: string; accountName: string; amount: number }> = [];
+  const regExpenseCredits: Array<{ accountCode: string; accountName: string; amount: number }> = [];
+
+  for (const acc of expenseAccounts) {
+    if (acc.balance === 0) continue;
+    if (acc.balanceSide === "deudor") {
+      totalExpenses += acc.balance;
+      regExpenseCredits.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+    } else {
+      totalIncome += acc.balance;
+      regExpenseDebits.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+    }
+  }
+
+  for (const acc of incomeAccounts) {
+    if (acc.balance === 0) continue;
+    if (acc.balanceSide === "acreedor") {
+      totalIncome += acc.balance;
+      regExpenseDebits.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+    } else {
+      totalExpenses += acc.balance;
+      regExpenseCredits.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+    }
+  }
+
+  totalExpenses = Math.round(totalExpenses * 100) / 100;
+  totalIncome = Math.round(totalIncome * 100) / 100;
+  const netResult = Math.round((totalIncome - totalExpenses) * 100) / 100;
+  const isProfit = netResult >= 0;
+
+  if (regExpenseCredits.length > 0 || regExpenseDebits.length > 0) {
+    const regDebits = [...regExpenseDebits];
+    const regCredits = [...regExpenseCredits];
+
+    if (isProfit) {
+      regCredits.push({ accountCode: "129", accountName: "Resultado del ejercicio", amount: Math.abs(netResult) });
+    } else {
+      regDebits.push({ accountCode: "129", accountName: "Resultado del ejercicio", amount: Math.abs(netResult) });
+    }
+
+    regDebits.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+    regCredits.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+    const totalReg = Math.round(regDebits.reduce((s, d) => s + d.amount, 0) * 100) / 100;
+
+    regEntries.push({
+      entryNumber: String(nextEntryNum),
+      date: lastDate,
+      concept: "Regularización: cierre cuentas de gastos (grupo 6) e ingresos (grupo 7) — traspaso a Resultado del ejercicio (129)",
+      debits: regDebits,
+      credits: regCredits,
+      totalAmount: totalReg,
+    });
+  }
+
+  const expSections: ProfitLossSection[] = [];
+  const expBySubgroup = new Map<string, Array<{ accountCode: string; accountName: string; amount: number }>>();
+  for (const acc of expenseAccounts) {
+    if (acc.balance === 0) continue;
+    const sub = acc.accountCode.slice(0, 2);
+    if (!expBySubgroup.has(sub)) expBySubgroup.set(sub, []);
+    const amt = acc.balanceSide === "deudor" ? acc.balance : -acc.balance;
+    expBySubgroup.get(sub)!.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: Math.round(amt * 100) / 100 });
+  }
+  for (const [sub, accounts] of Array.from(expBySubgroup).sort(([a], [b]) => a.localeCompare(b))) {
+    const subtotal = Math.round(accounts.reduce((s, a) => s + a.amount, 0) * 100) / 100;
+    expSections.push({ title: EXPENSE_SECTIONS[sub] ?? `Grupo ${sub}`, accounts, subtotal });
+  }
+
+  const incSections: ProfitLossSection[] = [];
+  const incBySubgroup = new Map<string, Array<{ accountCode: string; accountName: string; amount: number }>>();
+  for (const acc of incomeAccounts) {
+    if (acc.balance === 0) continue;
+    const sub = acc.accountCode.slice(0, 2);
+    if (!incBySubgroup.has(sub)) incBySubgroup.set(sub, []);
+    const amt = acc.balanceSide === "acreedor" ? acc.balance : -acc.balance;
+    incBySubgroup.get(sub)!.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: Math.round(amt * 100) / 100 });
+  }
+  for (const [sub, accounts] of Array.from(incBySubgroup).sort(([a], [b]) => a.localeCompare(b))) {
+    const subtotal = Math.round(accounts.reduce((s, a) => s + a.amount, 0) * 100) / 100;
+    incSections.push({ title: INCOME_SECTIONS[sub] ?? `Grupo ${sub}`, accounts, subtotal });
+  }
+
+  const profitAndLoss = {
+    income: incSections,
+    expenses: expSections,
+    totalIncome,
+    totalExpenses,
+    netResult,
+    resultType: (isProfit ? "Beneficio" : "Pérdida") as "Beneficio" | "Pérdida",
+  };
+
+  const balanceAccounts = ledger.filter((a) => !a.accountCode.startsWith("6") && !a.accountCode.startsWith("7"));
+
+  const resultAccount: LedgerAccount = {
+    accountCode: "129",
+    accountName: "Resultado del ejercicio",
+    movements: [],
+    totalDebit: isProfit ? 0 : Math.abs(netResult),
+    totalCredit: isProfit ? Math.abs(netResult) : 0,
+    balance: Math.abs(netResult),
+    balanceSide: isProfit ? "acreedor" : "deudor",
+  };
+
+  const existing129 = balanceAccounts.find(a => a.accountCode === "129");
+  if (existing129) {
+    if (isProfit) {
+      existing129.totalCredit += Math.abs(netResult);
+    } else {
+      existing129.totalDebit += Math.abs(netResult);
+    }
+    const bal129 = existing129.totalDebit - existing129.totalCredit;
+    existing129.balance = Math.abs(Math.round(bal129 * 100) / 100);
+    existing129.balanceSide = bal129 >= 0 ? "deudor" : "acreedor";
+  } else {
+    balanceAccounts.push(resultAccount);
+    balanceAccounts.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+  }
+
+  const assetItems: BalanceSheetItem[] = [];
+  const equityItems: BalanceSheetItem[] = [];
+  const liabilityItems: BalanceSheetItem[] = [];
+
+  const CONTRA_ASSET_PREFIXES = ["28", "29", "39"];
+  const PASIVO_GROUP1_PREFIXES = ["14", "15", "16", "17", "18", "19"];
+
+  for (const acc of balanceAccounts) {
+    if (acc.balance === 0) continue;
+    const signedAmount = acc.balanceSide === "deudor" ? acc.balance : -acc.balance;
+    const g = acc.accountCode.charAt(0);
+    const sub2 = acc.accountCode.slice(0, 2);
+
+    if (g === "2") {
+      if (CONTRA_ASSET_PREFIXES.includes(sub2)) {
+        assetItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: signedAmount });
+      } else {
+        assetItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+      }
+    } else if (g === "3") {
+      if (sub2 === "39") {
+        assetItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: signedAmount });
+      } else {
+        assetItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+      }
+    } else if (g === "4") {
+      if (acc.balanceSide === "deudor") {
+        assetItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+      } else {
+        liabilityItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+      }
+    } else if (g === "5") {
+      if (acc.balanceSide === "deudor") {
+        assetItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+      } else {
+        liabilityItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+      }
+    } else if (g === "1") {
+      if (PASIVO_GROUP1_PREFIXES.includes(sub2)) {
+        liabilityItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+      } else if (acc.accountCode === "129") {
+        equityItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: signedAmount });
+      } else {
+        equityItems.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+      }
+    }
+  }
+
+  const buildSections = (items: BalanceSheetItem[]): BalanceSheetSection[] => {
+    const grouped = new Map<string, BalanceSheetItem[]>();
+    for (const item of items) {
+      const g = item.accountCode.charAt(0);
+      const label = PGC_ACCOUNT_GROUPS[g] ?? `Grupo ${g}`;
+      if (!grouped.has(label)) grouped.set(label, []);
+      grouped.get(label)!.push(item);
+    }
+    return Array.from(grouped).map(([title, items]) => ({
+      title,
+      items: items.sort((a, b) => a.accountCode.localeCompare(b.accountCode)),
+      subtotal: Math.round(items.reduce((s, i) => s + i.amount, 0) * 100) / 100,
+    }));
+  };
+
+  const assetSections = buildSections(assetItems);
+  const equitySections = buildSections(equityItems);
+  const liabilitySections = buildSections(liabilityItems);
+
+  const totalAssets = Math.round(assetSections.reduce((s, sec) => s + sec.subtotal, 0) * 100) / 100;
+  const totalEquityAndLiabilities = Math.round(
+    (equitySections.reduce((s, sec) => s + sec.subtotal, 0) + liabilitySections.reduce((s, sec) => s + sec.subtotal, 0)) * 100
+  ) / 100;
+
+  const closingDebits: Array<{ accountCode: string; accountName: string; amount: number }> = [];
+  const closingCredits: Array<{ accountCode: string; accountName: string; amount: number }> = [];
+
+  for (const acc of balanceAccounts) {
+    if (acc.balance === 0) continue;
+    if (acc.balanceSide === "deudor") {
+      closingCredits.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+    } else {
+      closingDebits.push({ accountCode: acc.accountCode, accountName: acc.accountName, amount: acc.balance });
+    }
+  }
+  closingDebits.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+  closingCredits.sort((a, b) => a.accountCode.localeCompare(b.accountCode));
+
+  const closingTotal = Math.round(closingDebits.reduce((s, d) => s + d.amount, 0) * 100) / 100;
+
+  const closingEntry: RegularizationEntry = {
+    entryNumber: String(nextEntryNum + regEntries.length),
+    date: lastDate,
+    concept: "Asiento de cierre del ejercicio — Se cierran todas las cuentas de balance (grupos 1 a 5) dejando saldos a cero.",
+    debits: closingDebits,
+    credits: closingCredits,
+    totalAmount: closingTotal,
+  };
+
+  return {
+    ledger,
+    trialBalance,
+    regularizationEntries: regEntries,
+    profitAndLoss,
+    finalBalanceSheet: {
+      assets: assetSections,
+      totalAssets,
+      equity: equitySections,
+      liabilities: liabilitySections,
+      totalEquityAndLiabilities,
+    },
+    closingEntry,
+  };
 }

@@ -1104,6 +1104,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       entityName: zod.string(),
     })).optional(),
     accountDigits: zod.number().optional(),
+    yearEndClosing: zod.any().optional(),
 });
 
 /**

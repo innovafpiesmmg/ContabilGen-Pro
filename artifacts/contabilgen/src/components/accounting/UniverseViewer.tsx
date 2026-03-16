@@ -19,6 +19,11 @@ import {
   BarChart3,
   Archive,
   Loader2,
+  BookCheck,
+  Scale,
+  TrendingUp,
+  ClipboardList,
+  Lock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { 
@@ -43,6 +48,12 @@ import {
   CronologiaView,
   BankDebitNotesView,
   SubAccountsView,
+  LedgerView,
+  TrialBalanceView,
+  RegularizationView,
+  ProfitAndLossView,
+  FinalBalanceSheetView,
+  ClosingEntryView,
 } from "./UniverseViews";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import { useToast } from "@/hooks/use-toast";
@@ -74,6 +85,8 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
   const hasExtraExpenses = universe.extraordinaryExpenses && universe.extraordinaryExpenses.length > 0;
   const hasWarehouseCards = universe.warehouseCards && universe.warehouseCards.length > 0;
   const hasSubAccounts = !!(universe as any).subAccounts && ((universe as any).subAccounts as unknown[]).length > 0;
+  const yearEndClosing = (universe as any).yearEndClosing as any;
+  const hasYearEndClosing = !!yearEndClosing?.ledger;
 
   const companyName = universe.companyProfile.name;
 
@@ -258,6 +271,29 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
                 <FileDown className="w-4 h-4" /> Notas de Cargo
               </TabsTrigger>
             )}
+            {hasYearEndClosing && (
+              <>
+                <div className="w-full px-2 py-2"><div className="border-t border-slate-300" /><p className="text-[10px] text-slate-400 uppercase tracking-widest text-center mt-1">Cierre del Ejercicio</p></div>
+                <TabsTrigger value="mayor" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-lg gap-2 font-semibold">
+                  <BookCheck className="w-4 h-4" /> Libro Mayor
+                </TabsTrigger>
+                <TabsTrigger value="sumas_saldos" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-lg gap-2 font-semibold">
+                  <Scale className="w-4 h-4" /> Balance Sumas y Saldos
+                </TabsTrigger>
+                <TabsTrigger value="regularizacion" className="data-[state=active]:bg-amber-600 data-[state=active]:text-white rounded-lg gap-2 font-semibold">
+                  <ClipboardList className="w-4 h-4" /> Regularización
+                </TabsTrigger>
+                <TabsTrigger value="pyg" className="data-[state=active]:bg-emerald-700 data-[state=active]:text-white rounded-lg gap-2 font-semibold">
+                  <TrendingUp className="w-4 h-4" /> Pérdidas y Ganancias
+                </TabsTrigger>
+                <TabsTrigger value="balance_final" className="data-[state=active]:bg-violet-700 data-[state=active]:text-white rounded-lg gap-2 font-semibold">
+                  <Home className="w-4 h-4" /> Balance de Situación
+                </TabsTrigger>
+                <TabsTrigger value="asiento_cierre" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white rounded-lg gap-2 font-bold">
+                  <Lock className="w-4 h-4" /> Asiento de Cierre
+                </TabsTrigger>
+              </>
+            )}
           </TabsList>
         </div>
 
@@ -347,6 +383,28 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
                 company={universe.companyProfile}
               />
             </TabsContent>
+          )}
+          {hasYearEndClosing && (
+            <>
+              <TabsContent value="mayor" className="mt-0 outline-none">
+                <LedgerView data={yearEndClosing} />
+              </TabsContent>
+              <TabsContent value="sumas_saldos" className="mt-0 outline-none">
+                <TrialBalanceView data={yearEndClosing} />
+              </TabsContent>
+              <TabsContent value="regularizacion" className="mt-0 outline-none">
+                <RegularizationView data={yearEndClosing} />
+              </TabsContent>
+              <TabsContent value="pyg" className="mt-0 outline-none">
+                <ProfitAndLossView data={yearEndClosing} />
+              </TabsContent>
+              <TabsContent value="balance_final" className="mt-0 outline-none">
+                <FinalBalanceSheetView data={yearEndClosing} />
+              </TabsContent>
+              <TabsContent value="asiento_cierre" className="mt-0 outline-none">
+                <ClosingEntryView data={yearEndClosing} />
+              </TabsContent>
+            </>
           )}
         </div>
       </Tabs>
