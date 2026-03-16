@@ -411,8 +411,7 @@ async function generateMonthlyBundle(
   monthLabel: string,
   invoicesPerMonth: number,
   invoiceStartNum: number,
-  openingBalance: number,
-): Promise<{ invoices: unknown[]; bankStatement: unknown; cardMovements: unknown[] }> {
+): Promise<{ invoices: unknown[]; cardMovements: unknown[] }> {
   const rates = TAX_RATES[params.taxRegime];
   const sectorCtx = getSectorContext(params.sector, params.taxRegime, params.activity);
 
@@ -438,18 +437,17 @@ async function generateMonthlyBundle(
   const buyAcc = sectorCtx.purchaseAccount;
   const iva = rates.standard;
 
-  const prompt = `Datos contables de ${monthLabel} para "${scenario.companyName}" (${getActivityLabel(params)}, ${params.taxRegime}). Banco: ${scenario.bankEntity}, cta ${scenario.bankAccount}.
+  const prompt = `Datos contables de ${monthLabel} para "${scenario.companyName}" (${getActivityLabel(params)}, ${params.taxRegime}).
 IVA ${iva}%. Ventas→${sectorSaleHint}. Compras→${sectorBuyHint}.
 
 JSON exacto:
-{"invoices":[{"invoiceNumber":"${nums[0]}","date":"${monthStart.slice(0,7)}-10","type":"sale","partyName":"Cliente SA","partyNif":"A11111111","lines":[{"description":"Descripción venta","quantity":1,"unitPrice":1000,"discount":0,"subtotal":1000,"taxRate":${iva},"taxAmount":${iva * 10},"total":${1000 + iva * 10}}],"subtotal":1000,"taxBase":1000,"taxAmount":${iva * 10},"total":${1000 + iva * 10},"paymentMethod":"transfer","dueDate":"${monthEnd}","accountDebits":[{"accountCode":"430","accountName":"Clientes","amount":${1000 + iva * 10},"description":"Factura venta"}],"accountCredits":[{"accountCode":"${saleAcc.code}","accountName":"${saleAcc.name}","amount":1000,"description":"Venta"},{"accountCode":"477","accountName":"IVA repercutido","amount":${iva * 10},"description":"IVA"}]}],"bankStatement":{"bank":"${scenario.bankEntity}","accountNumber":"${scenario.bankAccount}","period":"${monthLabel}","openingBalance":${openingBalance},"closingBalance":${openingBalance + 500},"transactions":[{"date":"${monthStart.slice(0,7)}-05","concept":"Cobro cliente","debit":null,"credit":1210,"balance":${openingBalance + 1210}},{"date":"${monthStart.slice(0,7)}-20","concept":"Pago proveedor","debit":726,"credit":null,"balance":${openingBalance + 484}}]},"cardMovements":[{"date":"${monthStart.slice(0,7)}-15","description":"Gasto empresa","amount":150,"category":"Servicios","accountCode":"629","accountName":"Otros servicios"}]}
+{"invoices":[{"invoiceNumber":"${nums[0]}","date":"${monthStart.slice(0,7)}-10","type":"sale","partyName":"Cliente SA","partyNif":"A11111111","lines":[{"description":"Descripción venta","quantity":1,"unitPrice":1000,"discount":0,"subtotal":1000,"taxRate":${iva},"taxAmount":${iva * 10},"total":${1000 + iva * 10}}],"subtotal":1000,"taxBase":1000,"taxAmount":${iva * 10},"total":${1000 + iva * 10},"paymentMethod":"transfer","dueDate":"${monthEnd}","accountDebits":[{"accountCode":"430","accountName":"Clientes","amount":${1000 + iva * 10},"description":"Factura venta"}],"accountCredits":[{"accountCode":"${saleAcc.code}","accountName":"${saleAcc.name}","amount":1000,"description":"Venta"},{"accountCode":"477","accountName":"IVA repercutido","amount":${iva * 10},"description":"IVA"}]}],"cardMovements":[{"date":"${monthStart.slice(0,7)}-15","description":"Gasto empresa","amount":150,"category":"Servicios","accountCode":"629","accountName":"Otros servicios"}]}
 
-GENERA: ${invoicesPerMonth} facturas (mezcla compra/venta, al menos 1 de cada), 4-5 transacciones bancarias y 2-3 movimientos tarjeta. Todas las fechas entre ${monthStart} y ${monthEnd}. Usa números de factura: ${nums.join(", ")}. Ventas→cta ${saleAcc.code}. Compras→cta ${buyAcc.code}. Saldo cierre = apertura ± transacciones.`;
+GENERA: ${invoicesPerMonth} facturas (mezcla compra/venta, al menos 1 de cada) y 2-3 movimientos tarjeta. Todas las fechas entre ${monthStart} y ${monthEnd}. Usa números de factura: ${nums.join(", ")}. Ventas→cta ${saleAcc.code}. Compras→cta ${buyAcc.code}. NO generes extracto bancario (se construye automáticamente).`;
 
   const result = await callAI(client, model, prompt, 3500) as Record<string, unknown>;
   return {
     invoices: Array.isArray(result.invoices) ? result.invoices : [],
-    bankStatement: result.bankStatement ?? null,
     cardMovements: Array.isArray(result.cardMovements) ? result.cardMovements : [],
   };
 }
@@ -1665,16 +1663,13 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
 
   const months = getMonthsInPeriod(params);
   let invoiceNum = 1;
-  let rollingBalance = 20000;
   const monthlyBundlePromises = months.map((m) => {
     const startNum = invoiceNum;
     invoiceNum += invoicesPerMonth;
-    const balance = rollingBalance;
-    rollingBalance += Math.floor(Math.random() * 4000) - 1000;
     return generateMonthlyBundle(
       params, scenario, client, model,
       m.start, m.end, m.label,
-      invoicesPerMonth, startNum, balance,
+      invoicesPerMonth, startNum,
     ).then((r) => { progress(`Facturas ${m.label} completadas`); return r; });
   });
 
@@ -1704,19 +1699,15 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     (universe.companyProfile as Record<string, unknown>).activity = params.activity || null;
   }
 
-  // Merge monthly bundles
   const allInvoices: unknown[] = [];
-  const allBankStatements: unknown[] = [];
   const allCardMovements: unknown[] = [];
 
   for (const result of monthlyResults) {
     if (result.invoices?.length) allInvoices.push(...result.invoices);
-    if (result.bankStatement) allBankStatements.push(result.bankStatement);
     if (result.cardMovements?.length) allCardMovements.push(...result.cardMovements);
   }
 
   universe.invoices = allInvoices;
-  universe.bankStatements = allBankStatements;
 
   // Build creditCardStatement from collected monthly movements
   const totalCardCharges = allCardMovements.reduce(
@@ -1737,6 +1728,7 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
   universe.serviceInvoices = buildServiceInvoices(params, scenario);
   universe.bankDebitNotes = buildBankDebitNotes(universe, scenario, params);
   universe.paymentReceipts = buildPaymentReceipts(universe, scenario);
+  universe.bankStatements = buildBankStatements(universe, scenario, params);
 
   progress("Generando libro diario (basado en documentos reales)...");
   const documentContext = buildDocumentSummary(universe);
@@ -2144,6 +2136,325 @@ function buildPaymentReceipts(
   }
 
   return receipts;
+}
+
+// ─── BANK STATEMENTS BUILDER (deterministic from real operations) ─────────────
+
+interface BankTransaction {
+  date: string;
+  concept: string;
+  reference: string;
+  debit: number | null;
+  credit: number | null;
+  balance: number;
+}
+
+interface BankStatementMonth {
+  bank: string;
+  accountNumber: string;
+  period: string;
+  openingBalance: number;
+  closingBalance: number;
+  transactions: BankTransaction[];
+}
+
+function buildBankStatements(
+  universe: Record<string, unknown>,
+  scenario: Record<string, unknown>,
+  params: GenerateParams,
+): BankStatementMonth[] {
+  const bankEntity = String(scenario.bankEntity ?? "Entidad Bancaria");
+  const bankAccount = String(scenario.bankAccount ?? "ES00 0000 0000 0000 0000 0000");
+
+  const rawTxns: Array<{ date: string; concept: string; reference: string; amount: number; isCredit: boolean }> = [];
+
+  const paymentReceipts = Array.isArray(universe.paymentReceipts) ? universe.paymentReceipts : [];
+  for (const pr of paymentReceipts) {
+    const r = pr as Record<string, unknown>;
+    const amount = Number(r.amount ?? 0);
+    if (!amount) continue;
+    const isCobro = r.type === "cobro";
+    rawTxns.push({
+      date: String(r.date ?? ""),
+      concept: String(r.concept ?? (isCobro ? "Cobro" : "Pago")),
+      reference: String(r.receiptNumber ?? ""),
+      amount,
+      isCredit: isCobro,
+    });
+  }
+
+  const ssPayments = Array.isArray(universe.socialSecurityPayments) ? universe.socialSecurityPayments : [];
+  for (const ss of ssPayments) {
+    const s = ss as Record<string, unknown>;
+    const amount = Number(s.totalPayment ?? 0);
+    if (!amount) continue;
+    rawTxns.push({
+      date: String(s.dueDate ?? ""),
+      concept: `Adeudo TC1 Seguridad Social — ${s.month ?? ""}`,
+      reference: `TC1-${s.month ?? ""}`,
+      amount,
+      isCredit: false,
+    });
+  }
+
+  const taxLiqs = Array.isArray(universe.taxLiquidations) ? universe.taxLiquidations : [];
+  for (const liq of taxLiqs) {
+    const l = liq as Record<string, unknown>;
+    const amount = Number(l.result ?? 0);
+    if (!amount || amount <= 0) continue;
+    const model = String(l.model ?? "");
+    const period = String(l.period ?? "");
+    rawTxns.push({
+      date: String(l.dueDate ?? ""),
+      concept: `Pago Mod.${model} ${period}`,
+      reference: `MOD${model}-${period}`,
+      amount,
+      isCredit: false,
+    });
+  }
+
+  const loan = universe.bankLoan as Record<string, unknown> | undefined;
+  if (loan?.amortizationTable && Array.isArray(loan.amortizationTable)) {
+    for (const row of loan.amortizationTable as Array<Record<string, unknown>>) {
+      const installment = Number(row.installment ?? row.cuota ?? 0);
+      if (!installment) continue;
+      rawTxns.push({
+        date: String(row.date ?? ""),
+        concept: `Cuota préstamo — ${row.period ?? ""}`,
+        reference: String(loan.loanNumber ?? "PREST") + `-${row.period ?? ""}`,
+        amount: installment,
+        isCredit: false,
+      });
+    }
+  }
+
+  const mortgage = universe.mortgage as Record<string, unknown> | undefined;
+  if (mortgage?.amortizationTable && Array.isArray(mortgage.amortizationTable)) {
+    for (const row of mortgage.amortizationTable as Array<Record<string, unknown>>) {
+      const installment = Number(row.installment ?? row.cuota ?? 0);
+      if (!installment) continue;
+      rawTxns.push({
+        date: String(row.date ?? ""),
+        concept: `Cuota hipoteca — ${row.period ?? ""}`,
+        reference: String(mortgage.loanNumber ?? "HIP") + `-${row.period ?? ""}`,
+        amount: installment,
+        isCredit: false,
+      });
+    }
+  }
+
+  const insurances = Array.isArray(universe.insurancePolicies) ? universe.insurancePolicies : [];
+  for (const ins of insurances) {
+    const i = ins as Record<string, unknown>;
+    const premium = Number(i.annualPremium ?? 0);
+    if (!premium) continue;
+    rawTxns.push({
+      date: String(i.startDate ?? ""),
+      concept: `Prima seguro ${i.type ?? "multirriesgo"} — póliza ${i.policyNumber ?? ""}`,
+      reference: `SEG-${i.policyNumber ?? ""}`,
+      amount: premium,
+      isCredit: false,
+    });
+  }
+
+  const payroll = universe.payroll as Record<string, unknown> | undefined;
+  if (payroll?.totalNetSalary) {
+    rawTxns.push({
+      date: String(payroll.paymentDate ?? ""),
+      concept: `Pago nómina neta — ${payroll.month ?? ""}`,
+      reference: `NOM-${payroll.month ?? ""}`,
+      amount: Number(payroll.totalNetSalary),
+      isCredit: false,
+    });
+  }
+
+  const div = universe.dividendDistribution as Record<string, unknown> | undefined;
+  if (div?.netDividendPaid) {
+    rawTxns.push({
+      date: String(div.paymentDate ?? ""),
+      concept: `Pago dividendos netos ejercicio ${div.fiscalYear ?? ""}`,
+      reference: `DIV-${div.fiscalYear ?? ""}`,
+      amount: Number(div.netDividendPaid),
+      isCredit: false,
+    });
+  }
+
+  const policy = universe.creditPolicy as Record<string, unknown> | undefined;
+  if (policy?.totalSettlement) {
+    rawTxns.push({
+      date: String(policy.endDate ?? ""),
+      concept: `Liquidación póliza de crédito — ${policy.policyNumber ?? ""}`,
+      reference: `POL-${policy.policyNumber ?? ""}`,
+      amount: Number(policy.totalSettlement),
+      isCredit: false,
+    });
+  }
+
+  const fixedAssets = Array.isArray(universe.fixedAssets) ? universe.fixedAssets : [];
+  for (const fa of fixedAssets) {
+    const a = fa as Record<string, unknown>;
+    const amount = Number(a.purchaseCost ?? a.acquisitionValue ?? 0);
+    if (!amount) continue;
+    rawTxns.push({
+      date: String(a.purchaseDate ?? a.acquisitionDate ?? ""),
+      concept: `Compra inmovilizado: ${a.description ?? "activo fijo"}`,
+      reference: `INM-${a.code ?? a.assetCode ?? ""}`,
+      amount,
+      isCredit: false,
+    });
+  }
+
+  const cardSettlement = universe.creditCardStatement as Record<string, unknown> | undefined;
+  if (cardSettlement?.totalCharges) {
+    rawTxns.push({
+      date: String(cardSettlement.settlementDate ?? ""),
+      concept: "Liquidación tarjeta de crédito",
+      reference: "TRJ-LIQ",
+      amount: Number(cardSettlement.totalCharges),
+      isCredit: false,
+    });
+  }
+
+  const bankLoan = universe.bankLoan as Record<string, unknown> | undefined;
+  if (bankLoan?.principal) {
+    const loanAmount = Number(bankLoan.principal);
+    const loanDate = String(bankLoan.startDate ?? bankLoan.formalizationDate ?? "");
+    if (loanAmount && loanDate) {
+      rawTxns.push({
+        date: loanDate,
+        concept: `Formalización préstamo bancario — ${bankLoan.loanNumber ?? ""}`,
+        reference: `PREST-FORM-${bankLoan.loanNumber ?? ""}`,
+        amount: loanAmount,
+        isCredit: true,
+      });
+    }
+  }
+
+  const creditPolicy = universe.creditPolicy as Record<string, unknown> | undefined;
+  if (creditPolicy?.drawdownAmount || creditPolicy?.limit) {
+    const drawdown = Number(creditPolicy.drawdownAmount ?? creditPolicy.limit ?? 0);
+    const drawDate = String(creditPolicy.startDate ?? "");
+    if (drawdown && drawDate) {
+      rawTxns.push({
+        date: drawDate,
+        concept: `Disposición póliza de crédito — ${creditPolicy.policyNumber ?? ""}`,
+        reference: `POL-DISP-${creditPolicy.policyNumber ?? ""}`,
+        amount: drawdown,
+        isCredit: true,
+      });
+    }
+  }
+
+  const shareholders = universe.shareholdersInfo as Record<string, unknown> | undefined;
+  if (shareholders) {
+    const capitalBank = Number(shareholders.bankContribution ?? shareholders.totalCapital ?? 0);
+    const capDate = String(shareholders.constitutionDate ?? shareholders.date ?? "");
+    if (capitalBank && capDate) {
+      rawTxns.push({
+        date: capDate,
+        concept: "Aportación capital social — desembolso bancario",
+        reference: "CAP-APORT",
+        amount: capitalBank,
+        isCredit: true,
+      });
+    }
+  }
+
+  if (mortgage?.principal) {
+    const mortDate = String(mortgage.startDate ?? mortgage.formalizationDate ?? "");
+    const mortPrincipal = Number(mortgage.principal);
+    if (mortPrincipal && mortDate) {
+      rawTxns.push({
+        date: mortDate,
+        concept: `Formalización hipoteca — ingreso préstamo hipotecario`,
+        reference: `HIP-FORM`,
+        amount: mortPrincipal,
+        isCredit: true,
+      });
+    }
+  }
+
+  const extraExpenses = Array.isArray(universe.extraordinaryExpenses) ? universe.extraordinaryExpenses : [];
+  for (const exp of extraExpenses) {
+    const e = exp as Record<string, unknown>;
+    const amount = Number(e.amount ?? 0);
+    if (!amount) continue;
+    const credits = Array.isArray(e.accountCredits) ? e.accountCredits : [];
+    const debits = Array.isArray(e.accountDebits) ? e.accountDebits : [];
+    const has572Credit = credits.some((c: unknown) => String((c as Record<string, unknown>).accountCode) === "572");
+    const has572Debit = debits.some((d: unknown) => String((d as Record<string, unknown>).accountCode) === "572");
+    if (has572Credit) {
+      rawTxns.push({
+        date: String(e.date ?? ""),
+        concept: String(e.description ?? e.concept ?? "Gasto extraordinario"),
+        reference: `EXT-${e.type ?? ""}`,
+        amount,
+        isCredit: false,
+      });
+    } else if (has572Debit) {
+      rawTxns.push({
+        date: String(e.date ?? ""),
+        concept: String(e.description ?? e.concept ?? "Ingreso extraordinario"),
+        reference: `EXT-${e.type ?? ""}`,
+        amount,
+        isCredit: true,
+      });
+    }
+  }
+
+  const validTxns = rawTxns.filter(t => t.date && t.amount > 0);
+  validTxns.sort((a, b) => a.date.localeCompare(b.date));
+
+  const monthMap = new Map<string, typeof validTxns>();
+  for (const t of validTxns) {
+    const monthKey = t.date.slice(0, 7);
+    if (!monthMap.has(monthKey)) monthMap.set(monthKey, []);
+    monthMap.get(monthKey)!.push(t);
+  }
+
+  const months = getMonthsInPeriod(params);
+  const initialBalance = universe.initialBalanceSheet
+    ? Number((universe.initialBalanceSheet as Record<string, unknown>).bankBalance ?? 20000)
+    : 20000;
+
+  let runningBalance = Math.round(initialBalance * 100) / 100;
+  const statements: BankStatementMonth[] = [];
+
+  for (const m of months) {
+    const monthKey = m.start.slice(0, 7);
+    const monthTxns = monthMap.get(monthKey) ?? [];
+    const openingBalance = runningBalance;
+    const transactions: BankTransaction[] = [];
+
+    for (const t of monthTxns) {
+      if (t.isCredit) {
+        runningBalance += t.amount;
+      } else {
+        runningBalance -= t.amount;
+      }
+      runningBalance = Math.round(runningBalance * 100) / 100;
+
+      transactions.push({
+        date: t.date,
+        concept: t.concept,
+        reference: t.reference,
+        debit: t.isCredit ? null : t.amount,
+        credit: t.isCredit ? t.amount : null,
+        balance: runningBalance,
+      });
+    }
+
+    statements.push({
+      bank: bankEntity,
+      accountNumber: bankAccount,
+      period: m.label,
+      openingBalance: Math.round(openingBalance * 100) / 100,
+      closingBalance: runningBalance,
+      transactions,
+    });
+  }
+
+  return statements;
 }
 
 // ─── BANK DEBIT NOTES BUILDER ─────────────────────────────────────────────────

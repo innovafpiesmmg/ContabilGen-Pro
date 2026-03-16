@@ -332,6 +332,11 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
           <TabsContent value="bancos" className="mt-0 outline-none">
             <BankStatementView statements={universe.bankStatements} />
           </TabsContent>
+          {hasSubAccounts && (
+            <TabsContent value="subcuentas" className="mt-0 outline-none">
+              <SubAccountsView data={universe} />
+            </TabsContent>
+          )}
           <TabsContent value="diario" className="mt-0 outline-none">
             <JournalView entries={universe.journalEntries} />
           </TabsContent>

@@ -35,7 +35,11 @@ ContabilGen Pro es un generador de universos contables para prácticas de Grado 
    - Siniestro (cuentas 671 pérdida inmovilizado / 440 deudores aseguradora / 778 ingreso excepcional)
    - Gastos e ingresos extraordinarios (multas 678, donaciones, pérdidas inmovilizado 671, ingresos excepcionales 778/771)
    - Nómina con SS e IRPF
-   - Extracto bancario
+   - Extracto bancario (construido determinísticamente desde operaciones reales — NO generado por IA)
+   - Notas de adeudo bancario (construidas desde operaciones reales)
+   - Recibos de cobro/pago (construidos desde facturas reales)
+   - Facturas de servicios (alquiler, electricidad, agua, teléfono, internet, gestoría)
+   - Cuadro de subcuentas (5-8 dígitos, asignación automática)
    - Libro diario (asientos contables)
 
 ## Structure
