@@ -792,14 +792,53 @@ export const getGenerateAccountingUniverseUrl = () => {
 
 export const generateAccountingUniverse = async (
   generateUniverseRequest: GenerateUniverseRequest,
-  options?: RequestInit,
+  _options?: RequestInit,
 ): Promise<AccountingUniverse> => {
-  return customFetch<AccountingUniverse>(getGenerateAccountingUniverseUrl(), {
-    ...options,
+  const startRes = await fetch(getGenerateAccountingUniverseUrl(), {
     method: "POST",
-    headers: { "Content-Type": "application/json", ...options?.headers },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(generateUniverseRequest),
+    credentials: "include",
   });
+
+  if (!startRes.ok) {
+    let errorMsg = `HTTP ${startRes.status}`;
+    try {
+      const errBody = await startRes.json();
+      errorMsg = errBody.error || errBody.message || errorMsg;
+    } catch { /* ignore */ }
+    throw new Error(errorMsg);
+  }
+
+  const startData = await startRes.json();
+
+  if (!startData.jobId) {
+    return startData as AccountingUniverse;
+  }
+
+  const pollUrl = `/api/accounting/generate/status/${startData.jobId}`;
+  const maxWait = 10 * 60 * 1000;
+  const start = Date.now();
+
+  while (Date.now() - start < maxWait) {
+    await new Promise((r) => setTimeout(r, 3000));
+
+    const pollRes = await fetch(pollUrl, { credentials: "include" });
+    if (!pollRes.ok) {
+      throw new Error(`Error al consultar el estado: HTTP ${pollRes.status}`);
+    }
+
+    const pollData = await pollRes.json();
+
+    if (pollData.status === "done") {
+      return pollData.result as AccountingUniverse;
+    }
+    if (pollData.status === "error") {
+      throw new Error(pollData.error || "Error durante la generación");
+    }
+  }
+
+  throw new Error("La generación tardó demasiado tiempo. Inténtalo de nuevo.");
 };
 
 export const getGenerateAccountingUniverseMutationOptions = <
