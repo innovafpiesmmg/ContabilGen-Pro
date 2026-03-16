@@ -1276,17 +1276,36 @@ function buildDocumentSummary(universe: Record<string, unknown>): string {
     sections.push(bsLines.join("\n"));
   }
 
-  const payroll = universe.payroll as Record<string, unknown> | undefined;
-  if (payroll) {
-    const prLines = ["NÓMINA:"];
-    const employees = Array.isArray(payroll.employees) ? payroll.employees : [];
-    prLines.push(`  Mes: ${payroll.month} | Pago: ${payroll.paymentDate}`);
-    for (const emp of employees) {
-      const e = emp as Record<string, unknown>;
-      prLines.push(`  ${e.name} | Bruto: ${e.grossSalary}€ | Neto: ${e.netSalary}€ | SS obrera: ${e.ssEmployeeAmount}€ | IRPF: ${e.irpfAmount}€`);
+  const monthlyPayrolls = Array.isArray(universe.monthlyPayrolls) ? universe.monthlyPayrolls : [];
+  if (monthlyPayrolls.length > 0) {
+    const prLines = ["NÓMINAS MENSUALES:"];
+    for (const mp of monthlyPayrolls) {
+      const m = mp as Record<string, unknown>;
+      prLines.push(`  ${m.monthLabel}: Bruto ${m.totalGross}€ | SS patronal ${m.totalSsEmployer}€ | Neto ${m.totalNetSalary}€ | Devengo: ${m.devDate} | Pago: ${m.payDate}`);
     }
-    prLines.push(`  Totales: Bruto ${payroll.totalGross}€ | SS patronal ${payroll.totalSsEmployer}€ | Neto ${payroll.totalNetSalary}€`);
+    const firstPayroll = monthlyPayrolls[0] as Record<string, unknown>;
+    const employees = Array.isArray(firstPayroll?.employees) ? firstPayroll.employees : [];
+    if (employees.length > 0) {
+      prLines.push("  Empleados:");
+      for (const emp of employees) {
+        const e = emp as Record<string, unknown>;
+        prLines.push(`    ${e.name} | Bruto: ${e.grossSalary}€ | Neto: ${e.netSalary}€`);
+      }
+    }
     sections.push(prLines.join("\n"));
+  } else {
+    const payroll = universe.payroll as Record<string, unknown> | undefined;
+    if (payroll) {
+      const prLines = ["NÓMINA:"];
+      const employees = Array.isArray(payroll.employees) ? payroll.employees : [];
+      prLines.push(`  Mes: ${payroll.month} | Pago: ${payroll.paymentDate}`);
+      for (const emp of employees) {
+        const e = emp as Record<string, unknown>;
+        prLines.push(`  ${e.name} | Bruto: ${e.grossSalary}€ | Neto: ${e.netSalary}€ | SS obrera: ${e.ssEmployeeAmount}€ | IRPF: ${e.irpfAmount}€`);
+      }
+      prLines.push(`  Totales: Bruto ${payroll.totalGross}€ | SS patronal ${payroll.totalSsEmployer}€ | Neto ${payroll.totalNetSalary}€`);
+      sections.push(prLines.join("\n"));
+    }
   }
 
   const ssPayments = Array.isArray(universe.socialSecurityPayments) ? universe.socialSecurityPayments : [];
@@ -1465,8 +1484,18 @@ function buildValidDocumentRefs(universe: Record<string, unknown>): Set<string> 
     if (r.receiptNumber) refs.add(String(r.receiptNumber));
   }
 
+  const monthlyPayrolls = Array.isArray(universe.monthlyPayrolls) ? universe.monthlyPayrolls : [];
+  for (const mp of monthlyPayrolls) {
+    const mpr = mp as Record<string, unknown>;
+    const label = String(mpr.monthLabel ?? "");
+    if (label) {
+      refs.add(label);
+      refs.add(`Nómina ${label}`);
+      refs.add(`NOM-${label}`);
+    }
+  }
   const payroll = universe.payroll as Record<string, unknown> | undefined;
-  if (payroll) {
+  if (payroll && monthlyPayrolls.length === 0) {
     const month = String(payroll.month ?? "");
     if (month) {
       refs.add(month);
@@ -2047,29 +2076,19 @@ function buildDeterministicJournal(
     copyEntry(date, String(ex.concept ?? ex.type ?? "Gasto extraordinario").substring(0, 40), ref, ex);
   }
 
-  const payroll = universe.payroll as Record<string, unknown> | undefined;
-  if (payroll) {
-    const monthLabel = String(payroll.month ?? "");
-    const totalGross = Number(payroll.totalGross ?? 0);
-    const ssEmployer = Number(payroll.totalSsEmployer ?? payroll.ssEmployerAmount ?? 0);
-    const ssEmployee = Number(payroll.totalSsEmployee ?? payroll.ssEmployeeAmount ?? 0);
-    const irpfTotal = Number(payroll.totalIrpf ?? payroll.irpfAmount ?? 0);
-    const netPay = Number(payroll.totalNetSalary ?? payroll.netPay ?? payroll.totalNet ?? 0);
+  const monthlyPayrolls = Array.isArray(universe.monthlyPayrolls) ? universe.monthlyPayrolls as Record<string, unknown>[] : [];
+  for (const mp of monthlyPayrolls) {
+    const monthLabel = String(mp.monthLabel ?? "");
+    const totalGross = Number(mp.totalGross ?? 0);
+    const ssEmployer = Number(mp.totalSsEmployer ?? 0);
+    const ssEmployee = Number(mp.totalSsEmployee ?? 0);
+    const irpfTotal = Number(mp.totalIrpf ?? 0);
+    const netPay = Number(mp.totalNetSalary ?? 0);
     const ssTotal = r2(ssEmployee + ssEmployer);
-    const paymentDate = String(payroll.paymentDate ?? "");
+    const devDate = String(mp.devDate ?? "");
+    const payDate = String(mp.payDate ?? "");
 
-    if (totalGross > 0) {
-      const devDate = paymentDate || `${params.year}-01-28`;
-      const payDate = (() => {
-        if (paymentDate) return paymentDate;
-        try {
-          const d = new Date(devDate);
-          d.setMonth(d.getMonth() + 1);
-          d.setDate(1);
-          return d.toISOString().slice(0, 10);
-        } catch { return devDate; }
-      })();
-
+    if (totalGross > 0 && devDate) {
       addEntry(devDate, `Devengo nómina ${monthLabel}`, `Nómina ${monthLabel}`,
         [
           { accountCode: "640", accountName: "Sueldos y salarios", amount: totalGross },
@@ -2084,6 +2103,47 @@ function buildDeterministicJournal(
       addEntry(payDate, `Pago nómina ${monthLabel}`, `Nómina ${monthLabel}`,
         [{ accountCode: "465", accountName: "Remuneraciones pendientes de pago", amount: netPay }],
         [{ accountCode: "572", accountName: "Bancos c/c", amount: netPay }]);
+    }
+  }
+
+  if (monthlyPayrolls.length === 0) {
+    const payroll = universe.payroll as Record<string, unknown> | undefined;
+    if (payroll) {
+      const monthLabel = String(payroll.month ?? "");
+      const totalGross = Number(payroll.totalGross ?? 0);
+      const ssEmployer = Number(payroll.totalSsEmployer ?? payroll.ssEmployerAmount ?? 0);
+      const ssEmployee = Number(payroll.totalSsEmployee ?? payroll.ssEmployeeAmount ?? 0);
+      const irpfTotal = Number(payroll.totalIrpf ?? payroll.irpfAmount ?? 0);
+      const netPay = Number(payroll.totalNetSalary ?? payroll.netPay ?? payroll.totalNet ?? 0);
+      const ssTotal = r2(ssEmployee + ssEmployer);
+      const paymentDate = String(payroll.paymentDate ?? "");
+
+      if (totalGross > 0) {
+        const devDate = paymentDate || `${params.year}-01-28`;
+        const payDate = (() => {
+          try {
+            const d = new Date(devDate);
+            d.setMonth(d.getMonth() + 1);
+            d.setDate(1);
+            return d.toISOString().slice(0, 10);
+          } catch { return devDate; }
+        })();
+
+        addEntry(devDate, `Devengo nómina ${monthLabel}`, `Nómina ${monthLabel}`,
+          [
+            { accountCode: "640", accountName: "Sueldos y salarios", amount: totalGross },
+            { accountCode: "642", accountName: "SS a cargo de la empresa", amount: ssEmployer },
+          ],
+          [
+            { accountCode: "476", accountName: "Organismos SS acreedores", amount: ssTotal },
+            ...(irpfTotal > 0 ? [{ accountCode: "4751", accountName: "HP acreedora retenciones IRPF", amount: irpfTotal }] : []),
+            { accountCode: "465", accountName: "Remuneraciones pendientes de pago", amount: netPay },
+          ]);
+
+        addEntry(payDate, `Pago nómina ${monthLabel}`, `Nómina ${monthLabel}`,
+          [{ accountCode: "465", accountName: "Remuneraciones pendientes de pago", amount: netPay }],
+          [{ accountCode: "572", accountName: "Bancos c/c", amount: netPay }]);
+      }
     }
   }
 
@@ -2327,6 +2387,13 @@ function buildDeterministicJournal(
   addDocRefs(universe.serviceInvoices as unknown[] | undefined, "servicio", "invoiceNumber", "date");
   addDocRefs(universe.socialSecurityPayments as unknown[] | undefined, "TC1", "month", "dueDate");
   addDocRefs(universe.taxLiquidations as unknown[] | undefined, "liquidación", "model", "dueDate");
+  if (Array.isArray(universe.monthlyPayrolls)) {
+    for (const mp of universe.monthlyPayrolls as Record<string, unknown>[]) {
+      const label = String(mp.monthLabel ?? "");
+      const date = String(mp.devDate ?? "");
+      if (label) allDocRefs.push({ ref: `Nómina ${label}`, type: "nómina", date });
+    }
+  }
 
   const docsWithoutEntry = allDocRefs.filter(d => {
     if (entryDocs.has(d.ref)) return false;
@@ -2507,6 +2574,7 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     accountCredits: [{ accountCode: "410", accountName: "Acreedores por prestaciones de servicios", amount: totalCardCharges, description: "Total liquidado tarjeta" }],
   };
 
+  universe.monthlyPayrolls = buildMonthlyPayrolls(params, universe);
   universe.serviceInvoices = buildServiceInvoices(params, scenario);
   universe.bankDebitNotes = buildBankDebitNotes(universe, scenario, params);
   universe.paymentReceipts = buildPaymentReceipts(universe, scenario);
@@ -2792,6 +2860,110 @@ function assignSubAccounts(universe: Record<string, unknown>, digits: number): v
   universe.accountDigits = digits;
 
   console.log(`[subAccounts] Asignadas ${subAccountList.length} subcuentas (${digits} dígitos)`);
+}
+
+// ─── MONTHLY PAYROLLS BUILDER ─────────────────────────────────────────────────
+interface MonthlyPayrollItem {
+  month: string;
+  monthLabel: string;
+  devDate: string;
+  payDate: string;
+  employees: Array<Record<string, unknown>>;
+  totalGross: number;
+  totalSsEmployer: number;
+  totalSsEmployee: number;
+  totalIrpf: number;
+  totalNetSalary: number;
+  totalLaborCost: number;
+  accountDebits: Array<{ accountCode: string; accountName: string; amount: number; description: string }>;
+  accountCredits: Array<{ accountCode: string; accountName: string; amount: number; description: string }>;
+  journalNote: string;
+}
+
+function buildMonthlyPayrolls(
+  params: GenerateParams,
+  universe: Record<string, unknown>,
+): MonthlyPayrollItem[] {
+  const payroll = universe.payroll as Record<string, unknown> | undefined;
+  if (!payroll) return [];
+  const employees = Array.isArray(payroll.employees) ? payroll.employees as Record<string, unknown>[] : [];
+  if (employees.length === 0) return [];
+
+  const months = getMonthsInPeriod(params);
+  const payrolls: MonthlyPayrollItem[] = [];
+
+  for (const m of months) {
+    const lastDay = m.end;
+    const nextMonth1 = (() => {
+      const d = new Date(lastDay);
+      d.setMonth(d.getMonth() + 1);
+      d.setDate(1);
+      return d.toISOString().slice(0, 10);
+    })();
+
+    let totalGross = 0, totalSsEmployer = 0, totalSsEmployee = 0, totalIrpf = 0, totalNet = 0;
+    const monthEmployees: Record<string, unknown>[] = [];
+
+    for (const emp of employees) {
+      const gross = round2(Number(emp.grossSalary ?? 0));
+      const ssEmpRate = Number(emp.ssEmployeeRate ?? 6.35);
+      const ssErRate = Number(emp.ssEmployerRate ?? 30.40);
+      const irpfRate = Number(emp.irpfRate ?? 15);
+
+      const ssEmployee = round2(gross * ssEmpRate / 100);
+      const ssEmployer = round2(gross * ssErRate / 100);
+      const irpf = round2(gross * irpfRate / 100);
+      const net = round2(gross - ssEmployee - irpf);
+
+      totalGross += gross;
+      totalSsEmployer += ssEmployer;
+      totalSsEmployee += ssEmployee;
+      totalIrpf += irpf;
+      totalNet += net;
+
+      monthEmployees.push({
+        ...emp,
+        grossSalary: gross,
+        ssEmployeeAmount: ssEmployee,
+        ssEmployerAmount: ssEmployer,
+        irpfAmount: irpf,
+        netSalary: net,
+      });
+    }
+
+    totalGross = round2(totalGross);
+    totalSsEmployer = round2(totalSsEmployer);
+    totalSsEmployee = round2(totalSsEmployee);
+    totalIrpf = round2(totalIrpf);
+    totalNet = round2(totalNet);
+    const ssTotal = round2(totalSsEmployee + totalSsEmployer);
+
+    payrolls.push({
+      month: m.start.slice(0, 7),
+      monthLabel: m.label,
+      devDate: lastDay,
+      payDate: nextMonth1,
+      employees: monthEmployees,
+      totalGross,
+      totalSsEmployer,
+      totalSsEmployee,
+      totalIrpf,
+      totalNetSalary: totalNet,
+      totalLaborCost: round2(totalGross + totalSsEmployer),
+      accountDebits: [
+        { accountCode: "640", accountName: "Sueldos y salarios", amount: totalGross, description: `Nómina ${m.label}` },
+        { accountCode: "642", accountName: "SS a cargo de la empresa", amount: totalSsEmployer, description: `Cuota patronal ${m.label}` },
+      ],
+      accountCredits: [
+        { accountCode: "476", accountName: "Organismos SS acreedores", amount: ssTotal, description: `SS total ${m.label}` },
+        ...(totalIrpf > 0 ? [{ accountCode: "4751", accountName: "HP acreedora retenciones IRPF", amount: totalIrpf, description: `Retención IRPF ${m.label}` }] : []),
+        { accountCode: "465", accountName: "Remuneraciones pendientes de pago", amount: totalNet, description: `Neto a pagar ${m.label}` },
+      ],
+      journalNote: `Devengo nómina ${m.label}: DEBE 640 (${totalGross}€) + 642 (${totalSsEmployer}€); HABER 476 (${ssTotal}€), 4751 (${totalIrpf}€), 465 (${totalNet}€). Pago: DEBE 465, HABER 572.`,
+    });
+  }
+
+  return payrolls;
 }
 
 // ─── SERVICE INVOICES BUILDER ──────────────────────────────────────────────────
@@ -3087,15 +3259,31 @@ function buildBankStatements(
     });
   }
 
-  const payroll = universe.payroll as Record<string, unknown> | undefined;
-  if (payroll?.totalNetSalary) {
-    rawTxns.push({
-      date: String(payroll.paymentDate ?? ""),
-      concept: `Pago nómina neta — ${payroll.month ?? ""}`,
-      reference: `NOM-${payroll.month ?? ""}`,
-      amount: Number(payroll.totalNetSalary),
-      isCredit: false,
-    });
+  const monthlyPayrolls = Array.isArray(universe.monthlyPayrolls) ? universe.monthlyPayrolls as Record<string, unknown>[] : [];
+  if (monthlyPayrolls.length > 0) {
+    for (const mp of monthlyPayrolls) {
+      const netPay = Number(mp.totalNetSalary ?? 0);
+      if (netPay > 0) {
+        rawTxns.push({
+          date: String(mp.payDate ?? ""),
+          concept: `Pago nómina neta — ${mp.monthLabel ?? ""}`,
+          reference: `NOM-${mp.monthLabel ?? ""}`,
+          amount: netPay,
+          isCredit: false,
+        });
+      }
+    }
+  } else {
+    const payroll = universe.payroll as Record<string, unknown> | undefined;
+    if (payroll?.totalNetSalary) {
+      rawTxns.push({
+        date: String(payroll.paymentDate ?? ""),
+        concept: `Pago nómina neta — ${payroll.month ?? ""}`,
+        reference: `NOM-${payroll.month ?? ""}`,
+        amount: Number(payroll.totalNetSalary),
+        isCredit: false,
+      });
+    }
   }
 
   const div = universe.dividendDistribution as Record<string, unknown> | undefined;
@@ -3483,22 +3671,43 @@ function buildBankDebitNotes(
     });
   }
 
-  // 7. Payroll net payment
-  const payroll = universe.payroll as Record<string, unknown> | undefined;
-  if (payroll?.totalNetSalary) {
-    const amount = Number(payroll.totalNetSalary);
-    notes.push({
-      id: "nomina-pago",
-      date: String(payroll.paymentDate ?? ""),
-      concept: `Pago nómina neta — ${payroll.month}`,
-      reference: nextRef("NOM"),
-      beneficiary: "Empleados (transferencia bancaria individual)",
-      amount,
-      category: "Nóminas",
-      accountDebits: [{ accountCode: "465", accountName: "Remuneraciones pendientes de pago", amount, description: `Salario neto ${payroll.month}` }],
-      accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount, description: "Transferencia salario neto" }],
-      journalNote: `Pago nómina ${payroll.month}: cancelación 465 (salario neto pendiente) mediante transferencias individuales a empleados. 465 al debe, 572 al haber. Importe total: ${amount}€.`,
-    });
+  // 7. Payroll net payments (monthly)
+  const monthlyPayrolls = Array.isArray(universe.monthlyPayrolls) ? universe.monthlyPayrolls as Record<string, unknown>[] : [];
+  if (monthlyPayrolls.length > 0) {
+    for (const mp of monthlyPayrolls) {
+      const amount = Number(mp.totalNetSalary ?? 0);
+      if (amount > 0) {
+        notes.push({
+          id: `nomina-pago-${mp.month}`,
+          date: String(mp.payDate ?? ""),
+          concept: `Pago nómina neta — ${mp.monthLabel}`,
+          reference: nextRef("NOM"),
+          beneficiary: "Empleados (transferencia bancaria individual)",
+          amount,
+          category: "Nóminas",
+          accountDebits: [{ accountCode: "465", accountName: "Remuneraciones pendientes de pago", amount, description: `Salario neto ${mp.monthLabel}` }],
+          accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount, description: "Transferencia salario neto" }],
+          journalNote: `Pago nómina ${mp.monthLabel}: cancelación 465 (salario neto pendiente) mediante transferencias individuales a empleados. 465 al debe, 572 al haber. Importe total: ${amount}€.`,
+        });
+      }
+    }
+  } else {
+    const payroll = universe.payroll as Record<string, unknown> | undefined;
+    if (payroll?.totalNetSalary) {
+      const amount = Number(payroll.totalNetSalary);
+      notes.push({
+        id: "nomina-pago",
+        date: String(payroll.paymentDate ?? ""),
+        concept: `Pago nómina neta — ${payroll.month}`,
+        reference: nextRef("NOM"),
+        beneficiary: "Empleados (transferencia bancaria individual)",
+        amount,
+        category: "Nóminas",
+        accountDebits: [{ accountCode: "465", accountName: "Remuneraciones pendientes de pago", amount, description: `Salario neto ${payroll.month}` }],
+        accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount, description: "Transferencia salario neto" }],
+        journalNote: `Pago nómina ${payroll.month}: cancelación 465 (salario neto pendiente) mediante transferencias individuales a empleados. 465 al debe, 572 al haber. Importe total: ${amount}€.`,
+      });
+    }
   }
 
   // 8. Dividend payment (net)

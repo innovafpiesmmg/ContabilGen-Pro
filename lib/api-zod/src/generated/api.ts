@@ -648,6 +648,40 @@ export const GenerateAccountingUniverseResponse = zod.object({
       ),
     })
     .optional(),
+  monthlyPayrolls: zod
+      .array(
+        zod.object({
+          month: zod.string(),
+          monthLabel: zod.string(),
+          devDate: zod.string(),
+          payDate: zod.string(),
+          employees: zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+          totalGross: zod.number(),
+          totalSsEmployer: zod.number(),
+          totalSsEmployee: zod.number(),
+          totalIrpf: zod.number(),
+          totalNetSalary: zod.number(),
+          totalLaborCost: zod.number(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string().optional(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string().optional(),
+            }),
+          ),
+          journalNote: zod.string().optional(),
+        }),
+      )
+      .optional(),
   socialSecurityPayments: zod
     .array(
       zod.object({
@@ -1502,7 +1536,41 @@ export const SaveGenerationBody = zod.object({
         ),
       })
       .optional(),
-    socialSecurityPayments: zod
+    monthlyPayrolls: zod
+      .array(
+        zod.object({
+          month: zod.string(),
+          monthLabel: zod.string(),
+          devDate: zod.string(),
+          payDate: zod.string(),
+          employees: zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+          totalGross: zod.number(),
+          totalSsEmployer: zod.number(),
+          totalSsEmployee: zod.number(),
+          totalIrpf: zod.number(),
+          totalNetSalary: zod.number(),
+          totalLaborCost: zod.number(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string().optional(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string().optional(),
+            }),
+          ),
+          journalNote: zod.string().optional(),
+        }),
+      )
+      .optional(),
+  socialSecurityPayments: zod
       .array(
         zod.object({
           month: zod.string(),
@@ -2348,7 +2416,41 @@ export const GetGenerationResponse = zod.object({
         ),
       })
       .optional(),
-    socialSecurityPayments: zod
+    monthlyPayrolls: zod
+      .array(
+        zod.object({
+          month: zod.string(),
+          monthLabel: zod.string(),
+          devDate: zod.string(),
+          payDate: zod.string(),
+          employees: zod.array(zod.record(zod.string(), zod.unknown())).optional(),
+          totalGross: zod.number(),
+          totalSsEmployer: zod.number(),
+          totalSsEmployee: zod.number(),
+          totalIrpf: zod.number(),
+          totalNetSalary: zod.number(),
+          totalLaborCost: zod.number(),
+          accountDebits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string().optional(),
+            }),
+          ),
+          accountCredits: zod.array(
+            zod.object({
+              accountCode: zod.string(),
+              accountName: zod.string(),
+              amount: zod.number(),
+              description: zod.string().optional(),
+            }),
+          ),
+          journalNote: zod.string().optional(),
+        }),
+      )
+      .optional(),
+  socialSecurityPayments: zod
       .array(
         zod.object({
           month: zod.string(),
