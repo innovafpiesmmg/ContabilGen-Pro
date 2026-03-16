@@ -2072,6 +2072,25 @@ REGLAS:
       const result = await callAI(client, model, basePrompt(chunkStart, chunk.end, remaining, startNum, validRefsList), 8192) as Record<string, unknown>;
       const entries = (result as { journalEntries?: unknown[] }).journalEntries;
       if (Array.isArray(entries) && entries.length > 0) {
+        for (const e of entries) {
+          const entry = e as Record<string, unknown>;
+          const sanitizeLines = (lines: unknown) => {
+            if (!Array.isArray(lines)) return [];
+            for (const l of lines) {
+              const line = l as Record<string, unknown>;
+              if (!line.accountCode || line.accountCode === "undefined") line.accountCode = "";
+              if (!line.accountName || line.accountName === "undefined") line.accountName = "";
+              line.accountCode = String(line.accountCode);
+              line.accountName = String(line.accountName);
+              line.amount = Number(line.amount ?? 0);
+            }
+            return lines;
+          };
+          entry.debits = sanitizeLines(entry.debits);
+          entry.credits = sanitizeLines(entry.credits);
+          if (!entry.concept || entry.concept === "undefined") entry.concept = "";
+          if (!entry.document || entry.document === "undefined") entry.document = "";
+        }
         const filtered = entries.filter(e => {
           const entry = e as Record<string, unknown>;
           return entryMatchesDocument(entry, validRefs);
@@ -2383,7 +2402,18 @@ function assignSubAccounts(universe: Record<string, unknown>, digits: number): v
   function replaceInEntry(entry: Record<string, unknown>, entityHint: string) {
     const replaceLines = (lines: Array<Record<string, unknown>>) => {
       for (const line of lines) {
-        const code = String(line.accountCode ?? "");
+        if (line.accountName === undefined || line.accountName === null) {
+          line.accountName = "";
+        }
+        if (line.accountCode === undefined || line.accountCode === null) {
+          line.accountCode = "";
+        }
+        const code = String(line.accountCode);
+
+        if (!code || code === "undefined") {
+          line.accountCode = "";
+          continue;
+        }
 
         let replaced = false;
         for (const base of [code, code.substring(0, 4), code.substring(0, 3)]) {
@@ -2396,8 +2426,9 @@ function assignSubAccounts(universe: Record<string, unknown>, digits: number): v
               if (entityHint.toLowerCase().includes(ent.entityName.toLowerCase()) ||
                   ent.entityName.toLowerCase().includes(entityHint.toLowerCase().substring(0, 10))) {
                 line.accountCode = ent.subCode;
-                if (line.accountName) {
-                  line.accountName = `${String(line.accountName)} (${ent.entityName})`;
+                const currentName = String(line.accountName || "");
+                if (currentName && !currentName.includes(ent.entityName)) {
+                  line.accountName = `${currentName} (${ent.entityName})`;
                 }
                 matched = true;
                 replaced = true;

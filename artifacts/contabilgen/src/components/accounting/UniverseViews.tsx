@@ -81,18 +81,18 @@ const AsientoContable = ({ debits, credits, note }: { debits: AccountEntry[], cr
           {debits.map((d, i) => (
             <TableRow key={`d-${i}`} className="border-0 hover:bg-slate-100/50">
               <TableCell className="text-right font-mono font-medium text-blue-700">{formatEuro(d.amount)}</TableCell>
-              <TableCell className="text-center font-mono text-slate-500">{d.accountCode}</TableCell>
-              <TableCell className="text-slate-700">{d.accountName}{d.description ? <span className="text-xs text-slate-400 ml-1">({d.description})</span> : null}</TableCell>
+              <TableCell className="text-center font-mono text-slate-500">{d.accountCode || ''}</TableCell>
+              <TableCell className="text-slate-700">{(d.accountName && d.accountName !== 'undefined') ? d.accountName : ''}{d.description ? <span className="text-xs text-slate-400 ml-1">({d.description})</span> : null}</TableCell>
               <TableCell></TableCell>
             </TableRow>
           ))}
           {credits.map((c, i) => (
             <TableRow key={`c-${i}`} className="border-0 hover:bg-slate-100/50">
               <TableCell></TableCell>
-              <TableCell className="text-center font-mono text-slate-500">{c.accountCode}</TableCell>
+              <TableCell className="text-center font-mono text-slate-500">{c.accountCode || ''}</TableCell>
               <TableCell className="text-slate-700 pl-8 relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 w-2 h-px bg-slate-300"></span>
-                {c.accountName}{c.description ? <span className="text-xs text-slate-400 ml-1">({c.description})</span> : null}
+                {(c.accountName && c.accountName !== 'undefined') ? c.accountName : ''}{c.description ? <span className="text-xs text-slate-400 ml-1">({c.description})</span> : null}
               </TableCell>
               <TableCell className="text-right font-mono font-medium text-emerald-700">{formatEuro(c.amount)}</TableCell>
             </TableRow>
@@ -945,8 +945,8 @@ export const JournalView = ({ entries }: { entries: JournalEntry[] }) => {
                     <TableRow key={`d-${idx}-${i}`} className="border-0 hover:bg-slate-50 print-break-inside-avoid">
                       <TableCell></TableCell>
                       <TableCell></TableCell>
-                      <TableCell className="text-center font-mono text-slate-500">{d.accountCode}</TableCell>
-                      <TableCell className="text-slate-700">{d.accountName}</TableCell>
+                      <TableCell className="text-center font-mono text-slate-500">{d.accountCode || ''}</TableCell>
+                      <TableCell className="text-slate-700">{(d.accountName && d.accountName !== 'undefined') ? d.accountName : ''}</TableCell>
                       <TableCell className="text-right font-mono font-medium text-blue-700">{formatEuro(d.amount)}</TableCell>
                       <TableCell></TableCell>
                     </TableRow>
@@ -957,8 +957,8 @@ export const JournalView = ({ entries }: { entries: JournalEntry[] }) => {
                     <TableRow key={`c-${idx}-${i}`} className="border-0 hover:bg-slate-50 print-break-inside-avoid">
                       <TableCell></TableCell>
                       <TableCell></TableCell>
-                      <TableCell className="text-center font-mono text-slate-500">{c.accountCode}</TableCell>
-                      <TableCell className="text-slate-700 pl-8 italic">{c.accountName}</TableCell>
+                      <TableCell className="text-center font-mono text-slate-500">{c.accountCode || ''}</TableCell>
+                      <TableCell className="text-slate-700 pl-8 italic">{(c.accountName && c.accountName !== 'undefined') ? c.accountName : ''}</TableCell>
                       <TableCell></TableCell>
                       <TableCell className="text-right font-mono font-medium text-emerald-700">{formatEuro(c.amount)}</TableCell>
                     </TableRow>
