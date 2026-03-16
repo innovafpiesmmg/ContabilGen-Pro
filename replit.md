@@ -2,7 +2,7 @@
 
 ## Overview
 
-ContabilGen Pro es un generador de universos contables para prácticas de Grado Medio y Superior de Contabilidad (FP). Utiliza IA (DeepSeek) para generar ecosistemas contables coherentes con documentos reales del Plan General Contable español.
+ContabilGen Pro es un generador de universos contables con IA para prácticas de Grado Medio y Superior de Contabilidad (FP). Soporta DeepSeek y OpenAI como proveedores de IA seleccionables. Genera ecosistemas contables coherentes con documentos reales del Plan General Contable español. Instalable como aplicación (PWA).
 
 ## Stack
 
@@ -132,9 +132,19 @@ Custom email/password auth (no Replit Auth):
 
 ## Logo & Favicon
 
-- Logo file: `artifacts/contabilgen/public/logo.png` (CG blue logo)
+- Logo file: `artifacts/contabilgen/public/logo.png` (CG blue logo, 2000x2000)
 - Used in: login, register, forgot-password, reset-password pages; sidebar; loading screen
 - Favicon: `<link rel="icon" type="image/png" href="/logo.png" />` in index.html
+- PWA icons: `icon-192x192.png`, `icon-512x512.png`, `apple-touch-icon.png` (auto-generated from logo)
+
+## PWA (Progressive Web App)
+
+- **Manifest**: `artifacts/contabilgen/public/manifest.json` — name, icons, colors, standalone mode
+- **Service Worker**: `artifacts/contabilgen/public/sw.js` — network-first caching, offline fallback for visited pages
+- **Registration**: `artifacts/contabilgen/src/main.tsx` — registers SW on load
+- **Meta tags**: `index.html` includes `theme-color`, `apple-mobile-web-app-capable`, `apple-touch-icon`
+- **Installation**: Requires HTTPS (works after deployment). Chrome/Edge show install icon; iOS via Share → "Add to Home Screen"
+- **Cache strategy**: Network-first for all GET requests; API calls (`/api/`) are never cached
 
 ## Database
 
@@ -181,6 +191,17 @@ Implementation: `setDocColor(category)` sets `_activeColor` used by `headerBlock
 - **Cookies**: `SECURE_COOKIES` env var controls `secure` flag on session cookies (default: `false` for HTTP, `true` when Cloudflare Tunnel is configured)
 - **Ports**: API on 5001 (internal), Nginx on 80 (public)
 - **Update**: Re-run `sudo bash /var/www/contabilgen/install.sh` — detects existing install, preserves DB + credentials
+
+## Zod Schemas (Critical Manual Updates)
+
+The `universeJson` object is defined in **3 separate Zod schemas** in `lib/api-zod/src/generated/api.ts`:
+1. `GenerateAccountingUniverseResponse` (line ~1107) — API response from generation
+2. `SaveGenerationBody` (line ~1957) — saving to database
+3. `GetGenerationResponse` (line ~2797) — loading from database
+
+**All three must include every field** (`subAccounts`, `accountDigits`, `yearEndClosing`, etc.) or Zod will silently strip missing fields during validation, causing data loss on save.
+
+Similarly, `lib/api-client-react/src/generated/api.schemas.ts` has `AccountingUniverse` interface used by both `SaveGenerationRequest` and `GenerationDetail`.
 
 ## Error Handling
 
