@@ -794,76 +794,51 @@ export const generateAccountingUniverse = async (
   generateUniverseRequest: GenerateUniverseRequest,
   _options?: RequestInit,
 ): Promise<AccountingUniverse> => {
-  const response = await fetch(getGenerateAccountingUniverseUrl(), {
+  const startRes = await fetch(getGenerateAccountingUniverseUrl(), {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Accept": "text/event-stream",
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(generateUniverseRequest),
     credentials: "include",
   });
 
-  if (!response.ok) {
-    let errorMsg = `HTTP ${response.status}`;
+  if (!startRes.ok) {
+    let errorMsg = `HTTP ${startRes.status}`;
     try {
-      const errBody = await response.json();
+      const errBody = await startRes.json();
       errorMsg = errBody.error || errBody.message || errorMsg;
     } catch { /* ignore */ }
     throw new Error(errorMsg);
   }
 
-  const contentType = response.headers.get("content-type") || "";
-  if (!contentType.includes("text/event-stream")) {
-    return (await response.json()) as AccountingUniverse;
+  const startData = await startRes.json();
+
+  if (!startData.jobId) {
+    return startData as AccountingUniverse;
   }
 
-  return new Promise<AccountingUniverse>((resolve, reject) => {
-    const reader = response.body?.getReader();
-    if (!reader) { reject(new Error("No se pudo leer la respuesta")); return; }
+  const pollUrl = `/api/accounting/generate/status/${startData.jobId}`;
+  const maxWait = 10 * 60 * 1000;
+  const start = Date.now();
 
-    const decoder = new TextDecoder();
-    let buffer = "";
+  while (Date.now() - start < maxWait) {
+    await new Promise((r) => setTimeout(r, 3000));
 
-    const processLines = () => {
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-      let currentEvent = "";
-      for (const line of lines) {
-        if (line.startsWith("event: ")) {
-          currentEvent = line.slice(7).trim();
-        } else if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          try {
-            const parsed = JSON.parse(data);
-            if (currentEvent === "result") {
-              resolve(parsed as AccountingUniverse);
-              reader.cancel();
-              return true;
-            } else if (currentEvent === "error") {
-              reject(new Error(parsed.error || "Error en la generación"));
-              reader.cancel();
-              return true;
-            }
-          } catch { /* ignore parse errors for progress/keepalive */ }
-        }
-      }
-      return false;
-    };
+    const pollRes = await fetch(pollUrl, { credentials: "include" });
+    if (!pollRes.ok) {
+      throw new Error(`Error al consultar el estado: HTTP ${pollRes.status}`);
+    }
 
-    const read = (): void => {
-      reader.read().then(({ done, value }) => {
-        if (done) {
-          if (buffer.length > 0) processLines();
-          reject(new Error("La conexión se cerró antes de completar la generación"));
-          return;
-        }
-        buffer += decoder.decode(value, { stream: true });
-        if (!processLines()) read();
-      }).catch(reject);
-    };
-    read();
-  });
+    const pollData = await pollRes.json();
+
+    if (pollData.status === "done") {
+      return pollData.result as AccountingUniverse;
+    }
+    if (pollData.status === "error") {
+      throw new Error(pollData.error || "Error durante la generación");
+    }
+  }
+
+  throw new Error("La generación tardó demasiado tiempo. Inténtalo de nuevo.");
 };
 
 export const getGenerateAccountingUniverseMutationOptions = <
