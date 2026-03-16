@@ -1026,7 +1026,7 @@ ${quarterLines},
     "durationMonths": ${polMonths},
     "interestAmount": ${Math.round(drawn * 0.055 * polMonths / 12)},
     "totalSettlement": ${Math.round(drawn * 0.055 * polMonths / 12 + 150 + (limit - drawn) * 0.005)},
-    "journalNote": "Póliza de crédito ${polStartStr}–${polEndStr}. (1) Apertura y disposición: DEBE 572, HABER 5201 (saldo dispuesto). (2) Comisión apertura: DEBE 626, HABER 572. (3) Liquidación periódica intereses: DEBE 663 (intereses devengados), HABER 572. (4) Comisión no disposición: DEBE 626, HABER 572. (5) Cancelación al vencimiento: DEBE 5201, HABER 572 (devolución saldo dispuesto).",
+    "journalNote": "Póliza de crédito ${polStartStr}–${polEndStr}. (1) Apertura y disposición: DEBE 572, HABER 5201 (saldo dispuesto). (2) Comisión apertura: DEBE 626, HABER 572. (3) Liquidación periódica intereses: DEBE 662 (intereses de deudas), HABER 572. (4) Comisión no disposición: DEBE 626, HABER 572. (5) Cancelación al vencimiento: DEBE 5201, HABER 572 (devolución saldo dispuesto).",
     "accountDebits": [{"accountCode":"572","accountName":"Bancos c/c","amount":${drawn},"description":"Disposición póliza crédito"}],
     "accountCredits": [{"accountCode":"5201","accountName":"Deudas a CP — póliza de crédito","amount":${drawn},"description":"Saldo dispuesto póliza"}]
   }`);
@@ -1167,7 +1167,7 @@ async function generateEquityBlock(
     "closingBalance551": -1500.00,
     "closingBalance553": -4000.00,
     "journalNote": "551: operaciones administradores (retribuciones, anticipos). 553: operaciones socios. Saldo acreedor = empresa debe. Saldo deudor = socio/admin debe. Intereses art.18 LIS.",
-    "accountDebits": [{"accountCode":"651","accountName":"Retribución administradores","amount":1500.00,"description":"Remuneración órgano administración"}],
+    "accountDebits": [{"accountCode":"640","accountName":"Sueldos y salarios","amount":1500.00,"description":"Retribución órgano de administración"}],
     "accountCredits": [{"accountCode":"551","accountName":"C/C con administradores","amount":1500.00,"description":"Retribución pendiente pago"}]
   }`);
   }
@@ -1485,7 +1485,7 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     movements: allCardMovements,
     totalCharges: Math.round(totalCardCharges * 100) / 100,
     settlementDate: months[months.length - 1]?.end ?? `${params.year}-12-31`,
-    journalNote: "Cada gasto con tarjeta: DEBE gasto (6xx según naturaleza), HABER 523 (Proveedores de inmovilizado a CP) o 410 (Acreedores por prestaciones de servicios). Al pago bancario: DEBE 523/410, HABER 572.",
+    journalNote: "Cada gasto con tarjeta: DEBE gasto (6xx según naturaleza), HABER 410 (Acreedores por prestaciones de servicios). Al pago/liquidación bancaria: DEBE 410, HABER 572.",
     accountDebits: [{ accountCode: "629", accountName: "Otros servicios", amount: totalCardCharges, description: "Gastos tarjeta ejercicio" }],
     accountCredits: [{ accountCode: "410", accountName: "Acreedores por prestaciones de servicios", amount: totalCardCharges, description: "Total liquidado tarjeta" }],
   };
@@ -1692,11 +1692,11 @@ function buildBankDebitNotes(
       amount,
       category: "Póliza de Crédito",
       accountDebits: [
-        { accountCode: "663", accountName: "Intereses de deudas", amount: Number(policy.interestAmount ?? 0), description: "Intereses saldo dispuesto" },
+        { accountCode: "662", accountName: "Intereses de deudas", amount: Number(policy.interestAmount ?? 0), description: "Intereses saldo dispuesto" },
         { accountCode: "626", accountName: "Servicios bancarios", amount: Number(policy.openingCommission ?? 0) + Number(policy.unusedCommission ?? 0), description: "Comisiones bancarias" },
       ],
       accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount, description: "Liquidación póliza crédito" }],
-      journalNote: `Liquidación póliza crédito ${policy.policyNumber} al vencimiento (${policy.endDate}). Intereses (663) + comisiones (626) al debe; adeudo total ${amount}€ en cuenta corriente (572) al haber.`,
+      journalNote: `Liquidación póliza crédito ${policy.policyNumber} al vencimiento (${policy.endDate}). Intereses (662) + comisiones (626) al debe; adeudo total ${amount}€ en cuenta corriente (572) al haber.`,
     });
   }
 

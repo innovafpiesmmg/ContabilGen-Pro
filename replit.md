@@ -139,6 +139,10 @@ Per plangeneralcontable.com, loans use accounts 170 (LP) and 5200 (CP):
 - Amortization tables are computed server-side (French system), not by AI
 - Same treatment for mortgages (hipotecas)
 - Types: `DebtClassification`, `ReclassificationInfo`, `SubEntry` in `bankLoan.ts`
+- **Póliza de crédito**: 5201 (dispuesto), 662 (intereses), 626 (comisiones). NO usar 663 (no existe en PGC)
+- **Tarjeta de crédito**: gastos → 410 (Acreedores por prestaciones de servicios). NO usar 523 (solo para inmovilizado)
+- **Retribución administradores**: 640 (Sueldos y salarios). NO usar 651 (no existe en PGC)
+- **Siniestro**: 671 (pérdida inmovilizado) + 440 (Deudores varios). NO usar 678 ni 430
 
 ## Self-Hosted Deployment (Ubuntu)
 
