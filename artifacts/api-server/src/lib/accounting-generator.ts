@@ -2764,7 +2764,7 @@ function buildServiceInvoices(
         { accountCode: "472", accountName: `${taxName} soportado`, amount: taxAmount, description: `${taxName} ${iva}% s/ ${base}€` },
       ];
       const credits: ServiceInvoiceItem["accountCredits"] = [
-        { accountCode: "410", accountName: "Acreedores por prestaciones de servicios", amount: total + irpfAmount, description: `${svc.provider} — ${m.label}` },
+        { accountCode: "410", accountName: "Acreedores por prestaciones de servicios", amount: total, description: `${svc.provider} — ${m.label}` },
       ];
       if (svc.hasIrpf) {
         credits.push({ accountCode: "4751", accountName: "HP acreedora IRPF retenciones", amount: irpfAmount, description: `Retención IRPF ${svc.irpfRate}% alquiler` });
