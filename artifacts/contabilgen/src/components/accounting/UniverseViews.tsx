@@ -2129,29 +2129,20 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
     }
 
     const evLabel = (ev.label || "").toLowerCase();
+    const evSub = (ev.subtitle || "").toLowerCase();
     const conceptMatch = candidates.find(j => {
-      if (evLabel && (j.concept || "").toLowerCase().includes(evLabel)) return true;
+      const c = (j.concept || "").toLowerCase();
       const jDoc = (j.document || "").toLowerCase();
+      if (evLabel && c.includes(evLabel)) return true;
       if (jDoc && evLabel && evLabel.includes(jDoc)) return true;
+      if (evSub && c.includes(evSub)) return true;
+      if (jDoc && evSub && evSub.includes(jDoc)) return true;
       return false;
     });
     if (conceptMatch) { ev.journalEntry = conceptMatch; markMatched(conceptMatch); return; }
 
     if (candidates.length === 1) { ev.journalEntry = candidates[0]; markMatched(candidates[0]); }
   });
-
-  journalEntries
-    .filter(je => !matchedEntryNumbers.has(String(je.entryNumber)))
-    .forEach(je => {
-      events.push({
-        date: je.date,
-        kind: "asiento",
-        label: `Asiento ${je.entryNumber}`,
-        subtitle: je.concept,
-        amount: je.totalAmount,
-        journalEntry: je,
-      });
-    });
 
   return events.filter(e => e.date && /^\d{4}-\d{2}-\d{2}/.test(e.date))
     .sort((a, b) => a.date.localeCompare(b.date));
