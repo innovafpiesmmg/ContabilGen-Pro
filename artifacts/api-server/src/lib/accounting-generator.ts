@@ -140,9 +140,14 @@ async function callAI(client: OpenAI, model: string, prompt: string, maxTokens: 
     ],
   });
 
-  const finishReason = response.choices[0]?.finish_reason;
-  const content = response.choices[0]?.message?.content;
-  if (!content) throw new Error("La IA no devolvió contenido.");
+  const choice = response.choices[0];
+  const finishReason = choice?.finish_reason;
+  const content = choice?.message?.content;
+  console.log(`[callAI] model=${model}, finish_reason=${finishReason}, content_length=${content?.length ?? 0}, refusal=${(choice?.message as any)?.refusal ?? 'none'}`);
+  if (!content) {
+    const refusal = (choice?.message as any)?.refusal;
+    throw new Error(refusal ? `La IA rechazó la solicitud: ${refusal}` : "La IA no devolvió contenido. Verifica tu API key y modelo.");
+  }
 
   if (finishReason === "length") {
     // Attempt to repair and parse truncated JSON instead of hard-failing
