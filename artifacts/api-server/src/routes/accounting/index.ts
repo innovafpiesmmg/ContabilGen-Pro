@@ -109,6 +109,7 @@ router.post("/accounting/generate", wrap(async (req, res): Promise<void> => {
 
   res.json({ jobId });
 
+  console.log(`[generate] jobId=${jobId}, provider=${aiConfig.provider}, model=${aiConfig.model ?? aiConfig.deepseekModel ?? '?'}`);
   generateAccountingUniverse(
     buildParams(d),
     aiConfig,
