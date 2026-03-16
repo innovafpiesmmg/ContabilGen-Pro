@@ -24,15 +24,7 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
     return;
   }
 
-  const {
-    taxRegime, sector, complexity, year, companyName,
-    educationLevel, operationsPerMonth,
-    includePayroll, includeSocialSecurity, includeTaxLiquidation,
-    includeBankLoan, includeMortgage, includeCreditPolicy, includeFixedAssets,
-    includeShareholdersInfo, isNewCompany, includeInitialBalance,
-    includeShareholderAccounts, includeDividends,
-    startDate, endDate,
-  } = parsed.data;
+  const d = parsed.data;
 
   const settings = await getSettingsForUser(req.user.id);
   const provider = settings.provider ?? "openai";
@@ -60,31 +52,43 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
     };
   }
 
-  const universe = await generateAccountingUniverse(
-    {
-      taxRegime, sector, complexity, year,
-      companyName: companyName ?? null,
-      educationLevel: educationLevel ?? null,
-      operationsPerMonth: operationsPerMonth ?? null,
-      includePayroll: includePayroll ?? null,
-      includeSocialSecurity: includeSocialSecurity ?? null,
-      includeTaxLiquidation: includeTaxLiquidation ?? null,
-      includeBankLoan: includeBankLoan ?? null,
-      includeMortgage: includeMortgage ?? null,
-      includeCreditPolicy: includeCreditPolicy ?? null,
-      includeFixedAssets: includeFixedAssets ?? null,
-      includeShareholdersInfo: includeShareholdersInfo ?? null,
-      isNewCompany: isNewCompany ?? null,
-      includeInitialBalance: includeInitialBalance ?? null,
-      includeShareholderAccounts: includeShareholderAccounts ?? null,
-      includeDividends: includeDividends ?? null,
-      startDate: startDate ?? null,
-      endDate: endDate ?? null,
-    },
-    aiConfig,
-  );
+  try {
+    const universe = await generateAccountingUniverse(
+      {
+        taxRegime: d.taxRegime,
+        sector: d.sector,
+        activity: d.activity ?? null,
+        complexity: d.complexity,
+        year: d.year,
+        companyName: d.companyName ?? null,
+        educationLevel: d.educationLevel ?? null,
+        operationsPerMonth: d.operationsPerMonth ?? null,
+        includePayroll: d.includePayroll ?? null,
+        includeSocialSecurity: d.includeSocialSecurity ?? null,
+        includeTaxLiquidation: d.includeTaxLiquidation ?? null,
+        includeBankLoan: d.includeBankLoan ?? null,
+        includeMortgage: d.includeMortgage ?? null,
+        includeCreditPolicy: d.includeCreditPolicy ?? null,
+        includeFixedAssets: d.includeFixedAssets ?? null,
+        includeShareholdersInfo: d.includeShareholdersInfo ?? null,
+        isNewCompany: d.isNewCompany ?? null,
+        includeInitialBalance: d.includeInitialBalance ?? null,
+        includeShareholderAccounts: d.includeShareholderAccounts ?? null,
+        includeDividends: d.includeDividends ?? null,
+        includeWarehouse: d.includeWarehouse ?? null,
+        includeExtraordinary: d.includeExtraordinary ?? null,
+        startDate: d.startDate ?? null,
+        endDate: d.endDate ?? null,
+      },
+      aiConfig,
+    );
 
-  res.json(universe);
+    res.json(universe);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Error desconocido durante la generación";
+    console.error("[generate] Error:", message);
+    res.status(500).json({ error: message });
+  }
 });
 
 router.get("/accounting/generations", async (req, res): Promise<void> => {
