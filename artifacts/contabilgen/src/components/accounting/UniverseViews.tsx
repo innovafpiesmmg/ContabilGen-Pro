@@ -909,50 +909,83 @@ export const BankStatementView = ({ statements }: { statements: BankStatement[] 
   );
 };
 
+function docBadgeStyle(doc: string): { bg: string; text: string; label: string } {
+  const d = (doc || "").toLowerCase();
+  if (d.includes("apertura")) return { bg: "bg-emerald-100 text-emerald-700 border-emerald-300", text: "Apertura", label: doc };
+  if (d.startsWith("fra-") || d.startsWith("fv-") || /^[a-z]*\d+\//.test(d)) {
+    if (d.includes("compra") || d.startsWith("fc")) return { bg: "bg-orange-100 text-orange-700 border-orange-300", text: "Fra. compra", label: doc };
+    return { bg: "bg-blue-100 text-blue-700 border-blue-300", text: "Fra. venta", label: doc };
+  }
+  if (d.startsWith("rec-") || d.startsWith("cob-") || d.startsWith("pag-")) return { bg: "bg-sky-100 text-sky-700 border-sky-300", text: "Recibo", label: doc };
+  if (d.includes("nómina") || d.includes("nomina")) return { bg: "bg-purple-100 text-purple-700 border-purple-300", text: "Nómina", label: doc };
+  if (d.includes("tc1")) return { bg: "bg-amber-100 text-amber-700 border-amber-300", text: "TC1", label: doc };
+  if (d.includes("mod.") || d.includes("modelo")) return { bg: "bg-red-100 text-red-700 border-red-300", text: "Liquidación", label: doc };
+  if (d.includes("tarjeta")) return { bg: "bg-indigo-100 text-indigo-700 border-indigo-300", text: "Tarjeta", label: doc };
+  if (d.includes("préstamo") || d.includes("prestamo")) return { bg: "bg-teal-100 text-teal-700 border-teal-300", text: "Préstamo", label: doc };
+  if (d.includes("hipoteca")) return { bg: "bg-cyan-100 text-cyan-700 border-cyan-300", text: "Hipoteca", label: doc };
+  if (d.includes("póliza") || d.includes("poliza") || d.includes("crédito") || d.includes("credito")) return { bg: "bg-violet-100 text-violet-700 border-violet-300", text: "Póliza", label: doc };
+  if (d.includes("seguro")) return { bg: "bg-sky-100 text-sky-700 border-sky-300", text: "Seguro", label: doc };
+  if (d.includes("siniestro")) return { bg: "bg-rose-100 text-rose-700 border-rose-300", text: "Siniestro", label: doc };
+  if (d.includes("amort")) return { bg: "bg-gray-100 text-gray-700 border-gray-300", text: "Amortización", label: doc };
+  if (d.includes("dividendo")) return { bg: "bg-yellow-100 text-yellow-700 border-yellow-300", text: "Dividendos", label: doc };
+  if (d.includes("cc-socios") || d.includes("socio")) return { bg: "bg-pink-100 text-pink-700 border-pink-300", text: "Socios", label: doc };
+  if (d.includes("extraordinario") || d.includes("gasto_extra") || d.includes("ingreso_extra")) return { bg: "bg-red-100 text-red-600 border-red-300", text: "Extraordinario", label: doc };
+  return { bg: "bg-slate-100 text-slate-600 border-slate-300", text: "Doc.", label: doc };
+}
+
 export const JournalView = ({ entries }: { entries: JournalEntry[] }) => {
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <SectionTitle title="Libro Diario" description="Registro cronológico de todos los asientos contables generados." />
+      <SectionTitle title="Libro Diario" description="Registro cronológico de todos los asientos contables. Cada asiento incluye su documento de soporte." />
       
       <Card className="rounded-2xl shadow-xl border-border overflow-hidden bg-white">
         <div className="overflow-x-auto">
           <Table className="w-full text-sm">
             <TableHeader className="bg-slate-800 text-slate-50">
               <TableRow className="hover:bg-slate-800">
-                <TableHead className="text-slate-300 w-24">Nº Asiento</TableHead>
-                <TableHead className="text-slate-300 w-28">Fecha</TableHead>
+                <TableHead className="text-slate-300 w-16">Nº</TableHead>
+                <TableHead className="text-slate-300 w-24">Fecha</TableHead>
                 <TableHead className="text-slate-300 w-24 text-center">Cuenta</TableHead>
-                <TableHead className="text-slate-300">Concepto de la Cuenta / Asiento</TableHead>
-                <TableHead className="text-slate-300 text-right w-32">Debe</TableHead>
-                <TableHead className="text-slate-300 text-right w-32">Haber</TableHead>
+                <TableHead className="text-slate-300">Concepto</TableHead>
+                <TableHead className="text-slate-300 w-44">Documento soporte</TableHead>
+                <TableHead className="text-slate-300 text-right w-28">Debe</TableHead>
+                <TableHead className="text-slate-300 text-right w-28">Haber</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {entries.map((entry, idx) => (
+              {entries.map((entry, idx) => {
+                const badge = entry.document ? docBadgeStyle(entry.document) : null;
+                return (
                 <React.Fragment key={idx}>
-                  {/* Header row for the Journal Entry */}
                   <TableRow className="bg-slate-100/80 border-t-4 border-slate-200 print-break-inside-avoid">
                     <TableCell className="font-bold text-primary">{entry.entryNumber}</TableCell>
                     <TableCell className="font-semibold text-slate-600">{formatDate(entry.date)}</TableCell>
-                    <TableCell colSpan={4} className="font-semibold text-slate-700">
-                      {entry.concept}
-                      {entry.document && <span className="ml-2 font-normal text-slate-500 text-xs">(Ref: {entry.document})</span>}
+                    <TableCell></TableCell>
+                    <TableCell className="font-semibold text-slate-700">{entry.concept}</TableCell>
+                    <TableCell>
+                      {badge && (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold ${badge.bg}`}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                          {badge.label}
+                        </span>
+                      )}
                     </TableCell>
+                    <TableCell></TableCell>
+                    <TableCell></TableCell>
                   </TableRow>
                   
-                  {/* Debit lines */}
                   {entry.debits.map((d, i) => (
                     <TableRow key={`d-${idx}-${i}`} className="border-0 hover:bg-slate-50 print-break-inside-avoid">
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell className="text-center font-mono text-slate-500">{d.accountCode || ''}</TableCell>
                       <TableCell className="text-slate-700">{(d.accountName && d.accountName !== 'undefined') ? d.accountName : ''}</TableCell>
+                      <TableCell></TableCell>
                       <TableCell className="text-right font-mono font-medium text-blue-700">{formatEuro(d.amount)}</TableCell>
                       <TableCell></TableCell>
                     </TableRow>
                   ))}
                   
-                  {/* Credit lines */}
                   {entry.credits.map((c, i) => (
                     <TableRow key={`c-${idx}-${i}`} className="border-0 hover:bg-slate-50 print-break-inside-avoid">
                       <TableCell></TableCell>
@@ -960,11 +993,13 @@ export const JournalView = ({ entries }: { entries: JournalEntry[] }) => {
                       <TableCell className="text-center font-mono text-slate-500">{c.accountCode || ''}</TableCell>
                       <TableCell className="text-slate-700 pl-8 italic">{(c.accountName && c.accountName !== 'undefined') ? c.accountName : ''}</TableCell>
                       <TableCell></TableCell>
+                      <TableCell></TableCell>
                       <TableCell className="text-right font-mono font-medium text-emerald-700">{formatEuro(c.amount)}</TableCell>
                     </TableRow>
                   ))}
                 </React.Fragment>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </div>
