@@ -125,9 +125,12 @@ function repairTruncatedJson(raw: string): unknown | null {
 }
 
 async function callAI(client: OpenAI, model: string, prompt: string, maxTokens: number): Promise<unknown> {
+  const tokenParam = model.startsWith("gpt-5") || model.startsWith("o1") || model.startsWith("o3") || model.startsWith("o4")
+    ? { max_completion_tokens: maxTokens }
+    : { max_tokens: maxTokens };
   const response = await client.chat.completions.create({
     model,
-    max_tokens: maxTokens,
+    ...tokenParam,
     messages: [
       {
         role: "system",
