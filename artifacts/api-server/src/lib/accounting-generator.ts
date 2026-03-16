@@ -1444,6 +1444,239 @@ function buildDocumentSummary(universe: Record<string, unknown>): string {
   return summary;
 }
 
+function buildValidDocumentRefs(universe: Record<string, unknown>): Set<string> {
+  const refs = new Set<string>();
+
+  const invoices = Array.isArray(universe.invoices) ? universe.invoices : [];
+  for (const inv of invoices) {
+    const i = inv as Record<string, unknown>;
+    if (i.invoiceNumber) refs.add(String(i.invoiceNumber));
+  }
+
+  const svcInvoices = Array.isArray(universe.serviceInvoices) ? universe.serviceInvoices : [];
+  for (const si of svcInvoices) {
+    const s = si as Record<string, unknown>;
+    if (s.invoiceNumber) refs.add(String(s.invoiceNumber));
+  }
+
+  const pmtReceipts = Array.isArray(universe.paymentReceipts) ? universe.paymentReceipts : [];
+  for (const pr of pmtReceipts) {
+    const r = pr as Record<string, unknown>;
+    if (r.receiptNumber) refs.add(String(r.receiptNumber));
+  }
+
+  const payroll = universe.payroll as Record<string, unknown> | undefined;
+  if (payroll) {
+    const month = String(payroll.month ?? "");
+    if (month) {
+      refs.add(month);
+      refs.add(`Nómina ${month}`);
+      refs.add(`NOM-${month}`);
+    }
+  }
+
+  const ssPayments = Array.isArray(universe.socialSecurityPayments) ? universe.socialSecurityPayments : [];
+  for (const s of ssPayments) {
+    const ss = s as Record<string, unknown>;
+    const m = String(ss.month ?? "");
+    if (m) {
+      refs.add(`TC1-${m}`);
+      refs.add(`TC1 ${m}`);
+      refs.add(m);
+    }
+  }
+
+  const taxLiq = Array.isArray(universe.taxLiquidations) ? universe.taxLiquidations : [];
+  for (const t of taxLiq) {
+    const tx = t as Record<string, unknown>;
+    const model = String(tx.model ?? "");
+    const period = String(tx.period ?? "");
+    refs.add(`Mod.${model}-${period}`);
+    refs.add(`Mod.${model} ${period}`);
+    refs.add(`${model}-${period}`);
+  }
+
+  const loan = universe.bankLoan as Record<string, unknown> | undefined;
+  if (loan) {
+    if (loan.loanNumber) refs.add(String(loan.loanNumber));
+    const table = Array.isArray(loan.amortizationTable) ? loan.amortizationTable : [];
+    for (const row of table) {
+      const r = row as Record<string, unknown>;
+      if (r.date) refs.add(String(r.date));
+    }
+  }
+
+  const mortgage = universe.mortgage as Record<string, unknown> | undefined;
+  if (mortgage) {
+    if (mortgage.loanNumber) refs.add(String(mortgage.loanNumber));
+    const table = Array.isArray(mortgage.amortizationTable) ? mortgage.amortizationTable : [];
+    for (const row of table) {
+      const r = row as Record<string, unknown>;
+      if (r.date) refs.add(String(r.date));
+    }
+  }
+
+  const creditPolicy = universe.creditPolicy as Record<string, unknown> | undefined;
+  if (creditPolicy) {
+    if (creditPolicy.policyNumber) refs.add(String(creditPolicy.policyNumber));
+  }
+
+  const insurance = Array.isArray(universe.insurancePolicies) ? universe.insurancePolicies : [];
+  for (const ins of insurance) {
+    const p = ins as Record<string, unknown>;
+    if (p.policyNumber) refs.add(String(p.policyNumber));
+  }
+
+  const casualty = universe.casualtyEvent as Record<string, unknown> | undefined;
+  if (casualty) {
+    refs.add("Siniestro");
+    if (casualty.date) refs.add(String(casualty.date));
+  }
+
+  const card = universe.creditCardStatement as Record<string, unknown> | undefined;
+  if (card) {
+    if (card.cardNumber) refs.add(String(card.cardNumber));
+    refs.add("Tarjeta");
+    if (card.settlementDate) refs.add(String(card.settlementDate));
+  }
+
+  const fixedAssets = Array.isArray(universe.fixedAssets) ? universe.fixedAssets : [];
+  for (const fa of fixedAssets) {
+    const a = fa as Record<string, unknown>;
+    if (a.code) refs.add(String(a.code));
+  }
+
+  const equity = universe.shareholdersInfo as Record<string, unknown> | undefined;
+  if (equity) {
+    refs.add("Capital social");
+    refs.add("Constitución");
+  }
+
+  const dividends = universe.dividendDistribution as Record<string, unknown> | undefined;
+  if (dividends) {
+    refs.add("Dividendos");
+    if (dividends.approvalDate) refs.add(String(dividends.approvalDate));
+    if (dividends.paymentDate) refs.add(String(dividends.paymentDate));
+  }
+
+  const initialBalance = universe.initialBalanceSheet as Record<string, unknown> | undefined;
+  if (initialBalance) {
+    refs.add("Asiento apertura");
+    refs.add("Balance inicial");
+    if (initialBalance.date) refs.add(String(initialBalance.date));
+  }
+
+  const shareholderAccts = universe.shareholderAccounts as Record<string, unknown> | undefined;
+  if (shareholderAccts && Array.isArray(shareholderAccts.transactions)) {
+    for (const t of shareholderAccts.transactions as Array<Record<string, unknown>>) {
+      if (t.date) refs.add(String(t.date));
+    }
+  }
+
+  const extraordinary = Array.isArray(universe.extraordinaryExpenses) ? universe.extraordinaryExpenses : [];
+  for (const e of extraordinary) {
+    const ex = e as Record<string, unknown>;
+    if (ex.date) refs.add(String(ex.date));
+    if (ex.description) refs.add(String(ex.description));
+  }
+
+  const debitNotes = Array.isArray(universe.bankDebitNotes) ? universe.bankDebitNotes : [];
+  for (const dn of debitNotes) {
+    const n = dn as Record<string, unknown>;
+    if (n.reference) refs.add(String(n.reference));
+  }
+
+  return refs;
+}
+
+function entryMatchesDocument(entry: Record<string, unknown>, validRefs: Set<string>): boolean {
+  const doc = String(entry.document ?? "").trim();
+  if (!doc) return false;
+  if (validRefs.has(doc)) return true;
+  const docLower = doc.toLowerCase();
+  for (const ref of validRefs) {
+    const refLower = ref.toLowerCase();
+    if (docLower.includes(refLower) || refLower.includes(docLower)) return true;
+  }
+  const knownPatterns = [
+    /^(F|FV|FC|FAC|FACT|INV|SVC|REC|NOM|TC1|MOD|SEG|POL|HIP|PREST|AMO|DIV|APE|SIN|TAR|EXT)/i,
+    /^Mod\.\d{3}/i,
+    /nómina|apertura|cierre|amortización|dividendo|siniestro|seguro|préstamo|hipoteca|póliza|tarjeta|capital/i,
+    /^\d{4}-\d{2}-\d{2}$/,
+  ];
+  for (const pattern of knownPatterns) {
+    if (pattern.test(doc)) return true;
+  }
+  return false;
+}
+
+function buildValidRefsList(universe: Record<string, unknown>): string {
+  const refs: string[] = [];
+
+  const invoices = Array.isArray(universe.invoices) ? universe.invoices : [];
+  for (const inv of invoices) {
+    const i = inv as Record<string, unknown>;
+    refs.push(String(i.invoiceNumber));
+  }
+
+  const svcInvoices = Array.isArray(universe.serviceInvoices) ? universe.serviceInvoices : [];
+  for (const si of svcInvoices) {
+    refs.push(String((si as Record<string, unknown>).invoiceNumber));
+  }
+
+  const pmtReceipts = Array.isArray(universe.paymentReceipts) ? universe.paymentReceipts : [];
+  for (const pr of pmtReceipts) {
+    refs.push(String((pr as Record<string, unknown>).receiptNumber));
+  }
+
+  const payroll = universe.payroll as Record<string, unknown> | undefined;
+  if (payroll && payroll.month) refs.push(`Nómina ${payroll.month}`);
+
+  const ssPayments = Array.isArray(universe.socialSecurityPayments) ? universe.socialSecurityPayments : [];
+  for (const s of ssPayments) {
+    const ss = s as Record<string, unknown>;
+    refs.push(`TC1-${ss.month}`);
+  }
+
+  const taxLiq = Array.isArray(universe.taxLiquidations) ? universe.taxLiquidations : [];
+  for (const t of taxLiq) {
+    const tx = t as Record<string, unknown>;
+    refs.push(`Mod.${tx.model}-${tx.period}`);
+  }
+
+  const loan = universe.bankLoan as Record<string, unknown> | undefined;
+  if (loan) refs.push(String(loan.loanNumber));
+
+  const mortgage = universe.mortgage as Record<string, unknown> | undefined;
+  if (mortgage) refs.push(String(mortgage.loanNumber));
+
+  const creditPolicy = universe.creditPolicy as Record<string, unknown> | undefined;
+  if (creditPolicy) refs.push(String(creditPolicy.policyNumber));
+
+  const insurance = Array.isArray(universe.insurancePolicies) ? universe.insurancePolicies : [];
+  for (const ins of insurance) refs.push(String((ins as Record<string, unknown>).policyNumber));
+
+  if (universe.casualtyEvent) refs.push("Siniestro");
+
+  const card = universe.creditCardStatement as Record<string, unknown> | undefined;
+  if (card) refs.push("Tarjeta-liquidación");
+
+  const fixedAssets = Array.isArray(universe.fixedAssets) ? universe.fixedAssets : [];
+  for (const fa of fixedAssets) refs.push(`Amort-${(fa as Record<string, unknown>).code}`);
+
+  if (universe.shareholdersInfo) refs.push("Capital social");
+  if (universe.dividendDistribution) refs.push("Dividendos");
+  if (universe.initialBalanceSheet) refs.push("Asiento apertura");
+
+  const extraordinary = Array.isArray(universe.extraordinaryExpenses) ? universe.extraordinaryExpenses : [];
+  for (const e of extraordinary) {
+    const ex = e as Record<string, unknown>;
+    refs.push(`${ex.type}-${ex.date}`);
+  }
+
+  return refs.length > 0 ? `\n\nREFERENCIAS DE DOCUMENTO VÁLIDAS (usar EXACTAMENTE estas en el campo "document"):\n${refs.join(", ")}` : "";
+}
+
 async function generateJournalBlock(
   params: GenerateParams,
   scenario: Record<string, unknown>,
@@ -1451,6 +1684,7 @@ async function generateJournalBlock(
   model: string,
   onProgress?: (msg: string) => void,
   documentContext?: string,
+  universe?: Record<string, unknown>,
 ) {
   const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
   const opsPerMonth = params.operationsPerMonth ?? 8;
@@ -1550,7 +1784,7 @@ MODELO LIQUIDACIÓN ${params.taxRegime} (Mod.${params.taxRegime === "IGIC" ? "42
 
   const docCtx = documentContext || "";
 
-  const basePrompt = (chunkStart: string, chunkEnd: string, count: number, startNum: number) =>
+  const basePrompt = (chunkStart: string, chunkEnd: string, count: number, startNum: number, validRefsList: string) =>
     `Genera el LIBRO DIARIO (journalEntries) del universo contable.
 
 EMPRESA: ${sc}
@@ -1564,11 +1798,14 @@ ${params.sector === "Servicios" ? "- Esta empresa NO vende bienes físicos — l
 
 OPERACIONES: ${enabledOps.join(", ")}
 ${payrollInstructions}${taxInstructions}
-${docCtx}
+${docCtx}${validRefsList}
 
 Genera EXACTAMENTE ${count} asientos del ${chunkStart} al ${chunkEnd}. Numera desde ${startNum}.
-CADA asiento DEBE corresponder a un documento real de los listados arriba. El campo "document" debe contener la referencia exacta del documento (nº factura, mes de nómina, referencia de cuota, etc.).
-NO inventes operaciones que no estén soportadas por un documento generado.
+
+⚠️ REGLA CRÍTICA: CADA asiento DEBE corresponder a un documento REAL de los listados arriba.
+El campo "document" DEBE contener una referencia EXACTA de la lista de REFERENCIAS VÁLIDAS.
+NO inventes documentos, facturas, nóminas, recibos u operaciones que NO estén en la lista.
+Si necesitas más asientos, repite operaciones del mismo documento con fechas distintas (ej: pago parcial, devengo, cobro).
 
 JSON: {"journalEntries":[{"entryNumber":"${startNum}","date":"YYYY-MM-DD","concept":"Máx 6 palabras","document":"REF-del-documento","debits":[{"accountCode":"XXX","accountName":"Cuenta PGC","amount":0.00}],"credits":[{"accountCode":"XXX","accountName":"Cuenta PGC","amount":0.00}],"totalAmount":0.00}]}
 
@@ -1579,7 +1816,10 @@ REGLAS:
 - Otros asientos: máx 3 líneas débito y 3 crédito
 - NO campo "description" — solo accountCode, accountName, amount
 - Conceptos breves (máx 6 palabras)
-- El campo "document" debe coincidir con una referencia real de los documentos listados arriba`;
+- PROHIBIDO inventar documentos — usar SOLO referencias de la lista proporcionada`;
+
+  const validRefs = universe ? buildValidDocumentRefs(universe) : new Set<string>();
+  const validRefsList = universe ? buildValidRefsList(universe) : "";
 
   const allEntries: unknown[] = [];
   let startNum = 1;
@@ -1594,12 +1834,20 @@ REGLAS:
     while (remaining > 0 && attempt < maxAttempts) {
       if (onProgress) onProgress(`Libro diario: lote ${i + 1} de ${chunks.length} (asientos ${startNum}–${startNum + remaining - 1})${attempt > 0 ? ` (reintento ${attempt})` : ''}`);
       console.log(`[journal] Lote ${i + 1}/${chunks.length}: ${chunkStart} a ${chunk.end}, ${remaining} asientos (desde #${startNum})${attempt > 0 ? ` retry=${attempt}` : ''}`);
-      const result = await callAI(client, model, basePrompt(chunkStart, chunk.end, remaining, startNum), 8192) as Record<string, unknown>;
+      const result = await callAI(client, model, basePrompt(chunkStart, chunk.end, remaining, startNum, validRefsList), 8192) as Record<string, unknown>;
       const entries = (result as { journalEntries?: unknown[] }).journalEntries;
       if (Array.isArray(entries) && entries.length > 0) {
-        allEntries.push(...entries);
-        startNum += entries.length;
-        remaining -= entries.length;
+        const filtered = entries.filter(e => {
+          const entry = e as Record<string, unknown>;
+          return entryMatchesDocument(entry, validRefs);
+        });
+        const dropped = entries.length - filtered.length;
+        if (dropped > 0) {
+          console.warn(`[journal] Lote ${i + 1}: descartados ${dropped} asientos con documentos inventados`);
+        }
+        allEntries.push(...filtered);
+        startNum += filtered.length;
+        remaining -= filtered.length;
       } else {
         break;
       }
@@ -1608,6 +1856,12 @@ REGLAS:
     if (remaining > 0) {
       console.warn(`[journal] Lote ${i + 1}: faltan ${remaining} asientos tras ${attempt} intentos`);
     }
+  }
+
+  let num = 1;
+  for (const entry of allEntries) {
+    (entry as Record<string, unknown>).entryNumber = String(num);
+    num++;
   }
 
   console.log(`[journal] Total generados: ${allEntries.length} asientos`);
@@ -1733,7 +1987,7 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
   progress("Generando libro diario (basado en documentos reales)...");
   const documentContext = buildDocumentSummary(universe);
   console.log(`[journal] Contexto de documentos: ${documentContext.length} chars`);
-  const journalBlock = await generateJournalBlock(params, scenario, client, model, progress, documentContext);
+  const journalBlock = await generateJournalBlock(params, scenario, client, model, progress, documentContext, universe);
   if (journalBlock && typeof journalBlock === "object") {
     Object.assign(universe, journalBlock);
   }
