@@ -1116,10 +1116,11 @@ async function generateJournalBlock(
   scenario: Record<string, unknown>,
   client: OpenAI,
   model: string,
+  onProgress?: (msg: string) => void,
 ) {
   const { periodStart, periodEnd, numMonths } = getPeriodInfo(params);
   const opsPerMonth = params.operationsPerMonth ?? 8;
-  const totalTarget = Math.min(opsPerMonth * numMonths, 60);
+  const totalTarget = opsPerMonth * numMonths;
   const level = params.educationLevel ?? "Medio";
 
   const sc = JSON.stringify({
@@ -1145,27 +1146,47 @@ async function generateJournalBlock(
   enabledOps.push("gastos generales (suministros, seguros, servicios bancarios)");
   if (params.sector !== "Servicios") enabledOps.push("variación de existencias");
 
-  const needsSplit = totalTarget > 25;
+  const ENTRIES_PER_CHUNK = 20;
   const chunks: Array<{ start: string; end: string; count: number }> = [];
 
-  if (needsSplit) {
-    const startDate = new Date(periodStart);
-    const endDate = new Date(periodEnd);
-    const midDate = new Date(startDate);
-    midDate.setMonth(midDate.getMonth() + Math.ceil(numMonths / 2));
-    if (midDate > endDate) midDate.setTime(endDate.getTime());
-    const midMinusOne = new Date(midDate);
-    midMinusOne.setDate(midMinusOne.getDate() - 1);
-
-    const half1 = Math.ceil(totalTarget / 2);
-    const half2 = totalTarget - half1;
-    chunks.push(
-      { start: periodStart, end: midMinusOne.toISOString().slice(0, 10), count: half1 },
-      { start: midDate.toISOString().slice(0, 10), end: periodEnd, count: half2 },
-    );
-  } else {
+  if (totalTarget <= ENTRIES_PER_CHUNK) {
     chunks.push({ start: periodStart, end: periodEnd, count: totalTarget });
+  } else {
+    const numChunks = Math.ceil(totalTarget / ENTRIES_PER_CHUNK);
+    const monthsPerChunk = Math.max(1, Math.floor(numMonths / numChunks));
+    const startDate = new Date(periodStart);
+    const endDateFull = new Date(periodEnd);
+    let remaining = totalTarget;
+
+    for (let i = 0; i < numChunks; i++) {
+      const chunkStart = new Date(startDate);
+      chunkStart.setMonth(chunkStart.getMonth() + i * monthsPerChunk);
+      if (chunkStart > endDateFull) break;
+
+      let chunkEnd: Date;
+      if (i === numChunks - 1) {
+        chunkEnd = endDateFull;
+      } else {
+        chunkEnd = new Date(startDate);
+        chunkEnd.setMonth(chunkEnd.getMonth() + (i + 1) * monthsPerChunk);
+        chunkEnd.setDate(chunkEnd.getDate() - 1);
+        if (chunkEnd > endDateFull) chunkEnd = endDateFull;
+      }
+
+      const chunkCount = (i === numChunks - 1)
+        ? remaining
+        : Math.min(ENTRIES_PER_CHUNK, remaining);
+      remaining -= chunkCount;
+
+      chunks.push({
+        start: chunkStart.toISOString().slice(0, 10),
+        end: chunkEnd.toISOString().slice(0, 10),
+        count: chunkCount,
+      });
+    }
   }
+
+  console.log(`[journal] Total: ${totalTarget} asientos en ${chunks.length} lotes`);
 
   const basePrompt = (chunkStart: string, chunkEnd: string, count: number, startNum: number) =>
     `Genera el LIBRO DIARIO (journalEntries) del universo contable.
@@ -1181,7 +1202,7 @@ ${params.sector === "Servicios" ? "- Esta empresa NO vende bienes físicos — l
 
 OPERACIONES: ${enabledOps.join(", ")}
 
-Genera exactamente ${count} asientos del ${chunkStart} al ${chunkEnd}. Numera desde ${startNum}.
+Genera EXACTAMENTE ${count} asientos del ${chunkStart} al ${chunkEnd}. Numera desde ${startNum}.
 
 JSON: {"journalEntries":[{"entryNumber":"${startNum}","date":"YYYY-MM-DD","concept":"Máx 6 palabras","document":"REF","debits":[{"accountCode":"XXX","accountName":"Cuenta PGC","amount":0.00}],"credits":[{"accountCode":"XXX","accountName":"Cuenta PGC","amount":0.00}],"totalAmount":0.00}]}
 
@@ -1195,8 +1216,10 @@ REGLAS:
   const allEntries: unknown[] = [];
   let startNum = 1;
 
-  for (const chunk of chunks) {
-    console.log(`[journal] Generando lote: ${chunk.start} a ${chunk.end}, ${chunk.count} asientos (desde #${startNum})`);
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i];
+    if (onProgress) onProgress(`Libro diario: lote ${i + 1} de ${chunks.length} (asientos ${startNum}–${startNum + chunk.count - 1})`);
+    console.log(`[journal] Lote ${i + 1}/${chunks.length}: ${chunk.start} a ${chunk.end}, ${chunk.count} asientos (desde #${startNum})`);
     const result = await callAI(client, model, basePrompt(chunk.start, chunk.end, chunk.count, startNum), 8192) as Record<string, unknown>;
     const entries = (result as { journalEntries?: unknown[] }).journalEntries;
     if (Array.isArray(entries)) {
@@ -1205,6 +1228,7 @@ REGLAS:
     }
   }
 
+  console.log(`[journal] Total generados: ${allEntries.length} asientos`);
   return { journalEntries: allEntries };
 }
 
@@ -1264,7 +1288,7 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     generateInsuranceCasualty(params, scenario, client, model).then((r) => { progress("Seguros completados"); return r; }),
     generateExtraordinaryExpenses(params, scenario, client, model).then((r) => { progress("Extraordinarios completados"); return r; }),
     generateOperationsBlock(params, scenario, client, model).then((r) => { progress("Operaciones completadas"); return r; }),
-    generateJournalBlock(params, scenario, client, model).then((r) => { progress("Libro diario completado"); return r; }),
+    generateJournalBlock(params, scenario, client, model, progress).then((r) => { progress("Libro diario completado"); return r; }),
   ];
   if (withEquity) {
     blockPromises.push(generateEquityBlock(params, scenario, client, model).then((r) => { progress("Capital y socios completado"); return r; }));
