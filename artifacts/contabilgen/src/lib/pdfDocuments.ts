@@ -39,7 +39,7 @@ function lightenColor(c: RGB, factor = 0.92): RGB {
   ];
 }
 
-interface CP {
+export interface CP {
   name: string;
   nif?: string;
   address?: string;

@@ -1,4 +1,15 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useCallback } from 'react';
+import { saveAs } from "file-saver";
+import {
+  generateInvoicePdf, generateBankStatementPdf, generatePayrollPdf,
+  generateSSPaymentPdf, generateTaxLiquidationPdf, generateBankLoanPdf,
+  generateMortgagePdf, generateCreditPolicyPdf, generateCreditCardStatementPdf,
+  generateInsurancePolicyPdf, generateCasualtyReportPdf, generateFixedAssetCardPdf,
+  generateBankDebitNotePdf, generateDividendDistributionPdf, generateShareholdersInfoPdf,
+  generateInitialBalancePdf, generateShareholderAccountsPdf,
+  generateExtraordinaryExpensePdf,
+  type CP,
+} from "@/lib/pdfDocuments";
 import { 
   AccountingUniverse, 
   AccountEntry, 
@@ -1745,6 +1756,8 @@ interface ChronoEvent {
   label: string;
   subtitle: string;
   amount?: number;
+  pdfGenerator?: () => Blob;
+  pdfFilename?: string;
 }
 
 const KIND_META: Record<EventKind, { color: string; bg: string; text: string; dot: string }> = {
@@ -1788,14 +1801,33 @@ function parsePayrollDate(month: string, year: number): string {
   return `${year}-06-28`;
 }
 
+function buildCP(universe: AccountingUniverse): CP {
+  const p = universe.companyProfile;
+  return {
+    name: p?.name || "Empresa",
+    nif: p?.nif || (p as any)?.cif || "",
+    address: p?.address || "",
+    city: p?.city || "",
+    sector: p?.sector || "",
+    taxRegime: p?.taxRegime || "",
+    fiscalYear: p?.fiscalYear as number | undefined,
+    description: (p as any)?.description || "",
+  };
+}
+
 function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
   const events: ChronoEvent[] = [];
+  const cp = buildCP(universe);
+  const safe = (s: string) => (s || "").replace(/[/\\?%*:|"<>]/g, "-").substring(0, 50);
 
   (universe.invoices ?? []).forEach((inv) => {
     const kind: EventKind = inv.type === "sale" ? "factura_venta"
       : inv.type === "rectification" ? "factura_rectif" : "factura_compra";
+    const tipo = inv.type === "sale" ? "Venta" : "Compra";
     events.push({ date: inv.date, kind, label: inv.invoiceNumber,
-      subtitle: inv.partyName, amount: inv.total });
+      subtitle: inv.partyName, amount: inv.total,
+      pdfGenerator: () => generateInvoicePdf(inv, cp),
+      pdfFilename: `Factura_${tipo}_${safe(inv.invoiceNumber)}.pdf` });
   });
 
   (universe.journalEntries ?? []).forEach((e) => {
@@ -1806,91 +1838,137 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
   (universe.bankStatements ?? []).forEach((bs) => {
     (bs.transactions ?? []).forEach((t) => {
       events.push({ date: t.date, kind: "banco", label: bs.bank,
-        subtitle: t.concept, amount: t.debit ?? t.credit ?? undefined });
+        subtitle: t.concept, amount: t.debit ?? t.credit ?? undefined,
+        pdfGenerator: () => generateBankStatementPdf(bs, cp),
+        pdfFilename: `Extracto_${safe(bs.bank || bs.period || "")}.pdf` });
     });
   });
 
-  (universe.creditCardStatement?.movements ?? []).forEach((m) => {
-    events.push({ date: m.date, kind: "tarjeta", label: "Tarjeta crédito",
-      subtitle: m.description, amount: m.amount });
-  });
+  if (universe.creditCardStatement) {
+    const card = universe.creditCardStatement;
+    (card.movements ?? []).forEach((m) => {
+      events.push({ date: m.date, kind: "tarjeta", label: "Tarjeta crédito",
+        subtitle: m.description, amount: m.amount,
+        pdfGenerator: () => generateCreditCardStatementPdf(card, cp),
+        pdfFilename: `Extracto_Tarjeta_${safe(card.statementPeriod || "")}.pdf` });
+    });
+  }
 
-  (universe.bankLoan?.amortizationTable ?? []).forEach((r) => {
-    events.push({ date: r.date, kind: "prestamo",
-      label: `Cuota ${r.period} préstamo`, subtitle: universe.bankLoan!.entity, amount: r.installment });
-  });
+  if (universe.bankLoan) {
+    const loan = universe.bankLoan;
+    (loan.amortizationTable ?? []).forEach((r) => {
+      events.push({ date: r.date, kind: "prestamo",
+        label: `Cuota ${r.period} préstamo`, subtitle: loan.entity, amount: r.installment,
+        pdfGenerator: () => generateBankLoanPdf(loan, cp),
+        pdfFilename: `Prestamo_${safe(loan.loanNumber || "")}.pdf` });
+    });
+  }
 
-  (universe.mortgage?.amortizationTable ?? []).forEach((r) => {
-    events.push({ date: r.date, kind: "hipoteca",
-      label: `Cuota ${r.period} hipoteca`, subtitle: universe.mortgage!.entity, amount: r.installment });
-  });
+  if (universe.mortgage) {
+    const mort = universe.mortgage;
+    (mort.amortizationTable ?? []).forEach((r) => {
+      events.push({ date: r.date, kind: "hipoteca",
+        label: `Cuota ${r.period} hipoteca`, subtitle: mort.entity, amount: r.installment,
+        pdfGenerator: () => generateMortgagePdf(mort, cp),
+        pdfFilename: `Hipoteca_${safe(mort.loanNumber || "")}.pdf` });
+    });
+  }
 
   (universe.socialSecurityPayments ?? []).forEach((ss) => {
     if (ss.dueDate) events.push({ date: ss.dueDate, kind: "ss", label: "Pago TC1",
-      subtitle: ss.month, amount: ss.totalPayment });
+      subtitle: ss.month, amount: ss.totalPayment,
+      pdfGenerator: () => generateSSPaymentPdf(ss, cp),
+      pdfFilename: `TC1_${safe(ss.month || "")}.pdf` });
   });
 
   (universe.taxLiquidations ?? []).forEach((t) => {
     if (t.dueDate) events.push({ date: t.dueDate, kind: "impuesto",
-      label: `Mod.${t.model} – ${t.period}`, subtitle: "Liquidación", amount: t.result });
+      label: `Mod.${t.model} – ${t.period}`, subtitle: "Liquidación", amount: t.result,
+      pdfGenerator: () => generateTaxLiquidationPdf(t, cp),
+      pdfFilename: `Mod${t.model || "303"}_${safe(t.period || "")}.pdf` });
   });
 
   if (universe.payroll?.month) {
     const yr = (universe.companyProfile?.fiscalYear as number) ?? new Date().getFullYear();
     events.push({ date: parsePayrollDate(universe.payroll.month, yr), kind: "nomina",
-      label: "Nómina", subtitle: universe.payroll.month, amount: universe.payroll.totalGross });
+      label: "Nómina", subtitle: universe.payroll.month, amount: universe.payroll.totalGross,
+      pdfGenerator: () => generatePayrollPdf(universe.payroll!, cp),
+      pdfFilename: `Nomina_${safe(universe.payroll!.month || "")}.pdf` });
   }
 
-  (universe.shareholderAccounts?.transactions ?? []).forEach((t) => {
-    events.push({ date: t.date, kind: "socio", label: t.accountName,
-      subtitle: `${t.shareholderName} — ${t.concept}`, amount: t.debit ?? t.credit ?? undefined });
-  });
+  if (universe.shareholderAccounts) {
+    const acc = universe.shareholderAccounts;
+    (acc.transactions ?? []).forEach((t) => {
+      events.push({ date: t.date, kind: "socio", label: t.accountName,
+        subtitle: `${t.shareholderName} — ${t.concept}`, amount: t.debit ?? t.credit ?? undefined,
+        pdfGenerator: () => generateShareholderAccountsPdf(acc, cp),
+        pdfFilename: `Cta_Corriente_Socios.pdf` });
+    });
+  }
 
   if (universe.dividendDistribution) {
     const dd = universe.dividendDistribution;
     if (dd.approvalDate) events.push({ date: dd.approvalDate, kind: "dividendo",
-      label: "Aprobación dividendos", subtitle: `Junta − ejercicio ${dd.fiscalYear}`, amount: dd.totalDividends });
+      label: "Aprobación dividendos", subtitle: `Junta − ejercicio ${dd.fiscalYear}`, amount: dd.totalDividends,
+      pdfGenerator: () => generateDividendDistributionPdf(dd, cp),
+      pdfFilename: `Dividendos_Ejercicio_${dd.fiscalYear || ""}.pdf` });
     if (dd.paymentDate) events.push({ date: dd.paymentDate, kind: "dividendo",
-      label: "Pago dividendos", subtitle: "Distribución a socios", amount: dd.totalDividends });
+      label: "Pago dividendos", subtitle: "Distribución a socios", amount: dd.totalDividends,
+      pdfGenerator: () => generateDividendDistributionPdf(dd, cp),
+      pdfFilename: `Dividendos_Ejercicio_${dd.fiscalYear || ""}.pdf` });
   }
 
   if (universe.initialBalanceSheet?.date) {
     events.push({ date: universe.initialBalanceSheet.date, kind: "apertura",
-      label: "Balance de apertura", subtitle: universe.initialBalanceSheet.description ?? "Asiento de apertura", amount: universe.initialBalanceSheet.totalAssets });
+      label: "Balance de apertura", subtitle: universe.initialBalanceSheet.description ?? "Asiento de apertura", amount: universe.initialBalanceSheet.totalAssets,
+      pdfGenerator: () => generateInitialBalancePdf(universe.initialBalanceSheet!, cp),
+      pdfFilename: `Balance_Apertura.pdf` });
   }
 
   (universe.fixedAssets ?? []).forEach((a) => {
     if (a.purchaseDate) events.push({ date: a.purchaseDate, kind: "inmovilizado",
-      label: `Alta: ${a.description}`, subtitle: `Cta. ${a.accountCode}`, amount: a.purchaseValue });
+      label: `Alta: ${a.description}`, subtitle: `Cta. ${a.accountCode}`, amount: a.purchaseValue,
+      pdfGenerator: () => generateFixedAssetCardPdf(a, cp),
+      pdfFilename: `Inmovilizado_${safe(a.description || "")}.pdf` });
   });
 
   (universe.insurancePolicies ?? []).forEach((ins: any) => {
     if (ins.startDate) events.push({ date: ins.startDate, kind: "seguro",
-      label: `Póliza: ${ins.type || "Seguro"}`, subtitle: ins.insurer || "", amount: ins.annualPremium });
+      label: `Póliza: ${ins.type || "Seguro"}`, subtitle: ins.insurer || "", amount: ins.annualPremium,
+      pdfGenerator: () => generateInsurancePolicyPdf(ins, cp),
+      pdfFilename: `Poliza_Seguro_${safe(ins.policyNumber || "")}.pdf` });
   });
 
   if (universe.casualtyEvent?.date) {
     events.push({ date: universe.casualtyEvent.date, kind: "siniestro",
       label: "Siniestro", subtitle: universe.casualtyEvent.description || "",
-      amount: universe.casualtyEvent.insuranceCompensation });
+      amount: universe.casualtyEvent.insuranceCompensation,
+      pdfGenerator: () => generateCasualtyReportPdf(universe.casualtyEvent!, cp),
+      pdfFilename: `Siniestro.pdf` });
   }
 
   if (universe.creditPolicy?.startDate) {
     events.push({ date: universe.creditPolicy.startDate, kind: "poliza_credito",
       label: `Póliza crédito: ${universe.creditPolicy.policyNumber || ""}`,
-      subtitle: universe.creditPolicy.entity || "", amount: universe.creditPolicy.limit });
+      subtitle: universe.creditPolicy.entity || "", amount: universe.creditPolicy.limit,
+      pdfGenerator: () => generateCreditPolicyPdf(universe.creditPolicy!, cp),
+      pdfFilename: `Poliza_Credito_${safe(universe.creditPolicy!.policyNumber || "")}.pdf` });
   }
 
   ((universe as any).bankDebitNotes ?? []).forEach((n: any) => {
     if (n.date) events.push({ date: n.date, kind: "nota_cargo",
-      label: `Nota cargo: ${n.reference || ""}`, subtitle: n.concept || "", amount: n.amount });
+      label: `Nota cargo: ${n.reference || ""}`, subtitle: n.concept || "", amount: n.amount,
+      pdfGenerator: () => generateBankDebitNotePdf(n, cp),
+      pdfFilename: `Nota_Cargo_${safe(n.reference || "")}.pdf` });
   });
 
   (universe.extraordinaryExpenses ?? []).forEach((exp) => {
     const isInc = exp.type === "ingreso_extraordinario" || (exp.accountCode || "").startsWith("7");
     const kind: EventKind = isInc ? "ingreso_extra" : "gasto_extra";
     events.push({ date: exp.date, kind, label: exp.description,
-      subtitle: `Cta. ${exp.accountCode} — ${exp.accountName}`, amount: exp.amount });
+      subtitle: `Cta. ${exp.accountCode} — ${exp.accountName}`, amount: exp.amount,
+      pdfGenerator: () => generateExtraordinaryExpensePdf(exp, cp),
+      pdfFilename: `${isInc ? "Ingreso" : "Gasto"}_Extra_${safe(exp.description || "")}.pdf` });
   });
 
   return events.filter(e => e.date && /^\d{4}-\d{2}-\d{2}/.test(e.date))
@@ -2032,6 +2110,23 @@ export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data })
                       <div className={`text-sm font-mono font-semibold flex-shrink-0 ${meta.color}`}>
                         {formatEuro(Math.abs(e.amount))}
                       </div>
+                    )}
+                    {e.pdfGenerator && (
+                      <button
+                        type="button"
+                        title="Descargar PDF"
+                        onClick={() => {
+                          try {
+                            const blob = e.pdfGenerator!();
+                            saveAs(blob, e.pdfFilename || "documento.pdf");
+                          } catch (err) {
+                            console.error("Error generando PDF:", err);
+                          }
+                        }}
+                        className="flex-shrink-0 mt-0.5 p-1.5 rounded-lg hover:bg-white/60 transition-colors"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={meta.color}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                      </button>
                     )}
                   </div>
                 );
