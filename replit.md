@@ -13,7 +13,7 @@ ContabilGen Pro es un generador de universos contables para prácticas de Grado 
 - **Frontend**: React + Vite + Tailwind CSS (artifacts/contabilgen)
 - **API framework**: Express 5 (artifacts/api-server)
 - **Database**: PostgreSQL + Drizzle ORM
-- **AI**: OpenAI gpt-5.2 via Replit AI Integrations
+- **AI**: DeepSeek (deepseek-chat) — NO OpenAI
 - **Validation**: Zod (`zod/v4`), `drizzle-zod`
 - **API codegen**: Orval (from OpenAPI spec)
 - **Build**: esbuild (CJS bundle)
@@ -32,7 +32,7 @@ ContabilGen Pro es un generador de universos contables para prácticas de Grado 
    - Liquidación de póliza de crédito
    - Extracto de tarjeta de crédito con movimientos
    - Pólizas de seguros con periodificación (cuenta 480)
-   - Siniestro (cuentas 678/778)
+   - Siniestro (cuentas 671 pérdida inmovilizado / 440 deudores aseguradora / 778 ingreso excepcional)
    - Gastos e ingresos extraordinarios (multas 678, donaciones, pérdidas inmovilizado 671, ingresos excepcionales 778/771)
    - Nómina con SS e IRPF
    - Extracto bancario
@@ -129,6 +129,16 @@ Custom email/password auth (no Replit Auth):
 
 - Development: `pnpm --filter @workspace/db run push`
 - Tables: `users`, `sessions`, `password_reset_tokens`, `settings`, `generations`
+
+## PGC Loan Accounting (Préstamos LP/CP)
+
+Per plangeneralcontable.com, loans use accounts 170 (LP) and 5200 (CP):
+- **Formalización**: DEBE 572, HABER 170 (LP portion) + 5200 (CP portion = capital due within 12 months)
+- **Pago cuota**: DEBE 5200 (capital) + 662 (intereses), HABER 572
+- **Reclasificación 31/12**: DEBE 170, HABER 5200 (move next year's capital from LP to CP)
+- Amortization tables are computed server-side (French system), not by AI
+- Same treatment for mortgages (hipotecas)
+- Types: `DebtClassification`, `ReclassificationInfo`, `SubEntry` in `bankLoan.ts`
 
 ## Self-Hosted Deployment (Ubuntu)
 

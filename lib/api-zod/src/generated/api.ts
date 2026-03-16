@@ -386,6 +386,15 @@ export const GenerateAccountingUniverseResponse = zod.object({
       termMonths: zod.number(),
       startDate: zod.string(),
       monthlyInstallment: zod.number(),
+      initialClassification: zod.object({
+        longTerm170: zod.number(),
+        shortTerm5200: zod.number(),
+      }).optional(),
+      reclassification31Dec: zod.object({
+        date: zod.string(),
+        longTerm170: zod.number().optional(),
+        shortTerm5200: zod.number(),
+      }).optional(),
       amortizationTable: zod.array(
         zod.object({
           period: zod.union([zod.number(), zod.string()]).optional(),
@@ -404,7 +413,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           amount: zod.number(),
           description: zod.string(),
         }),
-      ),
+      ).optional(),
       accountCredits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -412,7 +421,22 @@ export const GenerateAccountingUniverseResponse = zod.object({
           amount: zod.number(),
           description: zod.string(),
         }),
-      ),
+      ).optional(),
+      formalizationEntry: zod.object({
+        journalNote: zod.string().optional(),
+        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+      }).optional(),
+      installmentEntry: zod.object({
+        journalNote: zod.string().optional(),
+        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+      }).optional(),
+      reclassificationEntry: zod.object({
+        journalNote: zod.string().optional(),
+        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+      }).optional(),
     })
     .optional(),
   mortgage: zod
@@ -426,6 +450,15 @@ export const GenerateAccountingUniverseResponse = zod.object({
       termMonths: zod.number(),
       startDate: zod.string(),
       monthlyInstallment: zod.number(),
+      initialClassification: zod.object({
+        longTerm170: zod.number(),
+        shortTerm5200: zod.number(),
+      }).optional(),
+      reclassification31Dec: zod.object({
+        date: zod.string(),
+        longTerm170: zod.number().optional(),
+        shortTerm5200: zod.number(),
+      }).optional(),
       amortizationTable: zod.array(
         zod.object({
           period: zod.union([zod.number(), zod.string()]).optional(),
@@ -444,7 +477,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           amount: zod.number(),
           description: zod.string(),
         }),
-      ),
+      ).optional(),
       accountCredits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -452,7 +485,22 @@ export const GenerateAccountingUniverseResponse = zod.object({
           amount: zod.number(),
           description: zod.string(),
         }),
-      ),
+      ).optional(),
+      acquisitionEntry: zod.object({
+        journalNote: zod.string().optional(),
+        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+      }).optional(),
+      installmentEntry: zod.object({
+        journalNote: zod.string().optional(),
+        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+      }).optional(),
+      reclassificationEntry: zod.object({
+        journalNote: zod.string().optional(),
+        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
+      }).optional(),
     })
     .optional(),
   creditPolicy: zod
@@ -1250,6 +1298,8 @@ export const SaveGenerationBody = zod.object({
         termMonths: zod.number(),
         startDate: zod.string(),
         monthlyInstallment: zod.number(),
+        initialClassification: zod.object({ longTerm170: zod.number(), shortTerm5200: zod.number() }).optional(),
+        reclassification31Dec: zod.object({ date: zod.string(), longTerm170: zod.number().optional(), shortTerm5200: zod.number() }).optional(),
         amortizationTable: zod.array(
           zod.object({
             period: zod.union([zod.number(), zod.string()]).optional(),
@@ -1261,22 +1311,11 @@ export const SaveGenerationBody = zod.object({
           }),
         ),
         journalNote: zod.string().optional(),
-        accountDebits: zod.array(
-          zod.object({
-            accountCode: zod.string(),
-            accountName: zod.string(),
-            amount: zod.number(),
-            description: zod.string(),
-          }),
-        ),
-        accountCredits: zod.array(
-          zod.object({
-            accountCode: zod.string(),
-            accountName: zod.string(),
-            amount: zod.number(),
-            description: zod.string(),
-          }),
-        ),
+        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
+        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
+        formalizationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        installmentEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        reclassificationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
       })
       .optional(),
     mortgage: zod
@@ -1290,6 +1329,8 @@ export const SaveGenerationBody = zod.object({
         termMonths: zod.number(),
         startDate: zod.string(),
         monthlyInstallment: zod.number(),
+        initialClassification: zod.object({ longTerm170: zod.number(), shortTerm5200: zod.number() }).optional(),
+        reclassification31Dec: zod.object({ date: zod.string(), longTerm170: zod.number().optional(), shortTerm5200: zod.number() }).optional(),
         amortizationTable: zod.array(
           zod.object({
             period: zod.union([zod.number(), zod.string()]).optional(),
@@ -1301,22 +1342,11 @@ export const SaveGenerationBody = zod.object({
           }),
         ),
         journalNote: zod.string().optional(),
-        accountDebits: zod.array(
-          zod.object({
-            accountCode: zod.string(),
-            accountName: zod.string(),
-            amount: zod.number(),
-            description: zod.string(),
-          }),
-        ),
-        accountCredits: zod.array(
-          zod.object({
-            accountCode: zod.string(),
-            accountName: zod.string(),
-            amount: zod.number(),
-            description: zod.string(),
-          }),
-        ),
+        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
+        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
+        acquisitionEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        installmentEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        reclassificationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
       })
       .optional(),
     creditPolicy: zod
@@ -2114,6 +2144,8 @@ export const GetGenerationResponse = zod.object({
         termMonths: zod.number(),
         startDate: zod.string(),
         monthlyInstallment: zod.number(),
+        initialClassification: zod.object({ longTerm170: zod.number(), shortTerm5200: zod.number() }).optional(),
+        reclassification31Dec: zod.object({ date: zod.string(), longTerm170: zod.number().optional(), shortTerm5200: zod.number() }).optional(),
         amortizationTable: zod.array(
           zod.object({
             period: zod.union([zod.number(), zod.string()]).optional(),
@@ -2125,22 +2157,11 @@ export const GetGenerationResponse = zod.object({
           }),
         ),
         journalNote: zod.string().optional(),
-        accountDebits: zod.array(
-          zod.object({
-            accountCode: zod.string(),
-            accountName: zod.string(),
-            amount: zod.number(),
-            description: zod.string(),
-          }),
-        ),
-        accountCredits: zod.array(
-          zod.object({
-            accountCode: zod.string(),
-            accountName: zod.string(),
-            amount: zod.number(),
-            description: zod.string(),
-          }),
-        ),
+        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
+        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
+        formalizationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        installmentEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        reclassificationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
       })
       .optional(),
     mortgage: zod
@@ -2154,6 +2175,8 @@ export const GetGenerationResponse = zod.object({
         termMonths: zod.number(),
         startDate: zod.string(),
         monthlyInstallment: zod.number(),
+        initialClassification: zod.object({ longTerm170: zod.number(), shortTerm5200: zod.number() }).optional(),
+        reclassification31Dec: zod.object({ date: zod.string(), longTerm170: zod.number().optional(), shortTerm5200: zod.number() }).optional(),
         amortizationTable: zod.array(
           zod.object({
             period: zod.union([zod.number(), zod.string()]).optional(),
@@ -2165,22 +2188,11 @@ export const GetGenerationResponse = zod.object({
           }),
         ),
         journalNote: zod.string().optional(),
-        accountDebits: zod.array(
-          zod.object({
-            accountCode: zod.string(),
-            accountName: zod.string(),
-            amount: zod.number(),
-            description: zod.string(),
-          }),
-        ),
-        accountCredits: zod.array(
-          zod.object({
-            accountCode: zod.string(),
-            accountName: zod.string(),
-            amount: zod.number(),
-            description: zod.string(),
-          }),
-        ),
+        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
+        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
+        acquisitionEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        installmentEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        reclassificationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
       })
       .optional(),
     creditPolicy: zod

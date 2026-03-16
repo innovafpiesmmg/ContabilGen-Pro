@@ -472,7 +472,7 @@ async function generateInsuranceCasualty(
   const prompt = `Genera seguros y siniestro para "${scenario.companyName}" (${getActivityLabel(params)}), período ${periodStart}–${periodEnd}.
 
 JSON exacto:
-{"insurancePolicies":[{"policyNumber":"SEG-${params.year}-001","insurer":"Mapfre Seguros","type":"Seguro multirriesgo","annualPremium":${annualPremium}.00,"startDate":"${insStartStr}","endDate":"${insEndStr}","expenseCurrentPeriod":${expenseCurrentPeriod}.00,"prepaidNextPeriod":${prepaidNextPeriod}.00,"journalNote":"Póliza ${insStartStr}–${insEndStr}. Prima total ${annualPremium}€ pagada al contado. Parte corriente (${expenseCurrentPeriod}€) → cta 625 (Primas de seguros). Parte anticipada del próximo ejercicio (${prepaidNextPeriod}€) → cta 480 (Gastos anticipados). Ajuste de periodificación obligatorio por PGC.","accountDebits":[{"accountCode":"625","accountName":"Primas de seguros","amount":${expenseCurrentPeriod}.00,"description":"Prima seguro multirriesgo ${params.year}"},{"accountCode":"480","accountName":"Gastos anticipados","amount":${prepaidNextPeriod}.00,"description":"Parte prima ${params.year + 1} (periodificación)"}],"accountCredits":[{"accountCode":"572","accountName":"Bancos","amount":${annualPremium}.00,"description":"Pago prima seguro"}]}],"casualtyEvent":{"date":"${periodStart.slice(0,7)}-15","description":"Incendio parcial en almacén — daños en equipos informáticos","assetAffected":"Equipos para procesos de información","bookValue":5000.00,"insuranceCompensation":3500.00,"netLoss":1500.00,"journalNote":"Siniestro: baja del bien (cta 217 Equipos informáticos) y su amortización acumulada (2817). Pérdida neta → 678 (Pérdidas por siniestros). Indemnización aseguradora → 430 (Clientes, cobro pendiente) y 778 (Ingresos excepcionales) al haber.","accountDebits":[{"accountCode":"678","accountName":"Pérdidas procedentes del inmovilizado material","amount":1500.00,"description":"Pérdida neta siniestro"},{"accountCode":"2817","accountName":"Amort. acum. equipos informáticos","amount":3500.00,"description":"Amortización acumulada baja"},{"accountCode":"430","accountName":"Clientes — aseguradora","amount":3500.00,"description":"Indemnización a cobrar Mapfre"}],"accountCredits":[{"accountCode":"217","accountName":"Equipos para procesos de información","amount":5000.00,"description":"Baja por siniestro — valor contable bruto"},{"accountCode":"778","accountName":"Ingresos excepcionales","amount":3500.00,"description":"Indemnización seguro reconocida"}]}}
+{"insurancePolicies":[{"policyNumber":"SEG-${params.year}-001","insurer":"Mapfre Seguros","type":"Seguro multirriesgo","annualPremium":${annualPremium}.00,"startDate":"${insStartStr}","endDate":"${insEndStr}","expenseCurrentPeriod":${expenseCurrentPeriod}.00,"prepaidNextPeriod":${prepaidNextPeriod}.00,"journalNote":"Póliza ${insStartStr}–${insEndStr}. Prima total ${annualPremium}€ pagada al contado. Parte corriente (${expenseCurrentPeriod}€) → cta 625 (Primas de seguros). Parte anticipada del próximo ejercicio (${prepaidNextPeriod}€) → cta 480 (Gastos anticipados). Ajuste de periodificación obligatorio por PGC.","accountDebits":[{"accountCode":"625","accountName":"Primas de seguros","amount":${expenseCurrentPeriod}.00,"description":"Prima seguro multirriesgo ${params.year}"},{"accountCode":"480","accountName":"Gastos anticipados","amount":${prepaidNextPeriod}.00,"description":"Parte prima ${params.year + 1} (periodificación)"}],"accountCredits":[{"accountCode":"572","accountName":"Bancos","amount":${annualPremium}.00,"description":"Pago prima seguro"}]}],"casualtyEvent":{"date":"${periodStart.slice(0,7)}-15","description":"Incendio parcial en almacén — daños en equipos informáticos","assetAffected":"Equipos para procesos de información","bookValue":5000.00,"insuranceCompensation":3500.00,"netLoss":1500.00,"journalNote":"Siniestro: baja del bien (217 Equipos informáticos) y su amortización acumulada (2817). Pérdida neta → 671 (Pérdidas procedentes del inmovilizado material). Indemnización aseguradora → 440 (Deudores varios) al debe; si supera valor neto contable, diferencia a 778 (Ingresos excepcionales) al haber.","accountDebits":[{"accountCode":"671","accountName":"Pérdidas procedentes del inmovilizado material","amount":1500.00,"description":"Pérdida neta por siniestro"},{"accountCode":"2817","accountName":"Amort. acum. equipos informáticos","amount":3500.00,"description":"Amortización acumulada baja siniestro"},{"accountCode":"440","accountName":"Deudores varios","amount":3500.00,"description":"Indemnización a cobrar aseguradora"}],"accountCredits":[{"accountCode":"217","accountName":"Equipos para procesos de información","amount":5000.00,"description":"Baja por siniestro — valor contable bruto"},{"accountCode":"778","accountName":"Ingresos excepcionales","amount":3500.00,"description":"Indemnización seguro reconocida"}]}}
 
 Adapta descripción y actividad ${getActivityLabel(params)}. 1-2 pólizas de seguro realistas con periodificación (cta 480).`;
 
@@ -690,6 +690,80 @@ function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
+// ─── AMORTIZATION TABLE (French system) & LP/CP CLASSIFICATION ───────────────
+interface AmortRow {
+  period: number;
+  date: string;
+  installment: number;
+  interest: number;
+  principal: number;
+  balance: number;
+}
+
+function buildFrenchAmortization(
+  totalPrincipal: number,
+  annualRate: number,
+  termMonths: number,
+  startDate: string,
+): AmortRow[] {
+  const monthlyRate = annualRate / 100 / 12;
+  const installment = monthlyRate > 0
+    ? round2(totalPrincipal * monthlyRate / (1 - Math.pow(1 + monthlyRate, -termMonths)))
+    : round2(totalPrincipal / termMonths);
+
+  const rows: AmortRow[] = [];
+  let balance = totalPrincipal;
+  const [sy, sm, sd] = startDate.split("-").map(Number);
+
+  for (let i = 1; i <= termMonths; i++) {
+    const interest = round2(balance * monthlyRate);
+    const principalPaid = round2(i === termMonths ? balance : installment - interest);
+    balance = round2(balance - principalPaid);
+    if (balance < 0) balance = 0;
+
+    const payMonth = sm - 1 + i;
+    const payYear = sy + Math.floor(payMonth / 12);
+    const payM = (payMonth % 12) + 1;
+    const lastDay = new Date(payYear, payM, 0).getDate();
+    const payDay = Math.min(sd || 20, lastDay);
+
+    rows.push({
+      period: i,
+      date: `${payYear}-${String(payM).padStart(2, "0")}-${String(payDay).padStart(2, "0")}`,
+      installment: round2(principalPaid + interest),
+      interest,
+      principal: principalPaid,
+      balance,
+    });
+  }
+  return rows;
+}
+
+function classifyDebtLpCp(
+  amortRows: AmortRow[],
+  cutoffDate: string,
+): { shortTermPrincipal: number; longTermPrincipal: number } {
+  const cutoff = new Date(cutoffDate);
+  const oneYearLater = new Date(cutoff);
+  oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+
+  let shortTermPrincipal = 0;
+  for (const row of amortRows) {
+    const rowDate = new Date(row.date);
+    if (rowDate > cutoff && rowDate <= oneYearLater) {
+      shortTermPrincipal += row.principal;
+    }
+  }
+  shortTermPrincipal = round2(shortTermPrincipal);
+
+  const totalRemaining = amortRows.length > 0
+    ? round2(amortRows.filter(r => new Date(r.date) > cutoff).reduce((s, r) => s + r.principal, 0))
+    : 0;
+  const longTermPrincipal = round2(totalRemaining - shortTermPrincipal);
+
+  return { shortTermPrincipal, longTermPrincipal };
+}
+
 // ─── CALL 3: OPERATIONS BLOCK ─────────────────────────────────────────────────
 async function generateOperationsBlock(
   params: GenerateParams,
@@ -847,17 +921,39 @@ ${quarterLines},
     const p = fin.loanPrincipal ?? 50000;
     const r = fin.loanRate ?? 4.5;
     const t = fin.loanTermMonths ?? 60;
-    const monthly = p * (r / 1200) / (1 - Math.pow(1 + r / 1200, -t));
+    const loanStart = String(fin.loanStartDate ?? periodStart);
+    const loanAmort = buildFrenchAmortization(p, r, t, loanStart);
+    const loanMonthly = loanAmort[0]?.installment ?? 0;
+    const { shortTermPrincipal: loanCP, longTermPrincipal: loanLP } = classifyDebtLpCp(loanAmort, loanStart);
+    const loanAmortSlice = loanAmort.filter(row => row.date >= periodStart && row.date <= periodEnd);
+    const loanAmortJson = JSON.stringify(loanAmortSlice.length > 0 ? loanAmortSlice : loanAmort.slice(0, 12));
+    const loanReclassDate = `${params.year}-12-31`;
+    const { shortTermPrincipal: loanCPReclass } = classifyDebtLpCp(loanAmort, loanReclassDate);
+    const loanLPReclass = round2(loanAmort.filter(r => new Date(r.date) > new Date(loanReclassDate)).reduce((s, r) => s + r.principal, 0) - loanCPReclass);
     sections.push(`"bankLoan": {
     "entity": "${String(scenario.bankEntity ?? "Banco Ejemplo")}",
     "loanNumber": "PRE-${params.year}-001",
     "principal": ${p}, "annualRate": ${r}, "termMonths": ${t},
-    "startDate": "${fin.loanStartDate ?? periodStart}",
-    "monthlyInstallment": ${monthly.toFixed(2)},
-    "amortizationTable": [GENERA 3 filas: period, date, installment, interest, principal, balance],
-    "journalNote": "Recepción del préstamo: 572 al debe, 170 al haber. Cada cuota: 170/520 (capital) y 662 (intereses) al debe, 572 al haber.",
-    "accountDebits": [{"accountCode":"572","accountName":"Bancos","amount":${p},"description":"Recepción préstamo"}],
-    "accountCredits": [{"accountCode":"170","accountName":"Deudas LP entidades de crédito","amount":${p},"description":"Préstamo bancario"}]
+    "startDate": "${loanStart}",
+    "monthlyInstallment": ${loanMonthly},
+    "initialClassification": {"longTerm170": ${loanLP}, "shortTerm5200": ${loanCP}},
+    "reclassification31Dec": {"date": "${loanReclassDate}", "longTerm170": ${loanLPReclass > 0 ? loanLPReclass : 0}, "shortTerm5200": ${loanCPReclass}},
+    "amortizationTable": ${loanAmortJson},
+    "journalNote": "FORMALIZACIÓN: DEBE 572 (${p}€ recibidos), HABER 170 Deudas a LP (${loanLP}€) + 5200 Préstamos a CP (${loanCP}€ = capital a devolver próximos 12 meses). PAGO CUOTA MENSUAL: DEBE 5200 (capital amortizado) + 662 (intereses devengados), HABER 572. RECLASIFICACIÓN 31/12: DEBE 170, HABER 5200 (traspasar de LP a CP el capital a devolver en los próximos 12 meses = ${loanCPReclass}€).",
+    "formalizationEntry": {
+      "accountDebits": [{"accountCode":"572","accountName":"Bancos c/c","amount":${p},"description":"Recepción préstamo bancario"}],
+      "accountCredits": [{"accountCode":"170","accountName":"Deudas a LP con entidades de crédito","amount":${loanLP},"description":"Principal LP (vencimiento > 12 meses)"},{"accountCode":"5200","accountName":"Préstamos a CP de entidades de crédito","amount":${loanCP},"description":"Principal CP (vencimiento ≤ 12 meses)"}]
+    },
+    "installmentEntry": {
+      "journalNote": "Cuota mensual (ejemplo cuota 1): DEBE 5200 (${loanAmort[0]?.principal ?? 0}€ capital) + 662 (${loanAmort[0]?.interest ?? 0}€ intereses), HABER 572 (${loanMonthly}€ total). Las proporciones varían cada mes según cuadro de amortización.",
+      "accountDebits": [{"accountCode":"5200","accountName":"Préstamos a CP de entidades de crédito","amount":${loanAmort[0]?.principal ?? 0},"description":"Amortización capital (ej. cuota 1)"},{"accountCode":"662","accountName":"Intereses de deudas con entidades de crédito","amount":${loanAmort[0]?.interest ?? 0},"description":"Intereses devengados (ej. cuota 1)"}],
+      "accountCredits": [{"accountCode":"572","accountName":"Bancos c/c","amount":${loanMonthly},"description":"Pago cuota préstamo"}]
+    },
+    "reclassificationEntry": {
+      "journalNote": "Reclasificación al cierre 31/12: traspasar de LP (170) a CP (5200) el capital que vence en los próximos 12 meses.",
+      "accountDebits": [{"accountCode":"170","accountName":"Deudas a LP con entidades de crédito","amount":${loanCPReclass},"description":"Reclasificación LP→CP próximos 12 meses"}],
+      "accountCredits": [{"accountCode":"5200","accountName":"Préstamos a CP de entidades de crédito","amount":${loanCPReclass},"description":"Capital que vence en próximos 12 meses"}]
+    }
   }`);
   }
 
@@ -865,19 +961,44 @@ ${quarterLines},
     const mp = fin.mortgagePrincipal ?? 180000;
     const mr = fin.mortgageRate ?? 3.2;
     const mt = fin.mortgageTermMonths ?? 240;
-    const mMonthly = mp * (mr / 1200) / (1 - Math.pow(1 + mr / 1200, -mt));
+    const hipStart = String(fin.mortgageStartDate ?? periodStart);
+    const hipAmort = buildFrenchAmortization(mp, mr, mt, hipStart);
+    const hipMonthly = hipAmort[0]?.installment ?? 0;
+    const { shortTermPrincipal: hipCP, longTermPrincipal: hipLP } = classifyDebtLpCp(hipAmort, hipStart);
+    const hipAmortSlice = hipAmort.filter(row => row.date >= periodStart && row.date <= periodEnd);
+    const hipAmortJson = JSON.stringify(hipAmortSlice.length > 0 ? hipAmortSlice : hipAmort.slice(0, 12));
+    const hipReclassDate = `${params.year}-12-31`;
+    const { shortTermPrincipal: hipCPReclass } = classifyDebtLpCp(hipAmort, hipReclassDate);
+    const propertyValue = Math.round(mp * 1.4);
+    const terreno = Math.round(propertyValue * 0.2);
+    const construccion = propertyValue - terreno;
+    const entrada = round2(propertyValue - hipLP - hipCP);
     sections.push(`"mortgage": {
     "entity": "${String(scenario.bankEntity ?? "CaixaBank")}",
     "loanNumber": "HIP-${params.year}-001",
     "propertyDescription": "Local comercial ${getActivityLabel(params)}",
-    "propertyValue": ${Math.round(mp * 1.4)},
+    "propertyValue": ${propertyValue},
     "principal": ${mp}, "annualRate": ${mr}, "termMonths": ${mt},
-    "startDate": "${fin.mortgageStartDate ?? periodStart}",
-    "monthlyInstallment": ${mMonthly.toFixed(2)},
-    "amortizationTable": [GENERA 3 filas: period, date, installment, interest, principal, balance],
-    "journalNote": "Inmueble activo (221/222). Hipoteca: LP (170) y CP (521). Cuotas: 662 (intereses) + amortización capital.",
-    "accountDebits": [{"accountCode":"221","accountName":"Construcciones","amount":${Math.round(mp * 1.4)},"description":"Adquisición local"}],
-    "accountCredits": [{"accountCode":"170","accountName":"Deudas LP","amount":${Math.round(mp * 0.9)},"description":"Hipoteca LP"},{"accountCode":"521","accountName":"Deudas CP entidades crédito","amount":${Math.round(mp * 0.07)},"description":"Vencimiento CP hipoteca"},{"accountCode":"572","accountName":"Bancos","amount":${Math.round(mp * 0.03 + mp * 0.4)},"description":"Entrada + gastos"}]
+    "startDate": "${hipStart}",
+    "monthlyInstallment": ${hipMonthly},
+    "initialClassification": {"longTerm170": ${hipLP}, "shortTerm5200": ${hipCP}},
+    "reclassification31Dec": {"date": "${hipReclassDate}", "shortTerm5200": ${hipCPReclass}},
+    "amortizationTable": ${hipAmortJson},
+    "journalNote": "ADQUISICIÓN INMUEBLE CON HIPOTECA: (1) Alta activo: DEBE 220 Terrenos (${terreno}€) + 221 Construcciones (${construccion}€). HABER 170 Deudas LP (${hipLP}€) + 5200 Préstamos CP (${hipCP}€) + 572 Bancos (${entrada}€ entrada). (2) CUOTA MENSUAL: DEBE 5200 (capital) + 662 (intereses), HABER 572. (3) RECLASIFICACIÓN 31/12: DEBE 170, HABER 5200 (${hipCPReclass}€ = capital que vence próximos 12 meses).",
+    "acquisitionEntry": {
+      "accountDebits": [{"accountCode":"220","accountName":"Terrenos y bienes naturales","amount":${terreno},"description":"Terreno local comercial"},{"accountCode":"221","accountName":"Construcciones","amount":${construccion},"description":"Edificio local comercial"}],
+      "accountCredits": [{"accountCode":"170","accountName":"Deudas a LP con entidades de crédito","amount":${hipLP},"description":"Hipoteca LP (vencimiento > 12 meses)"},{"accountCode":"5200","accountName":"Préstamos a CP de entidades de crédito","amount":${hipCP},"description":"Hipoteca CP (vencimiento ≤ 12 meses)"},{"accountCode":"572","accountName":"Bancos c/c","amount":${entrada},"description":"Entrada + gastos escritura"}]
+    },
+    "installmentEntry": {
+      "journalNote": "Cuota mensual hipoteca (ejemplo cuota 1): DEBE 5200 (${hipAmort[0]?.principal ?? 0}€ capital) + 662 (${hipAmort[0]?.interest ?? 0}€ intereses), HABER 572 (${hipMonthly}€ total). Las proporciones varían cada mes según cuadro de amortización.",
+      "accountDebits": [{"accountCode":"5200","accountName":"Préstamos a CP de entidades de crédito","amount":${hipAmort[0]?.principal ?? 0},"description":"Amortización capital hipoteca (ej. cuota 1)"},{"accountCode":"662","accountName":"Intereses de deudas con entidades de crédito","amount":${hipAmort[0]?.interest ?? 0},"description":"Intereses hipotecarios (ej. cuota 1)"}],
+      "accountCredits": [{"accountCode":"572","accountName":"Bancos c/c","amount":${hipMonthly},"description":"Pago cuota hipoteca"}]
+    },
+    "reclassificationEntry": {
+      "journalNote": "Reclasificación al cierre 31/12: traspasar de LP (170) a CP (5200) el capital hipotecario que vence en los próximos 12 meses.",
+      "accountDebits": [{"accountCode":"170","accountName":"Deudas a LP con entidades de crédito","amount":${hipCPReclass},"description":"Reclasificación hipoteca LP→CP"}],
+      "accountCredits": [{"accountCode":"5200","accountName":"Préstamos a CP de entidades de crédito","amount":${hipCPReclass},"description":"Capital hipoteca próximos 12 meses"}]
+    }
   }`);
   }
 
@@ -905,9 +1026,9 @@ ${quarterLines},
     "durationMonths": ${polMonths},
     "interestAmount": ${Math.round(drawn * 0.055 * polMonths / 12)},
     "totalSettlement": ${Math.round(drawn * 0.055 * polMonths / 12 + 150 + (limit - drawn) * 0.005)},
-    "journalNote": "Póliza de crédito ${polStartStr}–${polEndStr}. Apertura: 5201 al haber (límite dispuesto), 572 al debe. Liquidación al vencimiento: 663 (intereses sobre saldo medio dispuesto) y 626 (comisión apertura + no disposición) al debe; 572 al haber.",
-    "accountDebits": [{"accountCode":"663","accountName":"Intereses de deudas","amount":${Math.round(drawn * 0.055 * polMonths / 12)},"description":"Intereses saldo dispuesto ${polStartStr}–${polEndStr}"},{"accountCode":"626","accountName":"Servicios bancarios y similares","amount":${Math.round(150 + (limit - drawn) * 0.005)},"description":"Comisión apertura + no disposición"}],
-    "accountCredits": [{"accountCode":"5201","accountName":"Deudas CP póliza de crédito","amount":${Math.round(drawn * 0.055 * polMonths / 12 + 150 + (limit - drawn) * 0.005)},"description":"Liquidación total póliza"}]
+    "journalNote": "Póliza de crédito ${polStartStr}–${polEndStr}. (1) Apertura y disposición: DEBE 572, HABER 5201 (saldo dispuesto). (2) Comisión apertura: DEBE 626, HABER 572. (3) Liquidación periódica intereses: DEBE 663 (intereses devengados), HABER 572. (4) Comisión no disposición: DEBE 626, HABER 572. (5) Cancelación al vencimiento: DEBE 5201, HABER 572 (devolución saldo dispuesto).",
+    "accountDebits": [{"accountCode":"572","accountName":"Bancos c/c","amount":${drawn},"description":"Disposición póliza crédito"}],
+    "accountCredits": [{"accountCode":"5201","accountName":"Deudas a CP — póliza de crédito","amount":${drawn},"description":"Saldo dispuesto póliza"}]
   }`);
   }
 
@@ -1139,8 +1260,8 @@ async function generateJournalBlock(
   ];
   if (params.includePayroll !== false) enabledOps.push("nóminas y SS (ver MODELO NÓMINAS abajo)");
   if (params.includeTaxLiquidation !== false) enabledOps.push("liquidaciones trimestrales de " + params.taxRegime + " (Mod.303/420) y Mod.111 IRPF retenciones");
-  if (params.includeBankLoan !== false) enabledOps.push("cuotas del préstamo bancario (capital e intereses)");
-  if (params.includeMortgage) enabledOps.push("cuotas de hipoteca");
+  if (params.includeBankLoan !== false) enabledOps.push("cuotas del préstamo bancario: DEBE 5200 (capital amortizado CP) + 662 (intereses), HABER 572. Reclasificación 31/12: DEBE 170, HABER 5200");
+  if (params.includeMortgage) enabledOps.push("cuotas de hipoteca: DEBE 5200 (capital amortizado CP) + 662 (intereses), HABER 572. Reclasificación 31/12: DEBE 170, HABER 5200");
   if (params.includeCreditPolicy !== false) enabledOps.push("disposición y liquidación de póliza de crédito");
   if (params.includeFixedAssets !== false) enabledOps.push("amortizaciones de inmovilizado");
   enabledOps.push("gastos generales (suministros, seguros, servicios bancarios)");
@@ -1364,9 +1485,9 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     movements: allCardMovements,
     totalCharges: Math.round(totalCardCharges * 100) / 100,
     settlementDate: months[months.length - 1]?.end ?? `${params.year}-12-31`,
-    journalNote: "Cada gasto con tarjeta: gasto (xxx) a deuda (5201). Al pago bancario: 5201 a 572.",
+    journalNote: "Cada gasto con tarjeta: DEBE gasto (6xx según naturaleza), HABER 523 (Proveedores de inmovilizado a CP) o 410 (Acreedores por prestaciones de servicios). Al pago bancario: DEBE 523/410, HABER 572.",
     accountDebits: [{ accountCode: "629", accountName: "Otros servicios", amount: totalCardCharges, description: "Gastos tarjeta ejercicio" }],
-    accountCredits: [{ accountCode: "5201", accountName: "Deudas tarjeta crédito", amount: totalCardCharges, description: "Total liquidado" }],
+    accountCredits: [{ accountCode: "410", accountName: "Acreedores por prestaciones de servicios", amount: totalCardCharges, description: "Total liquidado tarjeta" }],
   };
 
   // Phase 4: Build bank debit notes programmatically from all payment events
@@ -1498,11 +1619,11 @@ function buildBankDebitNotes(
         amount: installment,
         category: "Préstamo Bancario",
         accountDebits: [
-          { accountCode: "170", accountName: "Deudas LP entidades crédito", amount: principal, description: "Amortización capital" },
-          { accountCode: "662", accountName: "Intereses de deudas", amount: interest, description: "Intereses préstamo" },
+          { accountCode: "5200", accountName: "Préstamos a CP de entidades de crédito", amount: principal, description: "Amortización capital" },
+          { accountCode: "662", accountName: "Intereses de deudas con entidades de crédito", amount: interest, description: "Intereses préstamo" },
         ],
         accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount: installment, description: `Cuota ${row.period} préstamo` }],
-        journalNote: `Cuota préstamo ${row.period}: amortización de capital (170/520) e intereses (662) al debe; 572 al haber. Cuota: ${installment}€ = capital ${principal}€ + intereses ${interest}€.`,
+        journalNote: `Cuota préstamo ${row.period}: DEBE 5200 (capital amortizado ${principal}€) + 662 (intereses ${interest}€), HABER 572 (${installment}€).`,
       });
     }
   }
@@ -1524,11 +1645,11 @@ function buildBankDebitNotes(
         amount: installment,
         category: "Hipoteca",
         accountDebits: [
-          { accountCode: "170", accountName: "Deudas LP hipoteca", amount: principal, description: "Amortización capital" },
-          { accountCode: "662", accountName: "Intereses hipoteca", amount: interest, description: "Intereses hipotecarios" },
+          { accountCode: "5200", accountName: "Préstamos a CP de entidades de crédito", amount: principal, description: "Amortización capital hipoteca" },
+          { accountCode: "662", accountName: "Intereses de deudas con entidades de crédito", amount: interest, description: "Intereses hipotecarios" },
         ],
         accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount: installment, description: `Cuota ${row.period} hipoteca` }],
-        journalNote: `Cuota hipoteca ${row.period}: capital (170/521) e intereses (662) al debe; 572 al haber. Total: ${installment}€ = capital ${principal}€ + intereses ${interest}€.`,
+        journalNote: `Cuota hipoteca ${row.period}: DEBE 5200 (capital amortizado ${principal}€) + 662 (intereses ${interest}€), HABER 572 (${installment}€).`,
       });
     }
   }

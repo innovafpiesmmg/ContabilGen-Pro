@@ -366,8 +366,30 @@ export const FinancialView = ({ loan, policy, card }: { loan?: BankLoan | null, 
                 <p className="font-medium">{loan.termMonths} meses</p>
               </div>
             </CardHeader>
-            <CardContent className="p-6">
-              <h4 className="text-sm font-bold text-muted-foreground uppercase mb-4">Cuadro de Amortización (Primeros meses)</h4>
+            <CardContent className="p-6 space-y-6">
+              {loan.initialClassification && (
+                <div className="rounded-xl border p-4 bg-blue-50/50">
+                  <h4 className="text-sm font-bold text-muted-foreground uppercase mb-3">Clasificación Inicial de la Deuda</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-white rounded-lg border">
+                      <p className="text-xs text-muted-foreground font-semibold">170 — Largo Plazo (&gt; 12 meses)</p>
+                      <p className="font-mono font-bold text-lg text-blue-700">{formatEuro(loan.initialClassification.longTerm170)}</p>
+                    </div>
+                    <div className="p-3 bg-white rounded-lg border">
+                      <p className="text-xs text-muted-foreground font-semibold">5200 — Corto Plazo (≤ 12 meses)</p>
+                      <p className="font-mono font-bold text-lg text-amber-700">{formatEuro(loan.initialClassification.shortTerm5200)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {loan.reclassification31Dec && (
+                <div className="rounded-xl border p-4 bg-amber-50/50">
+                  <h4 className="text-sm font-bold text-muted-foreground uppercase mb-2">Reclasificación al Cierre ({loan.reclassification31Dec.date})</h4>
+                  <p className="text-sm text-slate-600 mb-2">Traspasar de 170 (LP) a 5200 (CP) el capital que vence en los próximos 12 meses:</p>
+                  <p className="font-mono font-bold text-lg text-amber-700">{formatEuro(loan.reclassification31Dec.shortTerm5200)}</p>
+                </div>
+              )}
+              <h4 className="text-sm font-bold text-muted-foreground uppercase mb-4">Cuadro de Amortización — Sistema Francés</h4>
               <div className="rounded-xl border overflow-hidden mb-6">
                 <Table>
                   <TableHeader className="bg-slate-100">
@@ -394,7 +416,26 @@ export const FinancialView = ({ loan, policy, card }: { loan?: BankLoan | null, 
                   </TableBody>
                 </Table>
               </div>
-              <AsientoContable debits={loan.accountDebits} credits={loan.accountCredits} note={loan.journalNote} />
+              {loan.formalizationEntry ? (
+                <div className="space-y-4">
+                  <h4 className="text-sm font-bold text-muted-foreground uppercase">Asiento de Formalización</h4>
+                  <AsientoContable debits={loan.formalizationEntry.accountDebits} credits={loan.formalizationEntry.accountCredits} note={loan.journalNote} />
+                  {loan.installmentEntry && (
+                    <>
+                      <h4 className="text-sm font-bold text-muted-foreground uppercase mt-4">Asiento de Pago de Cuota</h4>
+                      <AsientoContable debits={loan.installmentEntry.accountDebits} credits={loan.installmentEntry.accountCredits} note={loan.installmentEntry.journalNote} />
+                    </>
+                  )}
+                  {loan.reclassificationEntry && (
+                    <>
+                      <h4 className="text-sm font-bold text-muted-foreground uppercase mt-4">Asiento de Reclasificación LP → CP</h4>
+                      <AsientoContable debits={loan.reclassificationEntry.accountDebits} credits={loan.reclassificationEntry.accountCredits} note={loan.reclassificationEntry.journalNote} />
+                    </>
+                  )}
+                </div>
+              ) : (
+                <AsientoContable debits={loan.accountDebits} credits={loan.accountCredits} note={loan.journalNote} />
+              )}
             </CardContent>
           </Card>
         </section>
@@ -1189,35 +1230,78 @@ export const MortgageView = ({ mortgage, company }: MortgageViewProps) => {
         </div>
       </div>
 
+      {mortgage.initialClassification && (
+        <div className="rounded-xl border p-4 bg-blue-50/50">
+          <h4 className="text-sm font-bold text-muted-foreground uppercase mb-3">Clasificación Inicial de la Deuda Hipotecaria</h4>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="p-3 bg-white rounded-lg border">
+              <p className="text-xs text-muted-foreground font-semibold">170 — Largo Plazo (&gt; 12 meses)</p>
+              <p className="font-mono font-bold text-lg text-blue-700">{formatEuro(mortgage.initialClassification.longTerm170)}</p>
+            </div>
+            <div className="p-3 bg-white rounded-lg border">
+              <p className="text-xs text-muted-foreground font-semibold">5200 — Corto Plazo (≤ 12 meses)</p>
+              <p className="font-mono font-bold text-lg text-amber-700">{formatEuro(mortgage.initialClassification.shortTerm5200)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mortgage.reclassification31Dec && (
+        <div className="rounded-xl border p-4 bg-amber-50/50">
+          <h4 className="text-sm font-bold text-muted-foreground uppercase mb-2">Reclasificación al Cierre ({mortgage.reclassification31Dec.date})</h4>
+          <p className="text-sm text-slate-600 mb-2">Traspasar de 170 (LP) a 5200 (CP) el capital que vence en los próximos 12 meses:</p>
+          <p className="font-mono font-bold text-lg text-amber-700">{formatEuro(mortgage.reclassification31Dec.shortTerm5200)}</p>
+        </div>
+      )}
+
       <div className="bg-amber-50/60 border border-amber-200/60 rounded-xl p-4">
-        <h4 className="text-xs font-bold uppercase tracking-wide text-amber-700 mb-1">📚 Nota contable</h4>
+        <h4 className="text-xs font-bold uppercase tracking-wide text-amber-700 mb-1">Nota contable</h4>
         <p className="text-sm text-slate-700 leading-relaxed">{mortgage.journalNote}</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-        <div>
-          <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">DEBE — Asiento de alta</h4>
-          <div className="space-y-1.5">
-            {mortgage.accountDebits.map((e, i) => (
-              <div key={i} className="flex items-center justify-between bg-blue-50/60 rounded-lg px-3 py-2">
-                <div><span className="font-mono text-sm text-blue-700 font-bold">{e.accountCode}</span><span className="ml-2 text-sm text-slate-700">{e.accountName}</span></div>
-                <span className="font-mono font-bold text-blue-700">{formatEuro(e.amount)}</span>
-              </div>
-            ))}
+      {mortgage.acquisitionEntry ? (
+        <div className="space-y-4">
+          <h4 className="text-sm font-bold text-muted-foreground uppercase">Asiento de Adquisición del Inmueble</h4>
+          <AsientoContable debits={mortgage.acquisitionEntry.accountDebits} credits={mortgage.acquisitionEntry.accountCredits} note="" />
+          {mortgage.installmentEntry && (
+            <>
+              <h4 className="text-sm font-bold text-muted-foreground uppercase mt-4">Asiento de Pago de Cuota</h4>
+              <AsientoContable debits={mortgage.installmentEntry.accountDebits} credits={mortgage.installmentEntry.accountCredits} note={mortgage.installmentEntry.journalNote} />
+            </>
+          )}
+          {mortgage.reclassificationEntry && (
+            <>
+              <h4 className="text-sm font-bold text-muted-foreground uppercase mt-4">Asiento de Reclasificación LP → CP</h4>
+              <AsientoContable debits={mortgage.reclassificationEntry.accountDebits} credits={mortgage.reclassificationEntry.accountCredits} note={mortgage.reclassificationEntry.journalNote} />
+            </>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">DEBE</h4>
+            <div className="space-y-1.5">
+              {mortgage.accountDebits?.map((e, i) => (
+                <div key={i} className="flex items-center justify-between bg-blue-50/60 rounded-lg px-3 py-2">
+                  <div><span className="font-mono text-sm text-blue-700 font-bold">{e.accountCode}</span><span className="ml-2 text-sm text-slate-700">{e.accountName}</span></div>
+                  <span className="font-mono font-bold text-blue-700">{formatEuro(e.amount)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div>
+            <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">HABER</h4>
+            <div className="space-y-1.5">
+              {mortgage.accountCredits?.map((e, i) => (
+                <div key={i} className="flex items-center justify-between bg-emerald-50/60 rounded-lg px-3 py-2">
+                  <div><span className="font-mono text-sm text-emerald-700 font-bold">{e.accountCode}</span><span className="ml-2 text-sm text-slate-700">{e.accountName}</span></div>
+                  <span className="font-mono font-bold text-emerald-700">{formatEuro(e.amount)}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-        <div>
-          <h4 className="text-xs font-bold uppercase tracking-wide text-muted-foreground mb-2">HABER — Asiento de alta</h4>
-          <div className="space-y-1.5">
-            {mortgage.accountCredits.map((e, i) => (
-              <div key={i} className="flex items-center justify-between bg-emerald-50/60 rounded-lg px-3 py-2">
-                <div><span className="font-mono text-sm text-emerald-700 font-bold">{e.accountCode}</span><span className="ml-2 text-sm text-slate-700">{e.accountName}</span></div>
-                <span className="font-mono font-bold text-emerald-700">{formatEuro(e.amount)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      )}
 
       <h3 className="font-bold text-base text-foreground">Cuadro de Amortización (primeros períodos)</h3>
       <Card className="border-border/60 shadow-sm overflow-hidden">

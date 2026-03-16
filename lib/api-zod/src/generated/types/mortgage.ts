@@ -7,6 +7,7 @@
  */
 import type { AccountEntry } from "./accountEntry";
 import type { AmortizationRow } from "./amortizationRow";
+import type { DebtClassification, ReclassificationInfo, SubEntry } from "./bankLoan";
 
 export interface Mortgage {
   entity: string;
@@ -18,8 +19,13 @@ export interface Mortgage {
   termMonths: number;
   startDate: string;
   monthlyInstallment: number;
+  initialClassification?: DebtClassification;
+  reclassification31Dec?: ReclassificationInfo;
   amortizationTable: AmortizationRow[];
   journalNote?: string;
-  accountDebits: AccountEntry[];
-  accountCredits: AccountEntry[];
+  accountDebits?: AccountEntry[];
+  accountCredits?: AccountEntry[];
+  acquisitionEntry?: SubEntry;
+  installmentEntry?: SubEntry;
+  reclassificationEntry?: SubEntry;
 }
