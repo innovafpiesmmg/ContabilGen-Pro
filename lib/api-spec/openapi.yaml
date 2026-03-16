@@ -592,6 +592,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/JournalEntry"
+        serviceInvoices:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceInvoice"
+        paymentReceipts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PaymentReceipt"
       required:
         - companyProfile
         - inventory
@@ -1751,6 +1759,106 @@ components:
         - debits
         - credits
         - totalAmount
+
+    ServiceInvoice:
+      type: object
+      properties:
+        invoiceNumber:
+          type: string
+        date:
+          type: string
+        serviceType:
+          type: string
+          description: "luz, agua, gas, telefono, internet, alquiler, limpieza, etc."
+        provider:
+          type: string
+        providerNif:
+          type: string
+        concept:
+          type: string
+        taxBase:
+          type: number
+        taxRate:
+          type: number
+        taxAmount:
+          type: number
+        irpfRate:
+          type: number
+        irpfAmount:
+          type: number
+        total:
+          type: number
+        paymentMethod:
+          type: string
+        accountCode:
+          type: string
+        accountName:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        journalNote:
+          type: string
+      required:
+        - invoiceNumber
+        - date
+        - serviceType
+        - provider
+        - concept
+        - taxBase
+        - total
+        - accountCode
+        - accountName
+
+    PaymentReceipt:
+      type: object
+      properties:
+        receiptNumber:
+          type: string
+        date:
+          type: string
+        type:
+          type: string
+          description: "cobro (customer pays us) or pago (we pay supplier)"
+        partyName:
+          type: string
+        partyNif:
+          type: string
+        concept:
+          type: string
+        amount:
+          type: number
+        paymentMethod:
+          type: string
+          description: "transferencia, domiciliacion, cheque, efectivo"
+        relatedInvoice:
+          type: string
+          description: "Invoice number this payment relates to"
+        bankAccount:
+          type: string
+        accountDebits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        accountCredits:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountEntry"
+        journalNote:
+          type: string
+      required:
+        - receiptNumber
+        - date
+        - type
+        - partyName
+        - concept
+        - amount
+        - paymentMethod
 
     GenerationSummary:
       type: object

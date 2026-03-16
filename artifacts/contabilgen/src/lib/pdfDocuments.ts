@@ -1409,10 +1409,128 @@ export function buildAllDocuments(universe: any, cp: CP): ZipDocumentSet[] {
     });
   }
 
+  const svcInvoices = Array.isArray(universe.serviceInvoices) ? universe.serviceInvoices : [];
+  for (const si of svcInvoices) {
+    docs.push({
+      date: si.date || `${yr}-01-01`,
+      docType: "Factura_Suministro",
+      filename: `Suministro_${safe(si.invoiceNumber || "")}.pdf`,
+      blob: generateServiceInvoicePdf(si, cp),
+    });
+  }
+
+  const pmtReceipts = Array.isArray(universe.paymentReceipts) ? universe.paymentReceipts : [];
+  for (const pr of pmtReceipts) {
+    docs.push({
+      date: pr.date || `${yr}-01-01`,
+      docType: pr.type === "cobro" ? "Cobro" : "Pago",
+      filename: `${pr.type === "cobro" ? "Cobro" : "Pago"}_${safe(pr.receiptNumber || "")}.pdf`,
+      blob: generatePaymentReceiptPdf(pr, cp),
+    });
+  }
+
   docs.sort((a, b) => a.date.localeCompare(b.date));
 
   return docs.map((d, i) => ({
     ...d,
     filename: `${String(i + 1).padStart(3, "0")}_${d.date}_${d.filename}`,
   }));
+}
+
+export function generateServiceInvoicePdf(si: any, cp: CP): Blob {
+  setDocColor("comercial");
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  let y = headerBlock(doc, "FACTURA DE SUMINISTRO / SERVICIO", `Nº: ${si.invoiceNumber || ""}   Fecha: ${si.date || ""}`, cp);
+
+  y = sectionTitle(doc, y, "Datos del Proveedor");
+  y = labelValue(doc, y, "Proveedor:", si.provider || "");
+  y = labelValue(doc, y, "NIF:", si.providerNif || "");
+  y = labelValue(doc, y, "Tipo de servicio:", si.serviceType || "");
+  y += 3;
+
+  y = sectionTitle(doc, y, "Detalle");
+  y = labelValue(doc, y, "Concepto:", si.concept || "");
+  y = labelValue(doc, y, "Base imponible:", fmt(si.taxBase));
+  if (si.taxRate) y = labelValue(doc, y, `${si.taxRate > 10 ? "IVA" : "Impuesto"} (${si.taxRate}%):`, fmt(si.taxAmount));
+  if (si.irpfRate && si.irpfAmount) y = labelValue(doc, y, `Retención IRPF (${si.irpfRate}%):`, `-${fmt(si.irpfAmount)}`);
+  y = labelValue(doc, y, "TOTAL FACTURA:", fmt(si.total));
+  y = labelValue(doc, y, "Forma de pago:", si.paymentMethod || "domiciliación");
+  y += 5;
+
+  y = sectionTitle(doc, y, "Asiento Contable");
+  const cols = [
+    { label: "Cuenta", x: M, w: 15 },
+    { label: "Denominación", x: M + 16, w: 55 },
+    { label: "Debe", x: M + 90, w: 25, align: "right" as const },
+    { label: "Haber", x: M + 120, w: 25, align: "right" as const },
+  ];
+  y = tableHeader(doc, y, cols);
+  const debits = Array.isArray(si.accountDebits) ? si.accountDebits : [];
+  const credits = Array.isArray(si.accountCredits) ? si.accountCredits : [];
+  let row = 0;
+  for (const d of debits) {
+    y = tableRow(doc, y, cols, [d.accountCode, d.accountName, fmt(d.amount), ""], row++ % 2 === 0);
+  }
+  for (const c of credits) {
+    y = tableRow(doc, y, cols, [c.accountCode, c.accountName, "", fmt(c.amount)], row++ % 2 === 0);
+  }
+
+  if (si.journalNote) {
+    y += 5;
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    gray(doc, 80, 80, 80);
+    const lines = doc.splitTextToSize(si.journalNote, CW);
+    doc.text(lines, M, y);
+  }
+
+  fixupFooters(doc);
+  return doc.output("blob");
+}
+
+export function generatePaymentReceiptPdf(pr: any, cp: CP): Blob {
+  setDocColor(pr.type === "cobro" ? "comercial" : "bancario");
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const title = pr.type === "cobro" ? "JUSTIFICANTE DE COBRO" : "JUSTIFICANTE DE PAGO";
+  let y = headerBlock(doc, title, `Nº: ${pr.receiptNumber || ""}   Fecha: ${pr.date || ""}`, cp);
+
+  y = sectionTitle(doc, y, "Datos de la Operación");
+  y = labelValue(doc, y, pr.type === "cobro" ? "Cliente:" : "Proveedor:", pr.partyName || "");
+  if (pr.partyNif) y = labelValue(doc, y, "NIF:", pr.partyNif);
+  y = labelValue(doc, y, "Concepto:", pr.concept || "");
+  y = labelValue(doc, y, "Importe:", fmt(pr.amount));
+  y = labelValue(doc, y, "Forma de pago:", pr.paymentMethod || "");
+  if (pr.relatedInvoice) y = labelValue(doc, y, "Factura relacionada:", pr.relatedInvoice);
+  if (pr.bankAccount) y = labelValue(doc, y, "Cuenta bancaria:", pr.bankAccount);
+  y += 5;
+
+  y = sectionTitle(doc, y, "Asiento Contable");
+  const cols = [
+    { label: "Cuenta", x: M, w: 15 },
+    { label: "Denominación", x: M + 16, w: 55 },
+    { label: "Debe", x: M + 90, w: 25, align: "right" as const },
+    { label: "Haber", x: M + 120, w: 25, align: "right" as const },
+  ];
+  y = tableHeader(doc, y, cols);
+  const debits = Array.isArray(pr.accountDebits) ? pr.accountDebits : [];
+  const credits = Array.isArray(pr.accountCredits) ? pr.accountCredits : [];
+  let row = 0;
+  for (const d of debits) {
+    y = tableRow(doc, y, cols, [d.accountCode, d.accountName, fmt(d.amount), ""], row++ % 2 === 0);
+  }
+  for (const c of credits) {
+    y = tableRow(doc, y, cols, [c.accountCode, c.accountName, "", fmt(c.amount)], row++ % 2 === 0);
+  }
+
+  if (pr.journalNote) {
+    y += 5;
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    gray(doc, 80, 80, 80);
+    const lines = doc.splitTextToSize(pr.journalNote, CW);
+    doc.text(lines, M, y);
+  }
+
+  fixupFooters(doc);
+  return doc.output("blob");
 }

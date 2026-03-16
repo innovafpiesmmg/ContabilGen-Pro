@@ -8,6 +8,8 @@ import {
   generateBankDebitNotePdf, generateDividendDistributionPdf, generateShareholdersInfoPdf,
   generateInitialBalancePdf, generateShareholderAccountsPdf,
   generateExtraordinaryExpensePdf,
+  generateServiceInvoicePdf,
+  generatePaymentReceiptPdf,
   type CP,
 } from "@/lib/pdfDocuments";
 import { 
@@ -1748,7 +1750,8 @@ type EventKind =
   | "ss" | "impuesto"
   | "nomina" | "socio" | "dividendo" | "apertura" | "inmovilizado"
   | "seguro" | "siniestro" | "nota_cargo"
-  | "gasto_extra" | "ingreso_extra";
+  | "gasto_extra" | "ingreso_extra"
+  | "suministro" | "cobro" | "pago";
 
 interface ChronoEvent {
   date: string;
@@ -1782,6 +1785,9 @@ const KIND_META: Record<EventKind, { color: string; bg: string; text: string; do
   poliza_credito: { color: "text-violet-700",  bg: "bg-violet-50 border-violet-200", text: "Póliza crédito", dot: "bg-violet-500" },
   gasto_extra:    { color: "text-red-700",     bg: "bg-red-50 border-red-200",     text: "Gasto extraordinario", dot: "bg-red-400" },
   ingreso_extra:  { color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200", text: "Ingreso extraordinario", dot: "bg-emerald-400" },
+  suministro:     { color: "text-lime-700",    bg: "bg-lime-50 border-lime-200",   text: "Suministro/Servicio", dot: "bg-lime-500" },
+  cobro:          { color: "text-blue-700",    bg: "bg-blue-50 border-blue-200",   text: "Cobro cliente",    dot: "bg-blue-400" },
+  pago:           { color: "text-orange-700",  bg: "bg-orange-50 border-orange-200", text: "Pago proveedor",  dot: "bg-orange-400" },
 };
 
 function parsePayrollDate(month: string, year: number): string {
@@ -1969,6 +1975,23 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
       subtitle: `Cta. ${exp.accountCode} — ${exp.accountName}`, amount: exp.amount,
       pdfGenerator: () => generateExtraordinaryExpensePdf(exp, cp),
       pdfFilename: `${isInc ? "Ingreso" : "Gasto"}_Extra_${safe(exp.description || "")}.pdf` });
+  });
+
+  (universe.serviceInvoices ?? []).forEach((si) => {
+    events.push({ date: si.date, kind: "suministro",
+      label: si.invoiceNumber,
+      subtitle: `${si.provider} — ${si.concept}`, amount: si.total,
+      pdfGenerator: () => generateServiceInvoicePdf(si, cp),
+      pdfFilename: `Suministro_${safe(si.invoiceNumber || "")}.pdf` });
+  });
+
+  (universe.paymentReceipts ?? []).forEach((pr) => {
+    const kind: EventKind = pr.type === "cobro" ? "cobro" : "pago";
+    events.push({ date: pr.date, kind,
+      label: pr.receiptNumber,
+      subtitle: `${pr.partyName} — ${pr.concept}`, amount: pr.amount,
+      pdfGenerator: () => generatePaymentReceiptPdf(pr, cp),
+      pdfFilename: `${pr.type === "cobro" ? "Cobro" : "Pago"}_${safe(pr.receiptNumber || "")}.pdf` });
   });
 
   return events.filter(e => e.date && /^\d{4}-\d{2}-\d{2}/.test(e.date))

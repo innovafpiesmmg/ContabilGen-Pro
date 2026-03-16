@@ -1414,6 +1414,26 @@ function buildDocumentSummary(universe: Record<string, unknown>): string {
     sections.push(exLines.join("\n"));
   }
 
+  const svcInvoices = Array.isArray(universe.serviceInvoices) ? universe.serviceInvoices : [];
+  if (svcInvoices.length > 0) {
+    const siLines = ["FACTURAS DE SUMINISTROS Y SERVICIOS:"];
+    for (const si of svcInvoices) {
+      const s = si as Record<string, unknown>;
+      siLines.push(`  ${s.invoiceNumber} | ${s.serviceType} | ${s.date} | ${s.provider} | Base: ${s.taxBase}€ | Total: ${s.total}€ | Cta: ${s.accountCode}`);
+    }
+    sections.push(siLines.join("\n"));
+  }
+
+  const pmtReceipts = Array.isArray(universe.paymentReceipts) ? universe.paymentReceipts : [];
+  if (pmtReceipts.length > 0) {
+    const prLines = ["RECIBOS DE COBRO/PAGO:"];
+    for (const pr of pmtReceipts) {
+      const r = pr as Record<string, unknown>;
+      prLines.push(`  ${r.receiptNumber} | ${r.type} | ${r.date} | ${r.partyName} | ${r.amount}€ | Factura: ${r.relatedInvoice}`);
+    }
+    sections.push(prLines.join("\n"));
+  }
+
   if (sections.length === 0) return "";
 
   let summary = "\n\nDOCUMENTOS REALES YA GENERADOS — CADA ASIENTO DEBE REFERENCIAR UNO DE ESTOS DOCUMENTOS:\n" + sections.join("\n\n");
@@ -1713,7 +1733,9 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     accountCredits: [{ accountCode: "410", accountName: "Acreedores por prestaciones de servicios", amount: totalCardCharges, description: "Total liquidado tarjeta" }],
   };
 
+  universe.serviceInvoices = buildServiceInvoices(params, scenario);
   universe.bankDebitNotes = buildBankDebitNotes(universe, scenario, params);
+  universe.paymentReceipts = buildPaymentReceipts(universe, scenario);
 
   progress("Generando libro diario (basado en documentos reales)...");
   const documentContext = buildDocumentSummary(universe);
@@ -1733,6 +1755,180 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
   }
 
   return universe;
+}
+
+// ─── SERVICE INVOICES BUILDER ──────────────────────────────────────────────────
+interface ServiceInvoiceItem {
+  invoiceNumber: string; date: string; serviceType: string; provider: string; providerNif: string;
+  concept: string; taxBase: number; taxRate: number; taxAmount: number;
+  irpfRate: number; irpfAmount: number; total: number;
+  paymentMethod: string; accountCode: string; accountName: string;
+  accountDebits: Array<{ accountCode: string; accountName: string; amount: number; description: string }>;
+  accountCredits: Array<{ accountCode: string; accountName: string; amount: number; description: string }>;
+  journalNote: string;
+}
+
+function buildServiceInvoices(
+  params: GenerateParams,
+  scenario: Record<string, unknown>,
+): ServiceInvoiceItem[] {
+  const rates = TAX_RATES[params.taxRegime];
+  const iva = rates.standard;
+  const year = params.year;
+  const months = getMonthsInPeriod(params);
+  const bankEntity = String(scenario.bankEntity ?? "Entidad Bancaria");
+  const taxName = params.taxRegime;
+
+  const services: Array<{
+    type: string; provider: string; nif: string; concept: string;
+    monthlyBase: number; accountCode: string; accountName: string;
+    hasIrpf: boolean; irpfRate: number;
+  }> = [
+    { type: "electricidad", provider: "Iberdrola Clientes S.A.U.", nif: "A95758389", concept: "Suministro eléctrico", monthlyBase: 180, accountCode: "628", accountName: "Suministros", hasIrpf: false, irpfRate: 0 },
+    { type: "agua", provider: "Canal de Isabel II S.A.", nif: "A82342841", concept: "Suministro de agua y saneamiento", monthlyBase: 45, accountCode: "628", accountName: "Suministros", hasIrpf: false, irpfRate: 0 },
+    { type: "telefono_internet", provider: "Telefónica de España S.A.U.", nif: "A82018474", concept: "Telefonía e Internet empresarial", monthlyBase: 85, accountCode: "629", accountName: "Otros servicios", hasIrpf: false, irpfRate: 0 },
+    { type: "alquiler", provider: "Inmobiliaria Gestión Integral S.L.", nif: "B12345678", concept: "Alquiler local comercial", monthlyBase: 900, accountCode: "621", accountName: "Arrendamientos y cánones", hasIrpf: true, irpfRate: 19 },
+    { type: "limpieza", provider: "Limpiezas Profesionales S.L.", nif: "B87654321", concept: "Servicio de limpieza mensual", monthlyBase: 120, accountCode: "629", accountName: "Otros servicios", hasIrpf: false, irpfRate: 0 },
+  ];
+
+  const invoices: ServiceInvoiceItem[] = [];
+  let seq = 1;
+
+  for (const m of months) {
+    const monthNum = m.start.slice(5, 7);
+    for (const svc of services) {
+      const base = round2(svc.monthlyBase * (0.95 + Math.random() * 0.1));
+      const taxAmount = round2(base * iva / 100);
+      const irpfAmount = svc.hasIrpf ? round2(base * svc.irpfRate / 100) : 0;
+      const total = round2(base + taxAmount - irpfAmount);
+      const invNum = `SUM-${year}/${String(seq++).padStart(4, "0")}`;
+      const invDate = `${year}-${monthNum}-${String(Math.min(28, 5 + Math.floor(Math.random() * 10))).padStart(2, "0")}`;
+
+      const debits: ServiceInvoiceItem["accountDebits"] = [
+        { accountCode: svc.accountCode, accountName: svc.accountName, amount: base, description: `${svc.concept} ${m.label}` },
+        { accountCode: "472", accountName: `${taxName} soportado`, amount: taxAmount, description: `${taxName} ${iva}% s/ ${base}€` },
+      ];
+      const credits: ServiceInvoiceItem["accountCredits"] = [
+        { accountCode: "410", accountName: "Acreedores por prestaciones de servicios", amount: total + irpfAmount, description: `${svc.provider} — ${m.label}` },
+      ];
+      if (svc.hasIrpf) {
+        credits.push({ accountCode: "4751", accountName: "HP acreedora IRPF retenciones", amount: irpfAmount, description: `Retención IRPF ${svc.irpfRate}% alquiler` });
+      }
+
+      invoices.push({
+        invoiceNumber: invNum,
+        date: invDate,
+        serviceType: svc.type,
+        provider: svc.provider,
+        providerNif: svc.nif,
+        concept: `${svc.concept} — ${m.label}`,
+        taxBase: base,
+        taxRate: iva,
+        taxAmount,
+        irpfRate: svc.irpfRate,
+        irpfAmount,
+        total,
+        paymentMethod: svc.type === "alquiler" ? "transferencia" : "domiciliación bancaria",
+        accountCode: svc.accountCode,
+        accountName: svc.accountName,
+        accountDebits: debits,
+        accountCredits: credits,
+        journalNote: `Gasto ${svc.type} ${m.label}: ${svc.accountCode} (${base}€) + 472 ${taxName} soportado (${taxAmount}€)${svc.hasIrpf ? ` − retención IRPF ${svc.irpfRate}% (${irpfAmount}€) → 4751` : ""}. Contrapartida: 410 (${total}€).${svc.paymentMethod === "domiciliación bancaria" ? " Pago por domiciliación: 410 → 572." : " Pago por transferencia: 410 → 572."}`,
+      });
+    }
+  }
+
+  return invoices;
+}
+
+// ─── PAYMENT RECEIPTS BUILDER ──────────────────────────────────────────────────
+interface PaymentReceiptItem {
+  receiptNumber: string; date: string; type: string; partyName: string; partyNif: string;
+  concept: string; amount: number; paymentMethod: string;
+  relatedInvoice: string; bankAccount: string;
+  accountDebits: Array<{ accountCode: string; accountName: string; amount: number; description: string }>;
+  accountCredits: Array<{ accountCode: string; accountName: string; amount: number; description: string }>;
+  journalNote: string;
+}
+
+function buildPaymentReceipts(
+  universe: Record<string, unknown>,
+  scenario: Record<string, unknown>,
+): PaymentReceiptItem[] {
+  const receipts: PaymentReceiptItem[] = [];
+  const bankAccount = String(scenario.bankAccount ?? "ES00 0000 0000 0000 0000 0000");
+  let seq = 1;
+
+  const invoices = Array.isArray(universe.invoices) ? universe.invoices : [];
+  for (const inv of invoices) {
+    const i = inv as Record<string, unknown>;
+    const invDate = String(i.date ?? "");
+    const invTotal = Number(i.total ?? 0);
+    if (!invDate || !invTotal) continue;
+
+    const d = new Date(invDate);
+    d.setDate(d.getDate() + Math.floor(Math.random() * 25) + 5);
+    const payDate = d.toISOString().slice(0, 10);
+
+    const isSale = i.type === "sale";
+    const partyName = String(i.partyName ?? "Tercero");
+    const partyNif = String(i.partyNif ?? "");
+    const invNum = String(i.invoiceNumber ?? "");
+
+    receipts.push({
+      receiptNumber: `REC-${payDate.slice(0, 4)}/${String(seq++).padStart(4, "0")}`,
+      date: payDate,
+      type: isSale ? "cobro" : "pago",
+      partyName,
+      partyNif,
+      concept: isSale ? `Cobro factura ${invNum}` : `Pago factura ${invNum}`,
+      amount: invTotal,
+      paymentMethod: "transferencia",
+      relatedInvoice: invNum,
+      bankAccount,
+      accountDebits: isSale
+        ? [{ accountCode: "572", accountName: "Bancos c/c", amount: invTotal, description: `Cobro ${invNum}` }]
+        : [{ accountCode: "400", accountName: "Proveedores", amount: invTotal, description: `Pago ${invNum}` }],
+      accountCredits: isSale
+        ? [{ accountCode: "430", accountName: "Clientes", amount: invTotal, description: `Cancelación deuda ${invNum}` }]
+        : [{ accountCode: "572", accountName: "Bancos c/c", amount: invTotal, description: `Pago ${invNum}` }],
+      journalNote: isSale
+        ? `Cobro cliente por factura ${invNum}: 572 (${invTotal}€) al debe, 430 al haber.`
+        : `Pago proveedor factura ${invNum}: 400 (${invTotal}€) al debe, 572 al haber.`,
+    });
+  }
+
+  const serviceInvoices = Array.isArray(universe.serviceInvoices) ? universe.serviceInvoices : [];
+  for (const si of serviceInvoices) {
+    const s = si as Record<string, unknown>;
+    const invDate = String(s.date ?? "");
+    const invTotal = Number(s.total ?? 0);
+    if (!invDate || !invTotal) continue;
+
+    const d = new Date(invDate);
+    d.setDate(d.getDate() + Math.floor(Math.random() * 10) + 3);
+    const payDate = d.toISOString().slice(0, 10);
+    const invNum = String(s.invoiceNumber ?? "");
+    const provider = String(s.provider ?? "Proveedor servicios");
+
+    receipts.push({
+      receiptNumber: `REC-${payDate.slice(0, 4)}/${String(seq++).padStart(4, "0")}`,
+      date: payDate,
+      type: "pago",
+      partyName: provider,
+      partyNif: String(s.providerNif ?? ""),
+      concept: `Pago ${String(s.serviceType ?? "servicio")} — ${invNum}`,
+      amount: invTotal,
+      paymentMethod: String(s.paymentMethod ?? "domiciliación bancaria"),
+      relatedInvoice: invNum,
+      bankAccount,
+      accountDebits: [{ accountCode: "410", accountName: "Acreedores por prestaciones de servicios", amount: invTotal, description: `Pago ${invNum}` }],
+      accountCredits: [{ accountCode: "572", accountName: "Bancos c/c", amount: invTotal, description: `Pago ${provider}` }],
+      journalNote: `Pago servicio ${s.serviceType} (${invNum}): 410 al debe (${invTotal}€), 572 al haber.`,
+    });
+  }
+
+  return receipts;
 }
 
 // ─── BANK DEBIT NOTES BUILDER ─────────────────────────────────────────────────

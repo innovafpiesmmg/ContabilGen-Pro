@@ -682,6 +682,43 @@ export interface JournalEntry {
   totalAmount: number;
 }
 
+export interface ServiceInvoice {
+  invoiceNumber: string;
+  date: string;
+  serviceType: string;
+  provider: string;
+  providerNif?: string;
+  concept: string;
+  taxBase: number;
+  taxRate?: number;
+  taxAmount?: number;
+  irpfRate?: number;
+  irpfAmount?: number;
+  total: number;
+  paymentMethod?: string;
+  accountCode: string;
+  accountName: string;
+  accountDebits?: AccountEntry[];
+  accountCredits?: AccountEntry[];
+  journalNote?: string;
+}
+
+export interface PaymentReceipt {
+  receiptNumber: string;
+  date: string;
+  type: string;
+  partyName: string;
+  partyNif?: string;
+  concept: string;
+  amount: number;
+  paymentMethod: string;
+  relatedInvoice?: string;
+  bankAccount?: string;
+  accountDebits?: AccountEntry[];
+  accountCredits?: AccountEntry[];
+  journalNote?: string;
+}
+
 export interface AccountingUniverse {
   companyProfile: CompanyProfile;
   inventory: Inventory;
@@ -704,6 +741,8 @@ export interface AccountingUniverse {
   dividendDistribution?: DividendDistribution;
   bankStatements: BankStatement[];
   journalEntries: JournalEntry[];
+  serviceInvoices?: ServiceInvoice[];
+  paymentReceipts?: PaymentReceipt[];
 }
 
 export interface GenerationSummary {
