@@ -1957,9 +1957,27 @@ function buildDeterministicJournal(
   const entries: JEntry[] = [];
   const r2 = (n: number) => Math.round(n * 100) / 100;
 
-  function addEntry(date: string, concept: string, doc: string,
+  const { periodStart, periodEnd } = getPeriodInfo(params);
+
+  function isInPeriod(date: string): boolean {
+    if (!date || date.length < 10) return false;
+    return date >= periodStart && date <= periodEnd;
+  }
+
+  function clampDate(date: string): string {
+    if (!date || date.length < 10) return periodEnd;
+    if (date > periodEnd) return periodEnd;
+    if (date < periodStart) return periodStart;
+    return date;
+  }
+
+  function addEntry(rawDate: string, concept: string, doc: string,
     debits: Array<{ accountCode: string; accountName: string; amount: number }>,
     credits: Array<{ accountCode: string; accountName: string; amount: number }>) {
+    let date = rawDate;
+    if (!isInPeriod(date)) {
+      date = clampDate(date);
+    }
     const roundedDebits = debits.map(d => ({ ...d, amount: r2(d.amount) }));
     const roundedCredits = credits.map(c => ({ ...c, amount: r2(c.amount) }));
     const totalD = r2(roundedDebits.reduce((s, d) => s + d.amount, 0));
@@ -2577,7 +2595,7 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
   universe.monthlyPayrolls = buildMonthlyPayrolls(params, universe);
   universe.serviceInvoices = buildServiceInvoices(params, scenario);
   universe.bankDebitNotes = buildBankDebitNotes(universe, scenario, params);
-  universe.paymentReceipts = buildPaymentReceipts(universe, scenario);
+  universe.paymentReceipts = buildPaymentReceipts(universe, scenario, params);
   universe.bankStatements = buildBankStatements(universe, scenario, params);
 
   progress("Construyendo libro diario desde documentos...");
@@ -2890,16 +2908,18 @@ function buildMonthlyPayrolls(
   if (employees.length === 0) return [];
 
   const months = getMonthsInPeriod(params);
+  const { periodEnd } = getPeriodInfo(params);
   const payrolls: MonthlyPayrollItem[] = [];
 
   for (const m of months) {
     const lastDay = m.end;
-    const nextMonth1 = (() => {
+    const nextMonth1Raw = (() => {
       const d = new Date(lastDay);
       d.setMonth(d.getMonth() + 1);
       d.setDate(1);
       return d.toISOString().slice(0, 10);
     })();
+    const nextMonth1 = nextMonth1Raw > periodEnd ? periodEnd : nextMonth1Raw;
 
     let totalGross = 0, totalSsEmployer = 0, totalSsEmployee = 0, totalIrpf = 0, totalNet = 0;
     const monthEmployees: Record<string, unknown>[] = [];
@@ -3063,10 +3083,14 @@ interface PaymentReceiptItem {
 function buildPaymentReceipts(
   universe: Record<string, unknown>,
   scenario: Record<string, unknown>,
+  params?: GenerateParams,
 ): PaymentReceiptItem[] {
   const receipts: PaymentReceiptItem[] = [];
   const bankAccount = String(scenario.bankAccount ?? "ES00 0000 0000 0000 0000 0000");
   let seq = 1;
+
+  const pEnd = params ? getPeriodInfo(params).periodEnd : "9999-12-31";
+  const clamp = (d: string) => d > pEnd ? pEnd : d;
 
   const invoices = Array.isArray(universe.invoices) ? universe.invoices : [];
   for (const inv of invoices) {
@@ -3077,7 +3101,7 @@ function buildPaymentReceipts(
 
     const d = new Date(invDate);
     d.setDate(d.getDate() + Math.floor(Math.random() * 25) + 5);
-    const payDate = d.toISOString().slice(0, 10);
+    const payDate = clamp(d.toISOString().slice(0, 10));
 
     const isSale = i.type === "sale";
     const partyName = String(i.partyName ?? "Tercero");
@@ -3116,7 +3140,7 @@ function buildPaymentReceipts(
 
     const d = new Date(invDate);
     d.setDate(d.getDate() + Math.floor(Math.random() * 10) + 3);
-    const payDate = d.toISOString().slice(0, 10);
+    const payDate = clamp(d.toISOString().slice(0, 10));
     const invNum = String(s.invoiceNumber ?? "");
     const provider = String(s.provider ?? "Proveedor servicios");
 
