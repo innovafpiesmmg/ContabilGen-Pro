@@ -2380,7 +2380,22 @@ function buildDeterministicJournal(
   const dividends = universe.dividendDistribution as Record<string, unknown> | undefined;
   if (dividends && dividends.accountDebits) {
     const date = String(dividends.date ?? dividends.approvalDate ?? `${params.year}-06-30`);
-    copyEntry(date, "Distribución dividendos", "Dividendos", dividends);
+    copyEntry(date, "Distribución resultado ejercicio", "Dividendos", dividends);
+
+    const payEntry = dividends.paymentEntry as Record<string, unknown> | undefined;
+    if (payEntry && payEntry.accountDebits) {
+      const payDate = String(payEntry.date ?? dividends.paymentDate ?? `${params.year}-07-15`);
+      copyEntry(payDate, "Pago dividendos a socios", "Dividendos", payEntry);
+    }
+  }
+
+  const shareholderAccts = universe.shareholderAccounts as Record<string, unknown> | undefined;
+  if (shareholderAccts && shareholderAccts.accountDebits) {
+    const transactions = Array.isArray(shareholderAccts.transactions) ? shareholderAccts.transactions as Record<string, unknown>[] : [];
+    if (transactions.length > 0) {
+      const firstDate = String(transactions[0].date ?? `${params.year}-01-15`);
+      copyEntry(firstDate, "Retribución órgano de administración", "CC-Socios", shareholderAccts);
+    }
   }
 
   entries.sort((a, b) => {
