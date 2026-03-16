@@ -817,7 +817,7 @@ export const generateAccountingUniverse = async (
   }
 
   const pollUrl = `/api/accounting/generate/status/${startData.jobId}`;
-  const maxWait = 10 * 60 * 1000;
+  const maxWait = 30 * 60 * 1000;
   const start = Date.now();
 
   while (Date.now() - start < maxWait) {
