@@ -2380,7 +2380,13 @@ function buildDeterministicJournal(
     copyEntry(date, "Distribución dividendos", "Dividendos", dividends);
   }
 
-  entries.sort((a, b) => a.date.localeCompare(b.date));
+  entries.sort((a, b) => {
+    const dateComp = a.date.localeCompare(b.date);
+    if (dateComp !== 0) return dateComp;
+    const aIsApertura = a.document === "Asiento apertura" ? 0 : 1;
+    const bIsApertura = b.document === "Asiento apertura" ? 0 : 1;
+    return aIsApertura - bIsApertura;
+  });
   let num = 1;
   for (const e of entries) {
     e.entryNumber = String(num++);
