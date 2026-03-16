@@ -1677,6 +1677,241 @@ function buildValidRefsList(universe: Record<string, unknown>): string {
   return refs.length > 0 ? `\n\nREFERENCIAS DE DOCUMENTO VÁLIDAS (usar EXACTAMENTE estas en el campo "document"):\n${refs.join(", ")}` : "";
 }
 
+interface DocEntrySpec {
+  ref: string;
+  date: string;
+  concept: string;
+  debits: Array<{ accountCode: string; accountName: string; amount: number }>;
+  credits: Array<{ accountCode: string; accountName: string; amount: number }>;
+}
+
+function buildRequiredDocEntries(universe: Record<string, unknown>): DocEntrySpec[] {
+  const specs: DocEntrySpec[] = [];
+
+  const invoices = Array.isArray(universe.invoices) ? universe.invoices : [];
+  for (const inv of invoices) {
+    const i = inv as Record<string, unknown>;
+    const ref = String(i.invoiceNumber ?? "");
+    const date = String(i.date ?? "");
+    const type = String(i.type ?? "");
+    const total = Number(i.total ?? 0);
+    const taxBase = Number(i.taxBase ?? 0);
+    const taxAmount = Number(i.taxAmount ?? 0);
+    const irpfAmount = Number(i.irpfAmount ?? 0);
+    const partyName = String(i.partyName ?? "");
+    const isSale = type === "sale" || type === "emitida";
+    const partyAccount = String(i.accountCode ?? (isSale ? "430" : "400"));
+    const taxRegime = String((universe as any).companyProfile?.taxRegime ?? "IVA");
+
+    const existingDebits = Array.isArray(i.accountDebits) ? (i.accountDebits as Array<Record<string, unknown>>) : null;
+    const existingCredits = Array.isArray(i.accountCredits) ? (i.accountCredits as Array<Record<string, unknown>>) : null;
+
+    if (existingDebits && existingCredits && existingDebits.length > 0 && existingCredits.length > 0) {
+      specs.push({
+        ref, date,
+        concept: `${isSale ? "Venta" : "Compra"} ${partyName}`.substring(0, 40),
+        debits: existingDebits.map(d => ({
+          accountCode: String(d.accountCode ?? ""),
+          accountName: String(d.accountName ?? ""),
+          amount: Number(d.amount ?? 0),
+        })),
+        credits: existingCredits.map(c => ({
+          accountCode: String(c.accountCode ?? ""),
+          accountName: String(c.accountName ?? ""),
+          amount: Number(c.amount ?? 0),
+        })),
+      });
+    } else if (isSale) {
+      specs.push({
+        ref, date,
+        concept: `Venta ${partyName}`.substring(0, 40),
+        debits: [{ accountCode: partyAccount, accountName: `Clientes — ${partyName}`, amount: total }],
+        credits: [
+          { accountCode: "700", accountName: "Ventas de mercaderías", amount: taxBase },
+          ...(taxAmount > 0 ? [{ accountCode: "477", accountName: `${taxRegime} repercutido`, amount: taxAmount }] : []),
+        ],
+      });
+    } else {
+      specs.push({
+        ref, date,
+        concept: `Compra ${partyName}`.substring(0, 40),
+        debits: [
+          { accountCode: String(i.expenseAccount ?? "600"), accountName: String(i.expenseAccountName ?? "Compras de mercaderías"), amount: taxBase },
+          ...(taxAmount > 0 ? [{ accountCode: "472", accountName: `${taxRegime} soportado`, amount: taxAmount }] : []),
+        ],
+        credits: [
+          { accountCode: partyAccount, accountName: `Proveedores — ${partyName}`, amount: total - irpfAmount },
+          ...(irpfAmount > 0 ? [{ accountCode: "4751", accountName: "HP acreedora retenciones IRPF", amount: irpfAmount }] : []),
+        ],
+      });
+    }
+  }
+
+  const svcInvoices = Array.isArray(universe.serviceInvoices) ? universe.serviceInvoices : [];
+  for (const si of svcInvoices) {
+    const s = si as Record<string, unknown>;
+    const ref = String(s.invoiceNumber ?? "");
+    const date = String(s.date ?? "");
+    const total = Number(s.total ?? 0);
+    const taxBase = Number(s.taxBase ?? 0);
+    const taxAmount = Number(s.taxAmount ?? 0);
+    const irpfAmount = Number(s.irpfAmount ?? 0);
+    const provider = String(s.provider ?? "");
+    const acctCode = String(s.accountCode ?? "410");
+    const acctName = String(s.accountName ?? "Acreedores por prestaciones de servicios");
+    const taxRegime = String((universe as any).companyProfile?.taxRegime ?? "IVA");
+
+    const svcDebits = Array.isArray(s.accountDebits) ? (s.accountDebits as Array<Record<string, unknown>>) : null;
+    const svcCredits = Array.isArray(s.accountCredits) ? (s.accountCredits as Array<Record<string, unknown>>) : null;
+
+    if (svcDebits && svcCredits && svcDebits.length > 0 && svcCredits.length > 0) {
+      specs.push({
+        ref, date,
+        concept: `Servicio ${provider}`.substring(0, 40),
+        debits: svcDebits.map(d => ({
+          accountCode: String(d.accountCode ?? ""),
+          accountName: String(d.accountName ?? ""),
+          amount: Number(d.amount ?? 0),
+        })),
+        credits: svcCredits.map(c => ({
+          accountCode: String(c.accountCode ?? ""),
+          accountName: String(c.accountName ?? ""),
+          amount: Number(c.amount ?? 0),
+        })),
+      });
+    } else {
+      specs.push({
+        ref, date,
+        concept: `Servicio ${provider}`.substring(0, 40),
+        debits: [
+          { accountCode: String(s.expenseAccount ?? "629"), accountName: String(s.expenseAccountName ?? acctName), amount: taxBase },
+          ...(taxAmount > 0 ? [{ accountCode: "472", accountName: `${taxRegime} soportado`, amount: taxAmount }] : []),
+        ],
+        credits: [
+          { accountCode: acctCode, accountName: `${acctName} — ${provider}`, amount: total - irpfAmount },
+          ...(irpfAmount > 0 ? [{ accountCode: "4751", accountName: "HP acreedora retenciones IRPF", amount: irpfAmount }] : []),
+        ],
+      });
+    }
+  }
+
+  const pmtReceipts = Array.isArray(universe.paymentReceipts) ? universe.paymentReceipts : [];
+  for (const pr of pmtReceipts) {
+    const p = pr as Record<string, unknown>;
+    const ref = String(p.receiptNumber ?? "");
+    const date = String(p.date ?? "");
+    const amount = Number(p.amount ?? 0);
+    const party = String(p.partyName ?? "");
+    const type = String(p.type ?? "cobro");
+    const partyAccount = String(p.accountCode ?? (type === "cobro" ? "430" : "400"));
+    const partyLabel = type === "cobro" ? "Clientes" : "Proveedores";
+
+    if (type === "cobro") {
+      specs.push({
+        ref, date,
+        concept: `Cobro ${party}`.substring(0, 40),
+        debits: [{ accountCode: "572", accountName: "Bancos c/c", amount }],
+        credits: [{ accountCode: partyAccount, accountName: `${partyLabel} — ${party}`, amount }],
+      });
+    } else {
+      specs.push({
+        ref, date,
+        concept: `Pago ${party}`.substring(0, 40),
+        debits: [{ accountCode: partyAccount, accountName: `${partyLabel} — ${party}`, amount }],
+        credits: [{ accountCode: "572", accountName: "Bancos c/c", amount }],
+      });
+    }
+  }
+
+  const insurance = Array.isArray(universe.insurancePolicies) ? universe.insurancePolicies : [];
+  for (const ins of insurance) {
+    const pol = ins as Record<string, unknown>;
+    const ref = String(pol.policyNumber ?? "");
+    const date = String(pol.startDate ?? "");
+    const premium = Number(pol.annualPremium ?? pol.premium ?? 0);
+    if (premium > 0) {
+      specs.push({
+        ref, date,
+        concept: `Seguro ${String(pol.type ?? "")}`.substring(0, 40),
+        debits: [{ accountCode: "625", accountName: "Primas de seguros", amount: premium }],
+        credits: [{ accountCode: "572", accountName: "Bancos c/c", amount: premium }],
+      });
+    }
+  }
+
+  const extraordinary = Array.isArray(universe.extraordinaryExpenses) ? universe.extraordinaryExpenses : [];
+  for (const e of extraordinary) {
+    const ex = e as Record<string, unknown>;
+    const ref = `${ex.type}-${ex.date}`;
+    const date = String(ex.date ?? "");
+    const amount = Number(ex.amount ?? 0);
+    if (amount > 0) {
+      specs.push({
+        ref, date,
+        concept: `${String(ex.concept ?? ex.type ?? "Gasto extraordinario")}`.substring(0, 40),
+        debits: [{ accountCode: String(ex.accountCode ?? "678"), accountName: String(ex.accountName ?? "Gastos excepcionales"), amount }],
+        credits: [{ accountCode: "572", accountName: "Bancos c/c", amount }],
+      });
+    }
+  }
+
+  return specs;
+}
+
+function addMissingDocumentEntries(
+  entries: unknown[],
+  universe: Record<string, unknown>,
+): unknown[] {
+  const coveredRefs = new Set<string>();
+  for (const e of entries) {
+    const doc = String((e as Record<string, unknown>).document ?? "").trim();
+    if (doc) coveredRefs.add(doc);
+  }
+
+  const required = buildRequiredDocEntries(universe);
+  const missing = required.filter(spec => {
+    if (!spec.ref || spec.ref.trim().length === 0) return false;
+    if (coveredRefs.has(spec.ref)) return false;
+    for (const covered of coveredRefs) {
+      if (!covered) continue;
+      if (covered === spec.ref) return false;
+      if (covered.length >= 3 && spec.ref.length >= 3) {
+        if (covered.includes(spec.ref) || spec.ref.includes(covered)) return false;
+      }
+    }
+    return true;
+  });
+
+  if (missing.length === 0) return entries;
+
+  console.log(`[journal] Añadiendo ${missing.length} asientos deterministas para documentos sin asiento`);
+
+  const newEntries = missing.map(spec => ({
+    entryNumber: "0",
+    date: spec.date,
+    concept: spec.concept,
+    document: spec.ref,
+    debits: spec.debits,
+    credits: spec.credits,
+    totalAmount: spec.debits.reduce((s, d) => s + d.amount, 0),
+  }));
+
+  const all = [...entries, ...newEntries];
+  all.sort((a, b) => {
+    const da = String((a as Record<string, unknown>).date ?? "");
+    const db = String((b as Record<string, unknown>).date ?? "");
+    return da.localeCompare(db);
+  });
+
+  let num = 1;
+  for (const entry of all) {
+    (entry as Record<string, unknown>).entryNumber = String(num);
+    num++;
+  }
+
+  return all;
+}
+
 async function generateJournalBlock(
   params: GenerateParams,
   scenario: Record<string, unknown>,
@@ -1811,7 +2046,7 @@ JSON: {"journalEntries":[{"entryNumber":"${startNum}","date":"YYYY-MM-DD","conce
 
 REGLAS:
 - sum(débitos)=sum(créditos)=totalAmount en cada asiento
-- Orden cronológico, cuentas PGC 3-4 dígitos
+- Orden cronológico, cuentas PGC ${params.accountDigits && params.accountDigits > 4 ? `${params.accountDigits} dígitos (subcuentas). Si conoces la subcuenta usa el código largo, si no usa 3-4 dígitos base del PGC` : '3-4 dígitos'}
 - Nóminas: SIEMPRE 2 líneas al debe (640+642) y 3 al haber (476+4751+465). Pago nómina: 465 debe, 572 haber
 - Otros asientos: máx 3 líneas débito y 3 crédito
 - NO campo "description" — solo accountCode, accountName, amount
@@ -1864,8 +2099,10 @@ REGLAS:
     num++;
   }
 
-  console.log(`[journal] Total generados: ${allEntries.length} asientos`);
-  return { journalEntries: allEntries };
+  const finalEntries = universe ? addMissingDocumentEntries(allEntries, universe) : allEntries;
+
+  console.log(`[journal] Total generados: ${finalEntries.length} asientos (${finalEntries.length - allEntries.length} añadidos por documentos sin asiento)`);
+  return { journalEntries: finalEntries };
 }
 
 // ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
@@ -2147,33 +2384,37 @@ function assignSubAccounts(universe: Record<string, unknown>, digits: number): v
     const replaceLines = (lines: Array<Record<string, unknown>>) => {
       for (const line of lines) {
         const code = String(line.accountCode ?? "");
-        const baseCode = code.length <= 4 ? code : code.substring(0, code.length <= 4 ? code.length : 3);
 
-        const possibleBases = [code];
-        if (code.length <= 4) possibleBases.push(code);
-
+        let replaced = false;
         for (const base of [code, code.substring(0, 4), code.substring(0, 3)]) {
-          if (entityMap.has(base.replace(/^0+/, "") || base)) {
-            const map = entityMap.get(base.replace(/^0+/, "") || base)!;
+          const normBase = base.replace(/^0+/, "") || base;
+          if (entityMap.has(normBase)) {
+            const map = entityMap.get(normBase)!;
 
             let matched = false;
-            for (const [, entry] of map) {
-              if (entityHint.toLowerCase().includes(entry.entityName.toLowerCase()) ||
-                  entry.entityName.toLowerCase().includes(entityHint.toLowerCase().substring(0, 10))) {
-                line.accountCode = entry.subCode;
+            for (const [, ent] of map) {
+              if (entityHint.toLowerCase().includes(ent.entityName.toLowerCase()) ||
+                  ent.entityName.toLowerCase().includes(entityHint.toLowerCase().substring(0, 10))) {
+                line.accountCode = ent.subCode;
                 if (line.accountName) {
-                  line.accountName = `${String(line.accountName)} (${entry.entityName})`;
+                  line.accountName = `${String(line.accountName)} (${ent.entityName})`;
                 }
                 matched = true;
+                replaced = true;
                 break;
               }
             }
             if (!matched && map.size === 1) {
               const only = map.values().next().value!;
               line.accountCode = only.subCode;
+              replaced = true;
             }
             break;
           }
+        }
+
+        if (!replaced && code.length < digits) {
+          line.accountCode = code.padEnd(digits, "0");
         }
       }
     };
@@ -2196,17 +2437,46 @@ function assignSubAccounts(universe: Record<string, unknown>, digits: number): v
     replaceInEntry(si, party);
   }
 
-  const journals = (universe.journalEntries ?? []) as Array<Record<string, unknown>>;
-  for (const je of journals) {
-    const concept = String(je.concept ?? "");
-    const document = String(je.document ?? "");
-    const hint = concept + " " + document;
-    replaceInEntry(je, hint);
-  }
-
   const paymentReceipts = (universe.paymentReceipts ?? []) as Array<Record<string, unknown>>;
   for (const pr of paymentReceipts) {
     replaceInEntry(pr, String(pr.partyName ?? ""));
+  }
+
+  const docToEntity = new Map<string, string>();
+  for (const inv of invoices) {
+    const ref = String(inv.invoiceNumber ?? "");
+    const party = String(inv.partyName ?? "");
+    if (ref && party) docToEntity.set(ref.toLowerCase(), party);
+  }
+  for (const si of svcInvoices) {
+    const ref = String(si.invoiceNumber ?? "");
+    const party = String(si.provider ?? "");
+    if (ref && party) docToEntity.set(ref.toLowerCase(), party);
+  }
+  for (const pr of paymentReceipts) {
+    const ref = String(pr.receiptNumber ?? "");
+    const party = String(pr.partyName ?? "");
+    if (ref && party) docToEntity.set(ref.toLowerCase(), party);
+  }
+
+  const journals = (universe.journalEntries ?? []) as Array<Record<string, unknown>>;
+  for (const je of journals) {
+    const concept = String(je.concept ?? "");
+    const document = String(je.document ?? "").trim();
+    let hint = concept + " " + document;
+
+    if (document.length >= 2) {
+      const docLower = document.toLowerCase();
+      for (const [ref, entity] of docToEntity) {
+        if (ref.length < 2) continue;
+        if (docLower === ref || docLower.includes(ref) || ref.includes(docLower)) {
+          hint = entity + " " + hint;
+          break;
+        }
+      }
+    }
+
+    replaceInEntry(je, hint);
   }
 
   const subAccountList: SubAccountEntry[] = [];

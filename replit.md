@@ -40,7 +40,7 @@ ContabilGen Pro es un generador de universos contables con IA para prácticas de
    - Recibos de cobro/pago (construidos desde facturas reales)
    - Facturas de servicios (alquiler, electricidad, agua, teléfono, internet, gestoría)
    - Cuadro de subcuentas (5-8 dígitos, asignación automática)
-   - Libro diario (asientos contables)
+   - Libro diario (asientos contables) — con validación de documentos: filtro post-IA descarta asientos con documentos inventados; generación determinista de asientos para documentos sin cobertura; subcuentas (N dígitos) aplicadas a todas las líneas del diario mediante mapa documento→entidad; códigos genéricos rellenados con ceros hasta el número de dígitos configurado
    - **Cierre de ejercicio** (todo determinístico desde el diario):
      - Libro Mayor (todas las cuentas con movimientos, sumas y saldos)
      - Balance de Comprobación de Sumas y Saldos
