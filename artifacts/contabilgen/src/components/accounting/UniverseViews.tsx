@@ -69,7 +69,7 @@ const AsientoContable = ({ debits, credits, note }: { debits: AccountEntry[], cr
             <TableRow key={`d-${i}`} className="border-0 hover:bg-slate-100/50">
               <TableCell className="text-right font-mono font-medium text-blue-700">{formatEuro(d.amount)}</TableCell>
               <TableCell className="text-center font-mono text-slate-500">{d.accountCode}</TableCell>
-              <TableCell className="text-slate-700">{d.accountName} <span className="text-xs text-slate-400 ml-1">({d.description})</span></TableCell>
+              <TableCell className="text-slate-700">{d.accountName}{d.description ? <span className="text-xs text-slate-400 ml-1">({d.description})</span> : null}</TableCell>
               <TableCell></TableCell>
             </TableRow>
           ))}
@@ -79,7 +79,7 @@ const AsientoContable = ({ debits, credits, note }: { debits: AccountEntry[], cr
               <TableCell className="text-center font-mono text-slate-500">{c.accountCode}</TableCell>
               <TableCell className="text-slate-700 pl-8 relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 w-2 h-px bg-slate-300"></span>
-                {c.accountName} <span className="text-xs text-slate-400 ml-1">({c.description})</span>
+                {c.accountName}{c.description ? <span className="text-xs text-slate-400 ml-1">({c.description})</span> : null}
               </TableCell>
               <TableCell className="text-right font-mono font-medium text-emerald-700">{formatEuro(c.amount)}</TableCell>
             </TableRow>

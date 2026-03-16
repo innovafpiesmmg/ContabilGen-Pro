@@ -263,7 +263,7 @@ export interface AccountEntry {
   accountCode: string;
   accountName: string;
   amount: number;
-  description: string;
+  description?: string;
 }
 
 export interface Invoice {
