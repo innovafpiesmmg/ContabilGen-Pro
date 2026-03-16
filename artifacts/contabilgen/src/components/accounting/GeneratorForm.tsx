@@ -153,6 +153,7 @@ const formSchema = z.object({
   includeDividends: z.boolean().optional(),
   startDate: z.string().optional().nullable(),
   endDate: z.string().optional().nullable(),
+  accountDigits: z.coerce.number().min(4).max(10).optional().nullable(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -225,6 +226,7 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
       includeDividends: true,
       startDate: defaultStart,
       endDate: defaultEnd,
+      accountDigits: null,
     },
   });
 
@@ -253,6 +255,9 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
     } else {
       delete payload.startDate;
       delete payload.endDate;
+    }
+    if (!payload.accountDigits) {
+      delete payload.accountDigits;
     }
     onSubmit(payload as GenerateUniverseRequest);
   };
@@ -566,6 +571,39 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
                       <FormDescription>
                         Total estimado: ~{estimatedEntries} asientos
                         {useCustomPeriod ? ` en ${numMonths} mes${numMonths !== 1 ? "es" : ""}` : " anuales"}
+                      </FormDescription>
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="accountDigits"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-sm font-semibold">
+                        Dígitos del plan contable
+                      </FormLabel>
+                      <FormControl>
+                        <div className="flex items-center gap-3">
+                          <select
+                            className="flex h-9 w-full rounded-lg border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+                            value={field.value ?? ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              field.onChange(val ? parseInt(val, 10) : null);
+                            }}
+                          >
+                            <option value="">Por defecto (3-4 dígitos PGC)</option>
+                            <option value="5">5 dígitos (ej. 40001)</option>
+                            <option value="6">6 dígitos (ej. 400001)</option>
+                            <option value="7">7 dígitos (ej. 4000001)</option>
+                            <option value="8">8 dígitos (ej. 40000001)</option>
+                          </select>
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Si se establece, se crean subcuentas específicas para cada proveedor, cliente, banco, acreedor, etc.
                       </FormDescription>
                     </FormItem>
                   )}

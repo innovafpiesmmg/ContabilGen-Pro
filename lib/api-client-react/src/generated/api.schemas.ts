@@ -743,6 +743,14 @@ export interface AccountingUniverse {
   journalEntries: JournalEntry[];
   serviceInvoices?: ServiceInvoice[];
   paymentReceipts?: PaymentReceipt[];
+  subAccounts?: SubAccountEntry[];
+  accountDigits?: number;
+}
+
+export interface SubAccountEntry {
+  baseCode: string;
+  subCode: string;
+  entityName: string;
 }
 
 export interface GenerationSummary {

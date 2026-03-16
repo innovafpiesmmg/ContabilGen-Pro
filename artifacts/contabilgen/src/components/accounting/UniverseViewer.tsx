@@ -42,6 +42,7 @@ import {
   DividendsView,
   CronologiaView,
   BankDebitNotesView,
+  SubAccountsView,
 } from "./UniverseViews";
 import { usePdfExport } from "@/hooks/usePdfExport";
 import { useToast } from "@/hooks/use-toast";
@@ -72,6 +73,7 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
   const hasBankDebitNotes = bankDebitNotes.length > 0;
   const hasExtraExpenses = universe.extraordinaryExpenses && universe.extraordinaryExpenses.length > 0;
   const hasWarehouseCards = universe.warehouseCards && universe.warehouseCards.length > 0;
+  const hasSubAccounts = !!(universe as any).subAccounts && ((universe as any).subAccounts as unknown[]).length > 0;
 
   const companyName = universe.companyProfile.name;
 
@@ -243,6 +245,11 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
             <TabsTrigger value="bancos" className="data-[state=active]:bg-primary/10 data-[state=active]:text-primary rounded-lg gap-2">
               <Wallet className="w-4 h-4" /> Bancos
             </TabsTrigger>
+            {hasSubAccounts && (
+              <TabsTrigger value="subcuentas" className="data-[state=active]:bg-violet-100 data-[state=active]:text-violet-700 rounded-lg gap-2 font-semibold">
+                <Archive className="w-4 h-4" /> Subcuentas
+              </TabsTrigger>
+            )}
             <TabsTrigger value="diario" className="data-[state=active]:bg-slate-800 data-[state=active]:text-white rounded-lg gap-2 font-bold shadow-sm">
               <BookOpenText className="w-4 h-4" /> Libro Diario
             </TabsTrigger>

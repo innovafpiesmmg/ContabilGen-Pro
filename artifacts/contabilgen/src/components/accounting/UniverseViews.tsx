@@ -2496,3 +2496,79 @@ export const BankDebitNotesView = ({
     </div>
   );
 };
+
+// ─── SUB-ACCOUNTS VIEW ───────────────────────────────────────────────────────
+
+export const SubAccountsView = ({ data }: { data: AccountingUniverse }) => {
+  const subAccounts = (data as any).subAccounts as Array<{ baseCode: string; subCode: string; entityName: string }> | undefined;
+  const digits = (data as any).accountDigits as number | undefined;
+
+  if (!subAccounts || subAccounts.length === 0) {
+    return (
+      <div className="text-center py-16 text-muted-foreground">
+        <p className="text-lg">No se han generado subcuentas.</p>
+        <p className="text-sm mt-1">Selecciona un número de dígitos del plan contable en la configuración para activar las subcuentas.</p>
+      </div>
+    );
+  }
+
+  const grouped = subAccounts.reduce<Record<string, Array<{ baseCode: string; subCode: string; entityName: string }>>>((acc, sa) => {
+    const base = sa.baseCode;
+    if (!acc[base]) acc[base] = [];
+    acc[base].push(sa);
+    return acc;
+  }, {});
+
+  const baseNames: Record<string, string> = {
+    "400": "Proveedores",
+    "410": "Acreedores por prestaciones de servicios",
+    "430": "Clientes",
+    "440": "Deudores",
+    "465": "Remuneraciones pendientes de pago",
+    "551": "Cuenta corriente con socios y admins",
+    "553": "Cuenta corriente con socios y admins",
+    "572": "Bancos e instituciones de crédito c/c",
+    "170": "Deudas a l/p con entidades de crédito",
+    "520": "Deudas a c/p con entidades de crédito",
+    "5200": "Préstamos a c/p de entidades de crédito",
+    "5201": "Deudas a c/p por crédito dispuesto",
+  };
+
+  return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <SectionTitle
+        title={`Cuadro de Subcuentas (${digits} dígitos)`}
+        description={`Se han asignado ${subAccounts.length} subcuentas específicas para individualizar cada proveedor, cliente, banco y demás terceros.`}
+      />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([base, entries]) => (
+          <Card key={base} className="rounded-2xl shadow-sm border-border/50 overflow-hidden">
+            <div className="bg-slate-800 px-4 py-2 flex items-center justify-between">
+              <span className="text-white font-mono font-bold text-sm">{base}</span>
+              <span className="text-slate-300 text-xs">{baseNames[base] || "Cuenta"}</span>
+            </div>
+            <CardContent className="p-0">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b text-slate-500">
+                    <th className="text-left px-4 py-2 font-medium w-32">Subcuenta</th>
+                    <th className="text-left px-4 py-2 font-medium">Tercero / Entidad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {entries.map((sa, i) => (
+                    <tr key={i} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-4 py-2 font-mono font-semibold text-primary">{sa.subCode}</td>
+                      <td className="px-4 py-2 text-slate-700">{sa.entityName}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+};

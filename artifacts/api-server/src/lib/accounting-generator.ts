@@ -23,6 +23,7 @@ interface GenerateParams {
   includeDividends?: boolean | null;
   startDate?: string | null;
   endDate?: string | null;
+  accountDigits?: number | null;
 }
 
 interface AiConfig {
@@ -1754,7 +1755,221 @@ export async function generateAccountingUniverse(params: GenerateParams, aiConfi
     }
   }
 
+  if (params.accountDigits && params.accountDigits > 4) {
+    progress("Asignando subcuentas...");
+    assignSubAccounts(universe, params.accountDigits);
+    progress("Subcuentas asignadas");
+  }
+
   return universe;
+}
+
+// ─── SUB-ACCOUNT ASSIGNMENT ───────────────────────────────────────────────────
+
+const SUBACCOUNT_BASES: Record<string, string> = {
+  "400": "Proveedores",
+  "401": "Proveedores, efectos comerciales a pagar",
+  "410": "Acreedores por prestaciones de servicios",
+  "430": "Clientes",
+  "431": "Clientes, efectos comerciales a cobrar",
+  "440": "Deudores",
+  "460": "Anticipos de remuneraciones",
+  "465": "Remuneraciones pendientes de pago",
+  "551": "Cuenta corriente con socios y administradores",
+  "553": "Cuenta corriente con socios y administradores",
+  "572": "Bancos e instituciones de crédito c/c",
+  "520": "Deudas a corto plazo con entidades de crédito",
+  "170": "Deudas a largo plazo con entidades de crédito",
+  "5200": "Préstamos a corto plazo de entidades de crédito",
+  "5201": "Deudas a c/p por crédito dispuesto",
+  "174": "Acreedores por arrendamiento financiero a l/p",
+  "524": "Acreedores por arrendamiento financiero a c/p",
+};
+
+function padCode(baseCode: string, seq: number, targetDigits: number): string {
+  const seqStr = String(seq);
+  const padLen = targetDigits - baseCode.length;
+  if (padLen <= 0) return baseCode;
+  return baseCode + seqStr.padStart(padLen, "0");
+}
+
+interface SubAccountEntry {
+  baseCode: string;
+  subCode: string;
+  entityName: string;
+}
+
+function assignSubAccounts(universe: Record<string, unknown>, digits: number): void {
+  const entityMap = new Map<string, Map<string, SubAccountEntry>>();
+  const counters = new Map<string, number>();
+
+  function getOrCreate(baseCode: string, entityName: string): string {
+    if (!entityName || entityName.trim().length === 0) return padCode(baseCode, 0, digits);
+    const normBase = baseCode.replace(/^0+/, "") || baseCode;
+    const normEntity = entityName.trim().toLowerCase();
+
+    if (!entityMap.has(normBase)) entityMap.set(normBase, new Map());
+    const map = entityMap.get(normBase)!;
+
+    if (map.has(normEntity)) return map.get(normEntity)!.subCode;
+
+    const counter = (counters.get(normBase) ?? 0) + 1;
+    counters.set(normBase, counter);
+    const subCode = padCode(baseCode, counter, digits);
+    map.set(normEntity, { baseCode, subCode, entityName: entityName.trim() });
+    return subCode;
+  }
+
+  function entityFromContext(accountCode: string, context?: string): string {
+    return context || "";
+  }
+
+  const suppliers = (universe.suppliers ?? []) as Array<Record<string, unknown>>;
+  for (const s of suppliers) {
+    const name = String(s.name ?? "");
+    const base = String(s.accountCode ?? "400");
+    const sub = getOrCreate(base, name);
+    s.accountCode = sub;
+    s.accountName = `${SUBACCOUNT_BASES[base] || "Proveedores"} — ${name}`;
+  }
+
+  const clients = (universe.clients ?? []) as Array<Record<string, unknown>>;
+  for (const c of clients) {
+    const name = String(c.name ?? "");
+    const base = String(c.accountCode ?? "430");
+    const sub = getOrCreate(base, name);
+    c.accountCode = sub;
+    c.accountName = `${SUBACCOUNT_BASES[base] || "Clientes"} — ${name}`;
+  }
+
+  const bankEntity = (() => {
+    const bs = (universe.bankStatements ?? []) as Array<Record<string, unknown>>;
+    if (bs.length > 0) return String(bs[0].bank ?? "Banco");
+    return "Banco principal";
+  })();
+  const bankSub = getOrCreate("572", bankEntity);
+
+  const loanEntity = (() => {
+    const loan = universe.bankLoan as Record<string, unknown> | undefined;
+    return loan ? String(loan.entity ?? "Banco préstamo") : "";
+  })();
+  if (loanEntity) {
+    getOrCreate("170", loanEntity);
+    getOrCreate("5200", loanEntity);
+    getOrCreate("520", loanEntity);
+  }
+
+  const mortEntity = (() => {
+    const mort = universe.mortgage as Record<string, unknown> | undefined;
+    return mort ? String(mort.entity ?? "Banco hipoteca") : "";
+  })();
+  if (mortEntity) {
+    getOrCreate("170", mortEntity);
+    getOrCreate("5200", mortEntity);
+  }
+
+  const creditEntity = (() => {
+    const cp = universe.creditPolicy as Record<string, unknown> | undefined;
+    return cp ? String(cp.entity ?? "Banco póliza") : "";
+  })();
+  if (creditEntity) {
+    getOrCreate("5201", creditEntity);
+  }
+
+  const serviceProviders = (universe.serviceInvoices ?? []) as Array<Record<string, unknown>>;
+  const providersByName = new Map<string, string>();
+  for (const si of serviceProviders) {
+    const name = String(si.provider ?? "");
+    if (name && !providersByName.has(name.toLowerCase())) {
+      providersByName.set(name.toLowerCase(), getOrCreate("410", name));
+    }
+  }
+
+  const shareholders = (((universe as any).shareholdersInfo?.shareholders) ?? []) as Array<Record<string, unknown>>;
+  for (const sh of shareholders) {
+    const name = String(sh.name ?? "");
+    if (name) {
+      getOrCreate("551", name);
+    }
+  }
+
+  function replaceInEntry(entry: Record<string, unknown>, entityHint: string) {
+    const replaceLines = (lines: Array<Record<string, unknown>>) => {
+      for (const line of lines) {
+        const code = String(line.accountCode ?? "");
+        const baseCode = code.length <= 4 ? code : code.substring(0, code.length <= 4 ? code.length : 3);
+
+        const possibleBases = [code];
+        if (code.length <= 4) possibleBases.push(code);
+
+        for (const base of [code, code.substring(0, 4), code.substring(0, 3)]) {
+          if (entityMap.has(base.replace(/^0+/, "") || base)) {
+            const map = entityMap.get(base.replace(/^0+/, "") || base)!;
+
+            let matched = false;
+            for (const [, entry] of map) {
+              if (entityHint.toLowerCase().includes(entry.entityName.toLowerCase()) ||
+                  entry.entityName.toLowerCase().includes(entityHint.toLowerCase().substring(0, 10))) {
+                line.accountCode = entry.subCode;
+                if (line.accountName) {
+                  line.accountName = `${String(line.accountName)} (${entry.entityName})`;
+                }
+                matched = true;
+                break;
+              }
+            }
+            if (!matched && map.size === 1) {
+              const only = map.values().next().value!;
+              line.accountCode = only.subCode;
+            }
+            break;
+          }
+        }
+      }
+    };
+
+    const debits = (entry.debits ?? entry.accountDebits ?? []) as Array<Record<string, unknown>>;
+    const credits = (entry.credits ?? entry.accountCredits ?? []) as Array<Record<string, unknown>>;
+    replaceLines(debits);
+    replaceLines(credits);
+  }
+
+  const invoices = (universe.invoices ?? []) as Array<Record<string, unknown>>;
+  for (const inv of invoices) {
+    const party = String(inv.partyName ?? "");
+    replaceInEntry(inv, party);
+  }
+
+  const svcInvoices = (universe.serviceInvoices ?? []) as Array<Record<string, unknown>>;
+  for (const si of svcInvoices) {
+    const party = String(si.provider ?? "");
+    replaceInEntry(si, party);
+  }
+
+  const journals = (universe.journalEntries ?? []) as Array<Record<string, unknown>>;
+  for (const je of journals) {
+    const concept = String(je.concept ?? "");
+    const document = String(je.document ?? "");
+    const hint = concept + " " + document;
+    replaceInEntry(je, hint);
+  }
+
+  const paymentReceipts = (universe.paymentReceipts ?? []) as Array<Record<string, unknown>>;
+  for (const pr of paymentReceipts) {
+    replaceInEntry(pr, String(pr.partyName ?? ""));
+  }
+
+  const subAccountList: SubAccountEntry[] = [];
+  for (const [, map] of entityMap) {
+    for (const [, entry] of map) {
+      subAccountList.push(entry);
+    }
+  }
+  subAccountList.sort((a, b) => a.subCode.localeCompare(b.subCode));
+  universe.subAccounts = subAccountList;
+  universe.accountDigits = digits;
+
+  console.log(`[subAccounts] Asignadas ${subAccountList.length} subcuentas (${digits} dígitos)`);
 }
 
 // ─── SERVICE INVOICES BUILDER ──────────────────────────────────────────────────

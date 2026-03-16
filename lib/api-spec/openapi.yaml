@@ -511,6 +511,11 @@ components:
         activity:
           type: ["string", "null"]
           description: "Optional sub-sector activity for contextualizing the exercises"
+        accountDigits:
+          type: integer
+          minimum: 4
+          maximum: 10
+          description: "Number of digits for PGC account codes. If set (e.g. 6), sub-accounts are created for each entity (suppliers, clients, banks, etc.). Default uses standard 3-4 digit PGC codes."
         includeWarehouse:
           type: boolean
           description: "Include warehouse cards (fichas de almacén) with PMP"

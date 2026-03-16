@@ -251,6 +251,14 @@ export const GenerateAccountingUniverseBody = zod.object({
     .string()
     .nullish()
     .describe("Optional sub-sector activity for contextualizing the exercises"),
+  accountDigits: zod
+    .number()
+    .min(4)
+    .max(10)
+    .optional()
+    .describe(
+      "Number of digits for PGC account codes. If set (e.g. 6), sub-accounts are created for each entity.",
+    ),
   includeWarehouse: zod
     .boolean()
     .optional()
@@ -1090,6 +1098,12 @@ export const GenerateAccountingUniverseResponse = zod.object({
       })).optional(),
       journalNote: zod.string().optional(),
     })).optional(),
+    subAccounts: zod.array(zod.object({
+      baseCode: zod.string(),
+      subCode: zod.string(),
+      entityName: zod.string(),
+    })).optional(),
+    accountDigits: zod.number().optional(),
 });
 
 /**
@@ -1930,6 +1944,12 @@ export const SaveGenerationBody = zod.object({
       accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string().optional() })).optional(),
       journalNote: zod.string().optional(),
     })).optional(),
+    subAccounts: zod.array(zod.object({
+        baseCode: zod.string(),
+        subCode: zod.string(),
+        entityName: zod.string(),
+      })).optional(),
+      accountDigits: zod.number().optional(),
   }),
 });
 
@@ -2764,6 +2784,12 @@ export const GetGenerationResponse = zod.object({
       accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string().optional() })).optional(),
       journalNote: zod.string().optional(),
     })).optional(),
+    subAccounts: zod.array(zod.object({
+        baseCode: zod.string(),
+        subCode: zod.string(),
+        entityName: zod.string(),
+      })).optional(),
+      accountDigits: zod.number().optional(),
   }),
 });
 
