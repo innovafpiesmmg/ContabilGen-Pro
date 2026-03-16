@@ -749,9 +749,9 @@ async function generateOperationsBlock(
       }
     ],
     "totalGross": X, "totalIrpf": X, "totalSsEmployee": X, "totalNetSalary": X, "totalSsEmployer": X, "totalLaborCost": X,
-    "journalNote": "Nómina devengada y pagada el ${payDate}. 640 (sueldos) y 642 (SS empresa) al debe; 465 cancelada con 572 (pago neto), 4751 (IRPF pendiente Mod.111), 476 (SS pendiente TC1) al haber.",
-    "accountDebits": [{"accountCode":"640","accountName":"Sueldos y salarios","amount":X,"description":"Nómina ${midMonthLabel}"},{"accountCode":"642","accountName":"SS a cargo empresa","amount":X,"description":"Cuota patronal ${midMonthLabel}"}],
-    "accountCredits": [{"accountCode":"465","accountName":"Remuneraciones pendientes","amount":X,"description":"Salario neto a pagar"},{"accountCode":"4751","accountName":"HP acreedora IRPF retenciones","amount":X,"description":"Retención IRPF Mod.111"},{"accountCode":"476","accountName":"Organismos SS acreedores","amount":X,"description":"SS total cuota ${midMonthLabel}"}]
+    "journalNote": "Devengo nómina ${midMonthLabel}: DEBE 640 (bruto) + 642 (SS patronal ≈30.40%); HABER 476 (SS obrera 6.35% + SS patronal 30.40% = cuota total TC1), 4751 (retención IRPF), 465 (neto = bruto − SS obrera − IRPF). Pago: DEBE 465, HABER 572. Pago TC1 mes siguiente: DEBE 476, HABER 572. Pago Mod.111 trimestral: DEBE 4751, HABER 572.",
+    "accountDebits": [{"accountCode":"640","accountName":"Sueldos y salarios","amount":"BRUTO_TOTAL","description":"Nómina ${midMonthLabel}"},{"accountCode":"642","accountName":"SS a cargo de la empresa","amount":"SS_PATRONAL (≈30.40% del bruto)","description":"Cuota patronal ${midMonthLabel}"}],
+    "accountCredits": [{"accountCode":"476","accountName":"Organismos de la SS acreedores","amount":"SS_OBRERA + SS_PATRONAL (cuota total TC1)","description":"SS total ${midMonthLabel}"},{"accountCode":"4751","accountName":"HP acreedora por retenciones practicadas","amount":"IRPF_RETENIDO","description":"Retención IRPF Mod.111"},{"accountCode":"465","accountName":"Remuneraciones pendientes de pago","amount":"NETO (bruto − SS obrera − IRPF)","description":"Salario neto a pagar"}]
   }`);
   }
 
@@ -815,9 +815,9 @@ async function generateOperationsBlock(
       "model": "${taxModel}", "period": "${q.label}",
       "quarterStart": "${q.start}", "quarterEnd": "${q.end}", "dueDate": "${q.dueDate}",
       "taxableBase": X, "outputTax": X, "inputTax": X, "result": X, "paymentType": "ingreso",
-      "journalNote": "Liquidación Mod.${taxModel} ${taxName} ${q.label} (vencimiento ${q.dueDate}): 477 (repercutido) menos 472 (soportado) = cuota (4750). Pago domiciliado en Bancos (572).",
-      "accountDebits": [{"accountCode":"477","accountName":"${taxName} repercutido","amount":X,"description":"${taxName} devengado ${q.label}"},{"accountCode":"472","accountName":"${taxName} soportado","amount":X,"description":"${taxName} deducible ${q.label}"}],
-      "accountCredits": [{"accountCode":"4750","accountName":"HP acreedora por ${taxName}","amount":X,"description":"Cuota neta ${q.label}"},{"accountCode":"572","accountName":"Bancos c/c","amount":X,"description":"Pago Mod.${taxModel} ${q.label}"}]
+      "journalNote": "Liquidación Mod.${taxModel} ${taxName} ${q.label} (vencimiento ${q.dueDate}): DEBE 477 (repercutido), HABER 472 (soportado), HABER 4750 (cuota a ingresar = 477−472). Pago posterior: DEBE 4750, HABER 572.",
+      "accountDebits": [{"accountCode":"477","accountName":"${taxName} repercutido","amount":X,"description":"Cancelar ${taxName} repercutido ${q.label}"}],
+      "accountCredits": [{"accountCode":"472","accountName":"${taxName} soportado","amount":X,"description":"Cancelar ${taxName} soportado ${q.label}"},{"accountCode":"4750","accountName":"HP acreedora por ${taxName}","amount":X,"description":"Cuota neta ${q.label}"}]
     },
     {
       "model": "111", "period": "${q.label}",
@@ -1137,8 +1137,8 @@ async function generateJournalBlock(
     "facturas de compra y venta",
     "cobros y pagos a clientes/proveedores",
   ];
-  if (params.includePayroll !== false) enabledOps.push("nóminas y pagos de seguridad social");
-  if (params.includeTaxLiquidation !== false) enabledOps.push("liquidaciones trimestrales de " + params.taxRegime + " e IS anual");
+  if (params.includePayroll !== false) enabledOps.push("nóminas y SS (ver MODELO NÓMINAS abajo)");
+  if (params.includeTaxLiquidation !== false) enabledOps.push("liquidaciones trimestrales de " + params.taxRegime + " (Mod.303/420) y Mod.111 IRPF retenciones");
   if (params.includeBankLoan !== false) enabledOps.push("cuotas del préstamo bancario (capital e intereses)");
   if (params.includeMortgage) enabledOps.push("cuotas de hipoteca");
   if (params.includeCreditPolicy !== false) enabledOps.push("disposición y liquidación de póliza de crédito");
@@ -1188,6 +1188,32 @@ async function generateJournalBlock(
 
   console.log(`[journal] Total: ${totalTarget} asientos en ${chunks.length} lotes`);
 
+  const payrollInstructions = params.includePayroll !== false ? `
+MODELO NÓMINAS — ASIENTOS OBLIGATORIOS CADA MES (PGC):
+A) Devengo nómina (último día del mes):
+   DEBE: 640 "Sueldos y salarios" (bruto total)
+   DEBE: 642 "SS a cargo de la empresa" (cuota patronal ≈30.40% del bruto)
+   HABER: 476 "Organismos SS acreedores" (cuota obrera 6.35% + cuota patronal 30.40%)
+   HABER: 4751 "HP acreedora retenciones IRPF" (retención IRPF según tipo del trabajador)
+   HABER: 465 "Remuneraciones pendientes de pago" (salario neto = bruto − SS obrera − IRPF)
+B) Pago nómina (mismo día o primero del mes siguiente):
+   DEBE: 465 "Remuneraciones pendientes de pago" (neto)
+   HABER: 572 "Bancos c/c" (neto transferido)
+C) Pago TC1 Seguridad Social (mes siguiente al devengo):
+   DEBE: 476 "Organismos SS acreedores" (cuota obrera + patronal)
+   HABER: 572 "Bancos c/c" (adeudo TGSS)
+D) Pago Mod.111 retenciones IRPF (trimestral: 20 abril, julio, octubre, enero):
+   DEBE: 4751 "HP acreedora retenciones IRPF" (acumulado trimestre)
+   HABER: 572 "Bancos c/c"
+IMPORTANTE: La cuenta 476 recoge TODA la cuota (obrera+patronal). La 4751 recoge las retenciones de IRPF practicadas. NO mezcles estas cuentas.` : "";
+
+  const taxInstructions = params.includeTaxLiquidation !== false ? `
+MODELO LIQUIDACIÓN ${params.taxRegime} (Mod.${params.taxRegime === "IGIC" ? "420" : "303"}) — TRIMESTRAL:
+   DEBE: 477 "${params.taxRegime} repercutido" (total del trimestre)
+   HABER: 472 "${params.taxRegime} soportado" (total del trimestre)
+   HABER: 4750 "HP acreedora por ${params.taxRegime}" (diferencia 477−472 si positiva)
+   Pago: DEBE 4750, HABER 572` : "";
+
   const basePrompt = (chunkStart: string, chunkEnd: string, count: number, startNum: number) =>
     `Genera el LIBRO DIARIO (journalEntries) del universo contable.
 
@@ -1201,6 +1227,7 @@ SECTOR ${getActivityLabel(params).toUpperCase()} — CUENTAS OBLIGATORIAS:
 ${params.sector === "Servicios" ? "- Esta empresa NO vende bienes físicos — los asientos de ventas deben reflejar servicios prestados (705)" : ""}
 
 OPERACIONES: ${enabledOps.join(", ")}
+${payrollInstructions}${taxInstructions}
 
 Genera EXACTAMENTE ${count} asientos del ${chunkStart} al ${chunkEnd}. Numera desde ${startNum}.
 
@@ -1209,7 +1236,8 @@ JSON: {"journalEntries":[{"entryNumber":"${startNum}","date":"YYYY-MM-DD","conce
 REGLAS:
 - sum(débitos)=sum(créditos)=totalAmount en cada asiento
 - Orden cronológico, cuentas PGC 3-4 dígitos
-- Máx 2 líneas débito y 2 crédito por asiento
+- Nóminas: SIEMPRE 2 líneas al debe (640+642) y 3 al haber (476+4751+465). Pago nómina: 465 debe, 572 haber
+- Otros asientos: máx 3 líneas débito y 3 crédito
 - NO campo "description" — solo accountCode, accountName, amount
 - Conceptos breves (máx 6 palabras)`;
 
