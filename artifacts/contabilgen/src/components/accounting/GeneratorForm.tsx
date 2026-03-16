@@ -343,7 +343,7 @@ export function GeneratorForm({ onSubmit, isPending }: GeneratorFormProps) {
                   </FormLabel>
                   <Select
                     onValueChange={field.onChange}
-                    value={field.value ?? ""}
+                    value={field.value ?? undefined}
                     key={watchSector}
                   >
                     <FormControl>
