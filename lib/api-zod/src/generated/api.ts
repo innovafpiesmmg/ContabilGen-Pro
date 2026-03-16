@@ -1951,6 +1951,7 @@ export const SaveGenerationBody = zod.object({
         entityName: zod.string(),
       })).optional(),
       accountDigits: zod.number().optional(),
+      yearEndClosing: zod.any().optional(),
   }),
 });
 
@@ -2791,6 +2792,7 @@ export const GetGenerationResponse = zod.object({
         entityName: zod.string(),
       })).optional(),
       accountDigits: zod.number().optional(),
+      yearEndClosing: zod.any().optional(),
   }),
 });
 
