@@ -1057,8 +1057,21 @@ function findPdf(pdfMap: Map<string, { gen: () => Blob; filename: string }>, doc
   return undefined;
 }
 
-export const JournalView = ({ entries, universe }: { entries: JournalEntry[]; universe?: AccountingUniverse }) => {
+export const JournalView = ({ entries, universe, highlightEntry, onHighlightClear }: { entries: JournalEntry[]; universe?: AccountingUniverse; highlightEntry?: string | null; onHighlightClear?: () => void }) => {
   const pdfMap = useMemo(() => universe ? buildPdfLookup(universe) : new Map<string, { gen: () => Blob; filename: string }>(), [universe]);
+  const highlightRef = React.useRef<HTMLTableRowElement>(null);
+
+  React.useEffect(() => {
+    if (highlightEntry && highlightRef.current) {
+      setTimeout(() => {
+        highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 150);
+      const timer = setTimeout(() => {
+        onHighlightClear?.();
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightEntry, onHighlightClear]);
 
   const handleDownload = useCallback((docRef: string) => {
     const pdf = findPdf(pdfMap, docRef);
@@ -1093,9 +1106,13 @@ export const JournalView = ({ entries, universe }: { entries: JournalEntry[]; un
               {entries.map((entry, idx) => {
                 const badge = entry.document ? docBadgeStyle(entry.document) : null;
                 const hasPdf = entry.document ? !!findPdf(pdfMap, entry.document) : false;
+                const isHighlighted = highlightEntry != null && String(entry.entryNumber) === String(highlightEntry);
                 return (
                 <React.Fragment key={idx}>
-                  <TableRow className="bg-slate-100/80 border-t-4 border-slate-200 print-break-inside-avoid">
+                  <TableRow
+                    ref={isHighlighted ? highlightRef : undefined}
+                    className={`border-t-4 border-slate-200 print-break-inside-avoid transition-colors duration-700 ${isHighlighted ? "bg-amber-100 ring-2 ring-amber-400 ring-inset" : "bg-slate-100/80"}`}
+                  >
                     <TableCell className="font-bold text-primary">{entry.entryNumber}</TableCell>
                     <TableCell className="font-semibold text-slate-600">{formatDate(entry.date)}</TableCell>
                     <TableCell></TableCell>
@@ -2884,13 +2901,13 @@ type YearEndData = {
   };
 };
 
-export const LedgerView = ({ data }: { data: YearEndData }) => {
+export const LedgerView = ({ data, onGoToEntry }: { data: YearEndData; onGoToEntry?: (entryNumber: string) => void }) => {
   const [openAccount, setOpenAccount] = React.useState<string | null>(null);
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <SectionTitle
         title="Libro Mayor"
-        description="Cada cuenta con todos sus movimientos del ejercicio, sumas y saldo final."
+        description="Cada cuenta con todos sus movimientos del ejercicio, sumas y saldo final. Pulsa en el nº de asiento para verlo en el Libro Diario."
       />
       {data.ledger.map((acc) => (
         <Card key={acc.accountCode} className="rounded-xl shadow-sm border-border/50 overflow-hidden">
@@ -2928,7 +2945,20 @@ export const LedgerView = ({ data }: { data: YearEndData }) => {
                 <TableBody>
                   {acc.movements.map((m, i) => (
                     <TableRow key={i} className="hover:bg-slate-50">
-                      <TableCell className="font-mono text-xs text-muted-foreground">{m.entryNumber}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {onGoToEntry ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onGoToEntry(String(m.entryNumber)); }}
+                            className="text-blue-600 hover:text-blue-800 underline decoration-dotted underline-offset-2 hover:decoration-solid font-semibold transition-colors"
+                            title={`Ver asiento ${m.entryNumber} en el Libro Diario`}
+                          >
+                            {m.entryNumber}
+                          </button>
+                        ) : (
+                          <span className="text-muted-foreground">{m.entryNumber}</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-xs">{formatDate(m.date)}</TableCell>
                       <TableCell className="text-xs max-w-xs truncate">{m.concept}</TableCell>
                       <TableCell className="text-right font-mono text-destructive">{m.debit ? formatEuro(m.debit) : ""}</TableCell>

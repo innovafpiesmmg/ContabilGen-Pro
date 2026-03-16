@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { AccountingUniverse } from "@workspace/api-client-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -67,7 +67,13 @@ interface UniverseViewerProps {
 
 export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: UniverseViewerProps) {
   const [activeTab, setActiveTab] = useState("empresa");
+  const [highlightEntry, setHighlightEntry] = useState<string | null>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  const goToJournalEntry = useCallback((entryNumber: string) => {
+    setHighlightEntry(entryNumber);
+    setActiveTab("diario");
+  }, []);
   const { exporting, exportTab, exportDocumentsAsZip } = usePdfExport();
   const { toast } = useToast();
 
@@ -374,7 +380,7 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
             </TabsContent>
           )}
           <TabsContent value="diario" className="mt-0 outline-none">
-            <JournalView entries={universe.journalEntries} universe={universe} />
+            <JournalView entries={universe.journalEntries} universe={universe} highlightEntry={highlightEntry} onHighlightClear={() => setHighlightEntry(null)} />
           </TabsContent>
           {hasBankDebitNotes && (
             <TabsContent value="notas_cargo" className="mt-0 outline-none">
@@ -387,7 +393,7 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
           {hasYearEndClosing && (
             <>
               <TabsContent value="mayor" className="mt-0 outline-none">
-                <LedgerView data={yearEndClosing} />
+                <LedgerView data={yearEndClosing} onGoToEntry={goToJournalEntry} />
               </TabsContent>
               <TabsContent value="sumas_saldos" className="mt-0 outline-none">
                 <TrialBalanceView data={yearEndClosing} />
