@@ -3,7 +3,6 @@ import { and, eq, desc } from "drizzle-orm";
 import { db, generationsTable } from "@workspace/db";
 import {
   GenerateAccountingUniverseBody,
-  SaveGenerationBody,
   GetGenerationParams,
   DeleteGenerationParams,
 } from "@workspace/api-zod";
@@ -184,13 +183,20 @@ router.post("/accounting/generations", wrap(async (req, res): Promise<void> => {
     return;
   }
 
-  const parsed = SaveGenerationBody.safeParse(req.body);
-  if (!parsed.success) {
-    res.status(400).json({ error: parsed.error.message });
+  const { companyName, sector, taxRegime, fiscalYear, universeJson } = req.body ?? {};
+  if (!companyName || typeof companyName !== "string" ||
+      !sector || typeof sector !== "string" ||
+      !taxRegime || typeof taxRegime !== "string" ||
+      typeof fiscalYear !== "number" ||
+      !universeJson || typeof universeJson !== "object") {
+    console.error("[save] Validación fallida: campos requeridos incompletos", {
+      companyName: typeof companyName, sector: typeof sector,
+      taxRegime: typeof taxRegime, fiscalYear: typeof fiscalYear,
+      universeJson: typeof universeJson,
+    });
+    res.status(400).json({ error: "Faltan campos obligatorios: companyName, sector, taxRegime, fiscalYear, universeJson" });
     return;
   }
-
-  const { companyName, sector, taxRegime, fiscalYear, universeJson } = parsed.data;
 
   const [row] = await db
     .insert(generationsTable)
