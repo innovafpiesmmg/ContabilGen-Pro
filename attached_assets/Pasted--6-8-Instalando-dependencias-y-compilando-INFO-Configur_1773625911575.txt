@@ -1,0 +1,58 @@
+>> 6/8 — Instalando dependencias y compilando
+[INFO] Configuración existente preservada
+Scope: all 12 workspace projects
+Lockfile is up to date, resolution step is skipped
+Already up to date
+. preinstall$ sh -c 'rm -f package-lock.json yarn.lock; case "$npm_config_user_agent" in pnpm/*) ;; *) echo "Use pnpm instead" >&2; exit 1 ;; esac'
+└─ Done in 16ms
+╭ Warning ───────────────────────────────────────────────────────────────────────────────────╮
+│                                                                                            │
+│   Ignored build scripts: core-js@3.48.0.                                                   │
+│   Run "pnpm approve-builds" to pick which dependencies should be allowed to run scripts.   │
+│                                                                                            │
+╰────────────────────────────────────────────────────────────────────────────────────────────╯
+Done in 2.7s using pnpm v10.32.1
+[  OK] Dependencias instaladas
+
+> @workspace/contabilgen@0.0.0 build /var/www/contabilgen/artifacts/contabilgen
+> vite build --config vite.config.ts
+
+vite v7.3.1 building client environment for production...
+src/components/ui/tooltip.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/label.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/dropdown-menu.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+src/components/ui/select.tsx (2:0): Error when using sourcemap for reporting an error: Can't resolve original location of error.
+✓ 2538 modules transformed.
+dist/public/index.html                              0.73 kB │ gzip:   0.41 kB
+dist/public/assets/index-CVa2NnYF.css             145.05 kB │ gzip:  22.75 kB
+dist/public/assets/purify.es-CovBOfck.js           22.58 kB │ gzip:   8.67 kB
+dist/public/assets/index.es-Bt7Uud2p.js           158.58 kB │ gzip:  52.93 kB
+dist/public/assets/html2canvas.esm-DXEQVQnt.js    201.04 kB │ gzip:  47.43 kB
+dist/public/assets/index-CNRz4s4_.js            1,362.02 kB │ gzip: 415.30 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 16.60s
+[  OK] Frontend compilado
+
+> @workspace/api-server@0.0.0 build /var/www/contabilgen/artifacts/api-server
+> tsx ./build.ts
+
+building server...
+
+  dist/index.cjs  1.4mb ⚠️
+
+⚡ Done in 604ms
+[  OK] API Server compilado
+[INFO] Aplicando esquema de base de datos...
+
+> @workspace/db@0.0.0 push-force /var/www/contabilgen/lib/db
+> drizzle-kit push --force --config ./drizzle.config.ts
+
+Reading config file '/var/www/contabilgen/lib/db/drizzle.config.ts'
+Using 'pg' driver for database querying
+[✓] Pulling schema from database...
+[i] No changes detected
+[  OK] Base de datos sincronizada
