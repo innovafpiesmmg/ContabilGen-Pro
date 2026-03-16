@@ -378,9 +378,10 @@ export const GenerateAccountingUniverseResponse = zod.object({
         "check",
         "promissory_note",
         "credit",
+        "card",
       ]),
       dueDate: zod.string().nullable(),
-      journalNote: zod.string().describe("Explanation of accounting entries"),
+      journalNote: zod.string().optional().describe("Explanation of accounting entries"),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -418,7 +419,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           balance: zod.number(),
         }),
       ),
-      journalNote: zod.string(),
+      journalNote: zod.string().optional(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -458,7 +459,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           balance: zod.number(),
         }),
       ),
-      journalNote: zod.string(),
+      journalNote: zod.string().optional(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -490,7 +491,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       endDate: zod.string(),
       interestAmount: zod.number(),
       totalSettlement: zod.number(),
-      journalNote: zod.string(),
+      journalNote: zod.string().optional(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -526,7 +527,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       ),
       totalCharges: zod.number(),
       settlementDate: zod.string(),
-      journalNote: zod.string(),
+      journalNote: zod.string().optional(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -557,7 +558,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         prepaidExpense: zod
           .number()
           .describe("Amount to defer to next period (cuenta 480)"),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -585,7 +586,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       bookValue: zod.number(),
       insuranceCompensation: zod.number(),
       netLoss: zod.number(),
-      journalNote: zod.string(),
+      journalNote: zod.string().optional(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -628,7 +629,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       totalNetSalary: zod.number(),
       totalSsEmployer: zod.number(),
       totalLaborCost: zod.number(),
-      journalNote: zod.string(),
+      journalNote: zod.string().optional(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -663,7 +664,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         totalPayment: zod
           .number()
           .describe("Total TC1: ssEmployeeAmount + ssEmployerAmount"),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -696,7 +697,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         inputTax: zod.number().describe("Cuota IVA\/IGIC deducible"),
         result: zod.number().describe("Positive = to pay, negative = refund"),
         paymentType: zod.enum(["ingreso", "devolución", "compensación"]),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -737,7 +738,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         depExpenseCode: zod
           .string()
           .describe("Depreciation expense account (e.g. 681)"),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1227,9 +1228,10 @@ export const SaveGenerationBody = zod.object({
           "check",
           "promissory_note",
           "credit",
+          "card",
         ]),
         dueDate: zod.string().nullable(),
-        journalNote: zod.string().describe("Explanation of accounting entries"),
+        journalNote: zod.string().optional().describe("Explanation of accounting entries"),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1267,7 +1269,7 @@ export const SaveGenerationBody = zod.object({
             balance: zod.number(),
           }),
         ),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1307,7 +1309,7 @@ export const SaveGenerationBody = zod.object({
             balance: zod.number(),
           }),
         ),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1339,7 +1341,7 @@ export const SaveGenerationBody = zod.object({
         endDate: zod.string(),
         interestAmount: zod.number(),
         totalSettlement: zod.number(),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1375,7 +1377,7 @@ export const SaveGenerationBody = zod.object({
         ),
         totalCharges: zod.number(),
         settlementDate: zod.string(),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1406,7 +1408,7 @@ export const SaveGenerationBody = zod.object({
           prepaidExpense: zod
             .number()
             .describe("Amount to defer to next period (cuenta 480)"),
-          journalNote: zod.string(),
+          journalNote: zod.string().optional(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -1434,7 +1436,7 @@ export const SaveGenerationBody = zod.object({
         bookValue: zod.number(),
         insuranceCompensation: zod.number(),
         netLoss: zod.number(),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1477,7 +1479,7 @@ export const SaveGenerationBody = zod.object({
         totalNetSalary: zod.number(),
         totalSsEmployer: zod.number(),
         totalLaborCost: zod.number(),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1512,7 +1514,7 @@ export const SaveGenerationBody = zod.object({
           totalPayment: zod
             .number()
             .describe("Total TC1: ssEmployeeAmount + ssEmployerAmount"),
-          journalNote: zod.string(),
+          journalNote: zod.string().optional(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -1545,7 +1547,7 @@ export const SaveGenerationBody = zod.object({
           inputTax: zod.number().describe("Cuota IVA\/IGIC deducible"),
           result: zod.number().describe("Positive = to pay, negative = refund"),
           paymentType: zod.enum(["ingreso", "devolución", "compensación"]),
-          journalNote: zod.string(),
+          journalNote: zod.string().optional(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -1586,7 +1588,7 @@ export const SaveGenerationBody = zod.object({
           depExpenseCode: zod
             .string()
             .describe("Depreciation expense account (e.g. 681)"),
-          journalNote: zod.string(),
+          journalNote: zod.string().optional(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -2068,9 +2070,10 @@ export const GetGenerationResponse = zod.object({
           "check",
           "promissory_note",
           "credit",
+          "card",
         ]),
         dueDate: zod.string().nullable(),
-        journalNote: zod.string().describe("Explanation of accounting entries"),
+        journalNote: zod.string().optional().describe("Explanation of accounting entries"),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2108,7 +2111,7 @@ export const GetGenerationResponse = zod.object({
             balance: zod.number(),
           }),
         ),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2148,7 +2151,7 @@ export const GetGenerationResponse = zod.object({
             balance: zod.number(),
           }),
         ),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2180,7 +2183,7 @@ export const GetGenerationResponse = zod.object({
         endDate: zod.string(),
         interestAmount: zod.number(),
         totalSettlement: zod.number(),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2216,7 +2219,7 @@ export const GetGenerationResponse = zod.object({
         ),
         totalCharges: zod.number(),
         settlementDate: zod.string(),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2247,7 +2250,7 @@ export const GetGenerationResponse = zod.object({
           prepaidExpense: zod
             .number()
             .describe("Amount to defer to next period (cuenta 480)"),
-          journalNote: zod.string(),
+          journalNote: zod.string().optional(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -2275,7 +2278,7 @@ export const GetGenerationResponse = zod.object({
         bookValue: zod.number(),
         insuranceCompensation: zod.number(),
         netLoss: zod.number(),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2318,7 +2321,7 @@ export const GetGenerationResponse = zod.object({
         totalNetSalary: zod.number(),
         totalSsEmployer: zod.number(),
         totalLaborCost: zod.number(),
-        journalNote: zod.string(),
+        journalNote: zod.string().optional(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2353,7 +2356,7 @@ export const GetGenerationResponse = zod.object({
           totalPayment: zod
             .number()
             .describe("Total TC1: ssEmployeeAmount + ssEmployerAmount"),
-          journalNote: zod.string(),
+          journalNote: zod.string().optional(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -2386,7 +2389,7 @@ export const GetGenerationResponse = zod.object({
           inputTax: zod.number().describe("Cuota IVA\/IGIC deducible"),
           result: zod.number().describe("Positive = to pay, negative = refund"),
           paymentType: zod.enum(["ingreso", "devolución", "compensación"]),
-          journalNote: zod.string(),
+          journalNote: zod.string().optional(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -2427,7 +2430,7 @@ export const GetGenerationResponse = zod.object({
           depExpenseCode: zod
             .string()
             .describe("Depreciation expense account (e.g. 681)"),
-          journalNote: zod.string(),
+          journalNote: zod.string().optional(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
