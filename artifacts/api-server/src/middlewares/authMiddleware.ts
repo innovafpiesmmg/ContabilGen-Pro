@@ -25,19 +25,24 @@ export async function authMiddleware(
     return this.user != null;
   } as Request["isAuthenticated"];
 
-  const sid = getSessionId(req);
-  if (!sid) {
-    next();
-    return;
-  }
+  try {
+    const sid = getSessionId(req);
+    if (!sid) {
+      next();
+      return;
+    }
 
-  const session = await getSession(sid);
-  if (!session?.user?.id) {
-    await clearSession(res, sid);
-    next();
-    return;
-  }
+    const session = await getSession(sid);
+    if (!session?.user?.id) {
+      await clearSession(res, sid);
+      next();
+      return;
+    }
 
-  req.user = session.user;
-  next();
+    req.user = session.user;
+    next();
+  } catch (err) {
+    console.error("[authMiddleware] Error al verificar sesión:", err instanceof Error ? err.message : err);
+    next();
+  }
 }

@@ -1,5 +1,17 @@
 import app from "./app";
 
+process.on("uncaughtException", (err) => {
+  console.error("[FATAL] Excepción no capturada:", err.message, err.stack || "");
+  process.exit(1);
+});
+
+process.on("unhandledRejection", (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  const stack = reason instanceof Error ? reason.stack : "";
+  console.error("[FATAL] Promesa rechazada sin capturar:", msg, stack || "");
+  process.exit(1);
+});
+
 const rawPort = process.env["PORT"];
 
 if (!rawPort) {

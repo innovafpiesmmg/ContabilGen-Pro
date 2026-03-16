@@ -170,3 +170,11 @@ Implementation: `setDocColor(category)` sets `_activeColor` used by `headerBlock
 - **Cookies**: `SECURE_COOKIES` env var controls `secure` flag on session cookies (default: `false` for HTTP, `true` when Cloudflare Tunnel is configured)
 - **Ports**: API on 5001 (internal), Nginx on 80 (public)
 - **Update**: Re-run `sudo bash /var/www/contabilgen/install.sh` — detects existing install, preserves DB + credentials
+
+## Error Handling
+
+- All async Express routes wrapped with `wrap()` helper → errors are caught and forwarded to the global error middleware
+- Global error middleware in `app.ts` returns `{ error: "..." }` JSON with 500 status and logs the stack trace
+- `process.on("uncaughtException")` and `process.on("unhandledRejection")` log the error and exit(1) so systemd can restart the service
+- `authMiddleware` has try/catch: if DB is down, treats request as unauthenticated (does not crash)
+- `forgot-password` route catches email send failures silently (security pattern: don't reveal if email exists)

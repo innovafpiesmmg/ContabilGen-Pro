@@ -1,9 +1,12 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { and, eq } from "drizzle-orm";
 import { db, settingsTable, appSettingsTable } from "@workspace/db";
 import { UpdateSettingsBody } from "@workspace/api-zod";
 
 const router: IRouter = Router();
+
+type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
+const wrap = (fn: AsyncHandler): AsyncHandler => (req, res, next) => fn(req, res, next).catch(next);
 
 const SETTINGS_KEYS = ["provider", "deepseekApiKey", "deepseekBaseUrl", "deepseekModel"] as const;
 const DEFAULTS: Record<string, string> = {
@@ -34,7 +37,7 @@ async function getSettingsForUser(userId: string): Promise<Record<string, string
   return map;
 }
 
-router.get("/settings", async (req, res): Promise<void> => {
+router.get("/settings", wrap(async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autenticado" });
     return;
@@ -51,9 +54,9 @@ router.get("/settings", async (req, res): Promise<void> => {
     sharedDeepseekAvailable: shared.enabled,
     sharedDeepseekModel: shared.enabled ? shared.model : null,
   });
-});
+}));
 
-router.put("/settings", async (req, res): Promise<void> => {
+router.put("/settings", wrap(async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autenticado" });
     return;
@@ -96,7 +99,7 @@ router.put("/settings", async (req, res): Promise<void> => {
     sharedDeepseekAvailable: shared.enabled,
     sharedDeepseekModel: shared.enabled ? shared.model : null,
   });
-});
+}));
 
 export { getSettingsForUser, getSharedDeepseekConfig };
 export default router;

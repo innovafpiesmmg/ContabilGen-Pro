@@ -1,4 +1,4 @@
-import { Router, type IRouter, type Request, type Response } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { db, usersTable, appSettingsTable } from "@workspace/db";
 import { eq, ne } from "drizzle-orm";
 import { adminMiddleware } from "../middlewares/adminMiddleware";
@@ -6,11 +6,14 @@ import { hashPassword } from "../lib/auth";
 
 const router: IRouter = Router();
 
+type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
+const wrap = (fn: AsyncHandler): AsyncHandler => (req, res, next) => fn(req, res, next).catch(next);
+
 router.use(adminMiddleware);
 
 // ─── Users ───────────────────────────────────────────────────────────────────
 
-router.get("/admin/users", async (_req: Request, res: Response): Promise<void> => {
+router.get("/admin/users", wrap(async (_req: Request, res: Response): Promise<void> => {
   const users = await db
     .select({
       id: usersTable.id,
@@ -23,9 +26,9 @@ router.get("/admin/users", async (_req: Request, res: Response): Promise<void> =
     .from(usersTable)
     .orderBy(usersTable.createdAt);
   res.json({ users });
-});
+}));
 
-router.patch("/admin/users/:id", async (req: Request, res: Response): Promise<void> => {
+router.patch("/admin/users/:id", wrap(async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
   const { isAdmin, firstName, lastName, newPassword } = req.body ?? {};
 
@@ -66,9 +69,9 @@ router.patch("/admin/users/:id", async (req: Request, res: Response): Promise<vo
   }
 
   res.json({ user: updated });
-});
+}));
 
-router.delete("/admin/users/:id", async (req: Request, res: Response): Promise<void> => {
+router.delete("/admin/users/:id", wrap(async (req: Request, res: Response): Promise<void> => {
   const { id } = req.params;
 
   if (id === req.user!.id) {
@@ -83,13 +86,13 @@ router.delete("/admin/users/:id", async (req: Request, res: Response): Promise<v
   }
 
   res.json({ success: true });
-});
+}));
 
 // ─── Email Config ─────────────────────────────────────────────────────────────
 
 const EMAIL_KEYS = ["resend_api_key", "email_from"] as const;
 
-router.get("/admin/email-config", async (_req: Request, res: Response): Promise<void> => {
+router.get("/admin/email-config", wrap(async (_req: Request, res: Response): Promise<void> => {
   const rows = await db.select().from(appSettingsTable);
   const config: Record<string, string> = {};
   for (const row of rows) {
@@ -107,9 +110,9 @@ router.get("/admin/email-config", async (_req: Request, res: Response): Promise<
     delete config.resend_api_key;
   }
   res.json({ config });
-});
+}));
 
-router.put("/admin/email-config", async (req: Request, res: Response): Promise<void> => {
+router.put("/admin/email-config", wrap(async (req: Request, res: Response): Promise<void> => {
   const { resend_api_key, email_from } = req.body ?? {};
 
   if (resend_api_key && typeof resend_api_key === "string") {
@@ -127,12 +130,12 @@ router.put("/admin/email-config", async (req: Request, res: Response): Promise<v
   }
 
   res.json({ success: true });
-});
+}));
 
-router.delete("/admin/email-config/key", async (_req: Request, res: Response): Promise<void> => {
+router.delete("/admin/email-config/key", wrap(async (_req: Request, res: Response): Promise<void> => {
   await db.delete(appSettingsTable).where(eq(appSettingsTable.key, "resend_api_key"));
   res.json({ success: true });
-});
+}));
 
 // ─── Shared DeepSeek Config ───────────────────────────────────────────────────
 
@@ -143,7 +146,7 @@ const SHARED_DEEPSEEK_KEYS = [
   "shared_deepseek_model",
 ] as const;
 
-router.get("/admin/deepseek-config", async (_req: Request, res: Response): Promise<void> => {
+router.get("/admin/deepseek-config", wrap(async (_req: Request, res: Response): Promise<void> => {
   const rows = await db.select().from(appSettingsTable);
   const config: Record<string, string> = {};
   for (const row of rows) {
@@ -160,9 +163,9 @@ router.get("/admin/deepseek-config", async (_req: Request, res: Response): Promi
     delete config.shared_deepseek_api_key;
   }
   res.json({ config });
-});
+}));
 
-router.put("/admin/deepseek-config", async (req: Request, res: Response): Promise<void> => {
+router.put("/admin/deepseek-config", wrap(async (req: Request, res: Response): Promise<void> => {
   const { enabled, api_key, base_url, model } = req.body ?? {};
 
   const upsert = async (key: string, value: string) => {
@@ -186,12 +189,12 @@ router.put("/admin/deepseek-config", async (req: Request, res: Response): Promis
   }
 
   res.json({ success: true });
-});
+}));
 
-router.delete("/admin/deepseek-config/key", async (_req: Request, res: Response): Promise<void> => {
+router.delete("/admin/deepseek-config/key", wrap(async (_req: Request, res: Response): Promise<void> => {
   await db.delete(appSettingsTable).where(eq(appSettingsTable.key, "shared_deepseek_api_key"));
   await db.delete(appSettingsTable).where(eq(appSettingsTable.key, "shared_deepseek_enabled"));
   res.json({ success: true });
-});
+}));
 
 export default router;

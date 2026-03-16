@@ -1,4 +1,4 @@
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Request, type Response, type NextFunction } from "express";
 import { and, eq, desc } from "drizzle-orm";
 import { db, generationsTable } from "@workspace/db";
 import {
@@ -12,6 +12,9 @@ import { getSettingsForUser, getSharedDeepseekConfig } from "../settings.js";
 import crypto from "crypto";
 
 const router: IRouter = Router();
+
+type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
+const wrap = (fn: AsyncHandler): AsyncHandler => (req, res, next) => fn(req, res, next).catch(next);
 
 interface Job {
   status: "running" | "done" | "error";
@@ -64,7 +67,7 @@ function resolveAiConfig(settings: any, shared?: any) {
   };
 }
 
-router.post("/accounting/generate", async (req, res): Promise<void> => {
+router.post("/accounting/generate", wrap(async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autenticado" });
     return;
@@ -112,9 +115,9 @@ router.post("/accounting/generate", async (req, res): Promise<void> => {
     job.progress = "Error";
     console.error("[generate] Error:", job.error);
   });
-});
+}));
 
-router.get("/accounting/generate/status/:jobId", async (req, res): Promise<void> => {
+router.get("/accounting/generate/status/:jobId", wrap(async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autenticado" });
     return;
@@ -137,9 +140,9 @@ router.get("/accounting/generate/status/:jobId", async (req, res): Promise<void>
   } else {
     res.json({ status: "running", progress: job.progress });
   }
-});
+}));
 
-router.get("/accounting/generations", async (req, res): Promise<void> => {
+router.get("/accounting/generations", wrap(async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autenticado" });
     return;
@@ -164,9 +167,9 @@ router.get("/accounting/generations", async (req, res): Promise<void> => {
       createdAt: r.createdAt instanceof Date ? r.createdAt.toISOString() : r.createdAt,
     })),
   );
-});
+}));
 
-router.post("/accounting/generations", async (req, res): Promise<void> => {
+router.post("/accounting/generations", wrap(async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autenticado" });
     return;
@@ -200,9 +203,9 @@ router.post("/accounting/generations", async (req, res): Promise<void> => {
     fiscalYear: row.fiscalYear,
     createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
   });
-});
+}));
 
-router.get("/accounting/generations/:id", async (req, res): Promise<void> => {
+router.get("/accounting/generations/:id", wrap(async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autenticado" });
     return;
@@ -230,9 +233,9 @@ router.get("/accounting/generations/:id", async (req, res): Promise<void> => {
     ...row,
     createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
   });
-});
+}));
 
-router.delete("/accounting/generations/:id", async (req, res): Promise<void> => {
+router.delete("/accounting/generations/:id", wrap(async (req, res): Promise<void> => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "No autenticado" });
     return;
@@ -263,6 +266,6 @@ router.delete("/accounting/generations/:id", async (req, res): Promise<void> => 
     );
 
   res.json({ success: true });
-});
+}));
 
 export default router;
