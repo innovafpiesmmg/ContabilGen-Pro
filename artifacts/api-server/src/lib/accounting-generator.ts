@@ -552,7 +552,22 @@ function computeWarehouseCards(universe: Record<string, unknown>): unknown[] {
 
   if (!inventory?.initialInventory?.length) return [];
 
+  const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+
+  function matchLine(lineDesc: string, itemDesc: string, itemCode: string): boolean {
+    const ld = normalize(lineDesc);
+    const id = normalize(itemDesc);
+    const ic = normalize(itemCode);
+    if (ld.includes(id) || id.includes(ld)) return true;
+    if (ic && ld.includes(ic)) return true;
+    const words = id.split(/\s+/).filter(w => w.length > 2);
+    if (words.length === 0) return false;
+    const matchCount = words.filter(w => ld.includes(w)).length;
+    return matchCount >= Math.max(1, Math.ceil(words.length * 0.5));
+  }
+
   const cards: unknown[] = [];
+  const invArr = invoices ?? [];
 
   for (const item of inventory.initialInventory) {
     const finalItem = inventory.finalInventory?.find(f => f.code === item.code);
@@ -560,7 +575,36 @@ function computeWarehouseCards(universe: Record<string, unknown>): unknown[] {
     const initCost = item.unitCost || (item.totalCost && initQty ? item.totalCost / initQty : 0);
     const initTotal = item.totalCost || initQty * initCost;
 
+    const allOps: Array<{
+      date: string; type: "purchase" | "sale"; lineDesc: string;
+      invoiceNumber: string; qty: number; unitCost: number; total: number;
+    }> = [];
+
+    for (const inv of invArr) {
+      if (inv.type !== "purchase" && inv.type !== "sale") continue;
+      for (const line of inv.lines) {
+        if (!matchLine(line.description || "", item.description, item.code)) continue;
+        allOps.push({
+          date: inv.date,
+          type: inv.type as "purchase" | "sale",
+          lineDesc: line.description,
+          invoiceNumber: inv.invoiceNumber,
+          qty: line.quantity || 0,
+          unitCost: line.unitPrice || 0,
+          total: line.subtotal || (line.quantity || 0) * (line.unitPrice || 0),
+        });
+      }
+    }
+
+    allOps.sort((a, b) => {
+      const dc = a.date.localeCompare(b.date);
+      if (dc !== 0) return dc;
+      return a.type === "purchase" ? -1 : 1;
+    });
+
     const movements: Array<Record<string, unknown>> = [];
+    let balQty = initQty;
+    let balTotal = round2(initTotal);
 
     movements.push({
       date: "Existencias iniciales",
@@ -570,83 +614,47 @@ function computeWarehouseCards(universe: Record<string, unknown>): unknown[] {
       entryUnitCost: round2(initCost),
       entryTotal: round2(initTotal),
       exitQty: 0, exitUnitCost: 0, exitTotal: 0,
-      balanceQty: initQty,
+      balanceQty: balQty,
       balanceUnitCost: round2(initCost),
-      balanceTotal: round2(initTotal),
+      balanceTotal: round2(balTotal),
     });
 
-    let balQty = initQty;
-    let balTotal = initTotal;
-
-    if (invoices?.length) {
-      const purchases = invoices
-        .filter(inv => inv.type === "purchase")
-        .sort((a, b) => a.date.localeCompare(b.date));
-
-      for (const inv of purchases) {
-        for (const line of inv.lines) {
-          const desc = line.description?.toLowerCase() || "";
-          const itemDesc = item.description?.toLowerCase() || "";
-          const words = itemDesc.split(/\s+/).filter(w => w.length > 3);
-          const matches = words.some(w => desc.includes(w));
-          if (!matches) continue;
-
-          const qty = line.quantity || 0;
-          const cost = line.unitPrice || 0;
-          const total = line.subtotal || qty * cost;
-
-          balQty += qty;
-          balTotal += total;
-          const pmp = balQty > 0 ? balTotal / balQty : 0;
-
-          movements.push({
-            date: inv.date,
-            concept: `Compra: ${line.description}`,
-            document: inv.invoiceNumber,
-            entryQty: qty,
-            entryUnitCost: round2(cost),
-            entryTotal: round2(total),
-            exitQty: 0, exitUnitCost: 0, exitTotal: 0,
-            balanceQty: balQty,
-            balanceUnitCost: round2(pmp),
-            balanceTotal: round2(balTotal),
-          });
-        }
-      }
-
-      const sales = invoices
-        .filter(inv => inv.type === "sale")
-        .sort((a, b) => a.date.localeCompare(b.date));
-
-      for (const inv of sales) {
-        for (const line of inv.lines) {
-          const desc = line.description?.toLowerCase() || "";
-          const itemDesc = item.description?.toLowerCase() || "";
-          const words = itemDesc.split(/\s+/).filter(w => w.length > 3);
-          const matches = words.some(w => desc.includes(w));
-          if (!matches) continue;
-
-          const qty = Math.min(line.quantity || 0, balQty);
-          if (qty <= 0) continue;
-          const pmp = balQty > 0 ? balTotal / balQty : 0;
-          const exitTotal = qty * pmp;
-
-          balQty -= qty;
-          balTotal -= exitTotal;
-
-          movements.push({
-            date: inv.date,
-            concept: `Venta: ${line.description}`,
-            document: inv.invoiceNumber,
-            entryQty: 0, entryUnitCost: 0, entryTotal: 0,
-            exitQty: qty,
-            exitUnitCost: round2(pmp),
-            exitTotal: round2(exitTotal),
-            balanceQty: balQty,
-            balanceUnitCost: round2(balQty > 0 ? balTotal / balQty : 0),
-            balanceTotal: round2(balTotal),
-          });
-        }
+    for (const op of allOps) {
+      if (op.type === "purchase") {
+        balQty += op.qty;
+        balTotal = round2(balTotal + op.total);
+        const pmp = balQty > 0 ? balTotal / balQty : 0;
+        movements.push({
+          date: op.date,
+          concept: `Compra: ${op.lineDesc}`,
+          document: op.invoiceNumber,
+          entryQty: op.qty,
+          entryUnitCost: round2(op.unitCost),
+          entryTotal: round2(op.total),
+          exitQty: 0, exitUnitCost: 0, exitTotal: 0,
+          balanceQty: balQty,
+          balanceUnitCost: round2(pmp),
+          balanceTotal: round2(balTotal),
+        });
+      } else {
+        const qty = Math.min(op.qty, balQty);
+        if (qty <= 0) continue;
+        const pmp = balQty > 0 ? balTotal / balQty : 0;
+        const exitTotal = round2(qty * pmp);
+        balQty -= qty;
+        balTotal = round2(balTotal - exitTotal);
+        movements.push({
+          date: op.date,
+          concept: `Venta: ${op.lineDesc}`,
+          document: op.invoiceNumber,
+          entryQty: 0, entryUnitCost: 0, entryTotal: 0,
+          exitQty: qty,
+          exitUnitCost: round2(pmp),
+          exitTotal: exitTotal,
+          balanceQty: balQty,
+          balanceUnitCost: round2(balQty > 0 ? balTotal / balQty : 0),
+          balanceTotal: round2(balTotal),
+        });
       }
     }
 
@@ -655,31 +663,31 @@ function computeWarehouseCards(universe: Record<string, unknown>): unknown[] {
       const finalCost = finalItem.unitCost || (finalItem.totalCost && finalQty ? finalItem.totalCost / finalQty : 0);
       const finalTotal = finalItem.totalCost || finalQty * finalCost;
       const adjQty = finalQty - balQty;
-      if (Math.abs(adjQty) > 0) {
+      if (Math.abs(adjQty) > 0.001) {
         if (adjQty > 0) {
           balQty += adjQty;
-          const adjTotal = adjQty * finalCost;
-          balTotal += adjTotal;
+          const adjTotal = round2(adjQty * finalCost);
+          balTotal = round2(balTotal + adjTotal);
           movements.push({
             date: "Regularización",
             concept: "Ajuste inventario final (sobrante)",
             document: "REG-FINAL",
-            entryQty: adjQty, entryUnitCost: round2(finalCost), entryTotal: round2(adjTotal),
+            entryQty: adjQty, entryUnitCost: round2(finalCost), entryTotal: adjTotal,
             exitQty: 0, exitUnitCost: 0, exitTotal: 0,
             balanceQty: finalQty, balanceUnitCost: round2(finalCost), balanceTotal: round2(finalTotal),
           });
         } else {
           const exitQty = Math.abs(adjQty);
           const pmp = balQty > 0 ? balTotal / balQty : finalCost;
-          const exitTotal = exitQty * pmp;
+          const exitTotal = round2(exitQty * pmp);
           balQty -= exitQty;
-          balTotal -= exitTotal;
+          balTotal = round2(balTotal - exitTotal);
           movements.push({
             date: "Regularización",
             concept: "Ajuste inventario final (faltante/merma)",
             document: "REG-FINAL",
             entryQty: 0, entryUnitCost: 0, entryTotal: 0,
-            exitQty: exitQty, exitUnitCost: round2(pmp), exitTotal: round2(exitTotal),
+            exitQty: exitQty, exitUnitCost: round2(pmp), exitTotal: exitTotal,
             balanceQty: finalQty, balanceUnitCost: round2(finalCost), balanceTotal: round2(finalTotal),
           });
         }
@@ -687,6 +695,13 @@ function computeWarehouseCards(universe: Record<string, unknown>): unknown[] {
     }
 
     if (movements.length > 1) {
+      const totalEntries = movements.reduce((s, m) => s + Number(m.entryQty ?? 0), 0) - initQty;
+      const totalExits = movements.reduce((s, m) => s + Number(m.exitQty ?? 0), 0);
+      const lastMov = movements[movements.length - 1];
+      console.log(`[almacén] Ficha ${item.code} "${item.description}": `
+        + `ini=${initQty} + entradas=${totalEntries} - salidas=${totalExits} = saldo=${lastMov.balanceQty} `
+        + `(${movements.length - 1} movimientos de ${allOps.length} ops encontradas en facturas)`);
+
       cards.push({
         productCode: item.code,
         productDescription: item.description,
