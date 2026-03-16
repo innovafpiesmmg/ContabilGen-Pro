@@ -933,7 +933,144 @@ function docBadgeStyle(doc: string): { bg: string; text: string; label: string }
   return { bg: "bg-slate-100 text-slate-600 border-slate-300", text: "Doc.", label: doc };
 }
 
-export const JournalView = ({ entries }: { entries: JournalEntry[] }) => {
+function buildPdfLookup(universe: AccountingUniverse): Map<string, { gen: () => Blob; filename: string }> {
+  const cp = buildCP(universe);
+  const safe = (s: string) => (s || "").replace(/[/\\?%*:|"<>]/g, "-").substring(0, 50);
+  const map = new Map<string, { gen: () => Blob; filename: string }>();
+
+  (universe.invoices ?? []).forEach(inv => {
+    const tipo = inv.type === "sale" ? "Venta" : "Compra";
+    map.set(inv.invoiceNumber, { gen: () => generateInvoicePdf(inv, cp), filename: `Factura_${tipo}_${safe(inv.invoiceNumber)}.pdf` });
+  });
+
+  (universe.paymentReceipts ?? []).forEach(pr => {
+    const tipo = pr.type === "cobro" ? "Cobro" : "Pago";
+    map.set(pr.receiptNumber, { gen: () => generatePaymentReceiptPdf(pr, cp), filename: `${tipo}_${safe(pr.receiptNumber)}.pdf` });
+  });
+
+  (universe.serviceInvoices ?? []).forEach(si => {
+    map.set(si.invoiceNumber, { gen: () => generateServiceInvoicePdf(si, cp), filename: `Suministro_${safe(si.invoiceNumber)}.pdf` });
+  });
+
+  const monthlyPayrolls = (universe as any).monthlyPayrolls as Array<typeof universe.payroll> | undefined;
+  if (monthlyPayrolls?.length) {
+    monthlyPayrolls.forEach(pay => {
+      if (pay?.month) map.set(`Nómina ${pay.month}`, { gen: () => generatePayrollPdf(pay, cp), filename: `Nomina_${safe(pay.month)}.pdf` });
+    });
+  } else if (universe.payroll?.month) {
+    map.set(`Nómina ${universe.payroll.month}`, { gen: () => generatePayrollPdf(universe.payroll!, cp), filename: `Nomina_${safe(universe.payroll!.month)}.pdf` });
+  }
+
+  (universe.socialSecurityPayments ?? []).forEach(ss => {
+    map.set(`TC1-${ss.month}`, { gen: () => generateSSPaymentPdf(ss, cp), filename: `TC1_${safe(String(ss.month))}.pdf` });
+  });
+
+  (universe.taxLiquidations ?? []).forEach(t => {
+    const ref = `Mod.${t.model}-${t.period}`;
+    map.set(ref, { gen: () => generateTaxLiquidationPdf(t, cp), filename: `Mod${t.model}_${safe(t.period)}.pdf` });
+  });
+
+  if (universe.bankLoan) {
+    const loan = universe.bankLoan;
+    const num = loan.loanNumber || "";
+    if (num) map.set(num, { gen: () => generateBankLoanPdf(loan, cp), filename: `Prestamo_${safe(num)}.pdf` });
+  }
+
+  if (universe.mortgage) {
+    const mort = universe.mortgage;
+    const num = mort.loanNumber || "";
+    if (num) map.set(num, { gen: () => generateMortgagePdf(mort, cp), filename: `Hipoteca_${safe(num)}.pdf` });
+  }
+
+  if (universe.creditPolicy) {
+    const pol = universe.creditPolicy;
+    const num = pol.policyNumber || "";
+    if (num) map.set(num, { gen: () => generateCreditPolicyPdf(pol, cp), filename: `Poliza_Credito_${safe(num)}.pdf` });
+  }
+
+  if (universe.creditCardStatement) {
+    map.set("Tarjeta-liquidación", {
+      gen: () => generateCreditCardStatementPdf(universe.creditCardStatement!, cp),
+      filename: "Extracto_Tarjeta.pdf"
+    });
+  }
+
+  (universe.insurancePolicies ?? []).forEach((ins: any) => {
+    const num = ins.policyNumber || "";
+    if (num) map.set(num, { gen: () => generateInsurancePolicyPdf(ins, cp), filename: `Poliza_Seguro_${safe(num)}.pdf` });
+  });
+
+  if (universe.casualtyEvent) {
+    map.set("Siniestro", { gen: () => generateCasualtyReportPdf(universe.casualtyEvent!, cp), filename: "Siniestro.pdf" });
+  }
+
+  (universe.fixedAssets ?? []).forEach(a => {
+    map.set(`Amort-${a.code || ""}`, { gen: () => generateFixedAssetCardPdf(a, cp), filename: `Inmovilizado_${safe(a.description)}.pdf` });
+  });
+
+  if (universe.initialBalanceSheet) {
+    map.set("Asiento apertura", { gen: () => generateInitialBalancePdf(universe.initialBalanceSheet!, cp), filename: "Balance_Apertura.pdf" });
+  }
+
+  if (universe.dividendDistribution) {
+    const dd = universe.dividendDistribution;
+    map.set("Dividendos", { gen: () => generateDividendDistributionPdf(dd, cp), filename: `Dividendos_${dd.fiscalYear || ""}.pdf` });
+  }
+
+  if (universe.shareholderAccounts) {
+    const acc = universe.shareholderAccounts;
+    map.set("CC-Socios", { gen: () => generateShareholderAccountsPdf(acc, cp), filename: "Cta_Corriente_Socios.pdf" });
+  }
+
+  if (universe.shareholdersInfo) {
+    map.set("Capital-social", { gen: () => generateShareholdersInfoPdf(universe.shareholdersInfo!, cp), filename: "Info_Socios.pdf" });
+  }
+
+  (universe.bankDebitNotes ?? []).forEach((note: any) => {
+    const ref = note.noteNumber || note.reference || "";
+    if (ref) map.set(ref, { gen: () => generateBankDebitNotePdf(note, cp), filename: `Nota_Cargo_${safe(ref)}.pdf` });
+  });
+
+  (universe.extraordinaryExpenses ?? []).forEach(exp => {
+    const ref = `${exp.type}-${exp.date}`;
+    const isInc = exp.type === "ingreso_extraordinario" || (exp.accountCode || "").startsWith("7");
+    map.set(ref, { gen: () => generateExtraordinaryExpensePdf(exp, cp), filename: `${isInc ? "Ingreso" : "Gasto"}_Extra_${safe(exp.description)}.pdf` });
+  });
+
+  (universe.bankStatements ?? []).forEach(bs => {
+    const key = `Extracto-${bs.bank || bs.period || ""}`;
+    map.set(key, { gen: () => generateBankStatementPdf(bs, cp), filename: `Extracto_${safe(bs.bank || bs.period || "")}.pdf` });
+  });
+
+  return map;
+}
+
+function findPdf(pdfMap: Map<string, { gen: () => Blob; filename: string }>, docRef: string): { gen: () => Blob; filename: string } | undefined {
+  if (!docRef) return undefined;
+  const exact = pdfMap.get(docRef);
+  if (exact) return exact;
+  const normalized = docRef.toLowerCase().trim();
+  if (normalized.length < 3) return undefined;
+  for (const [key, val] of pdfMap) {
+    if (key.toLowerCase().trim() === normalized) return val;
+  }
+  return undefined;
+}
+
+export const JournalView = ({ entries, universe }: { entries: JournalEntry[]; universe?: AccountingUniverse }) => {
+  const pdfMap = useMemo(() => universe ? buildPdfLookup(universe) : new Map<string, { gen: () => Blob; filename: string }>(), [universe]);
+
+  const handleDownload = useCallback((docRef: string) => {
+    const pdf = findPdf(pdfMap, docRef);
+    if (!pdf) return;
+    try {
+      const blob = pdf.gen();
+      saveAs(blob, pdf.filename);
+    } catch (err) {
+      console.error("Error generando PDF:", err);
+    }
+  }, [pdfMap]);
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <SectionTitle title="Libro Diario" description="Registro cronológico de todos los asientos contables. Cada asiento incluye su documento de soporte." />
@@ -947,7 +1084,7 @@ export const JournalView = ({ entries }: { entries: JournalEntry[] }) => {
                 <TableHead className="text-slate-300 w-24">Fecha</TableHead>
                 <TableHead className="text-slate-300 w-24 text-center">Cuenta</TableHead>
                 <TableHead className="text-slate-300">Concepto</TableHead>
-                <TableHead className="text-slate-300 w-44">Documento soporte</TableHead>
+                <TableHead className="text-slate-300 w-48">Documento soporte</TableHead>
                 <TableHead className="text-slate-300 text-right w-28">Debe</TableHead>
                 <TableHead className="text-slate-300 text-right w-28">Haber</TableHead>
               </TableRow>
@@ -955,6 +1092,7 @@ export const JournalView = ({ entries }: { entries: JournalEntry[] }) => {
             <TableBody>
               {entries.map((entry, idx) => {
                 const badge = entry.document ? docBadgeStyle(entry.document) : null;
+                const hasPdf = entry.document ? !!findPdf(pdfMap, entry.document) : false;
                 return (
                 <React.Fragment key={idx}>
                   <TableRow className="bg-slate-100/80 border-t-4 border-slate-200 print-break-inside-avoid">
@@ -964,10 +1102,22 @@ export const JournalView = ({ entries }: { entries: JournalEntry[] }) => {
                     <TableCell className="font-semibold text-slate-700">{entry.concept}</TableCell>
                     <TableCell>
                       {badge && (
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[11px] font-semibold ${badge.bg}`}>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <button
+                          type="button"
+                          disabled={!hasPdf}
+                          onClick={() => hasPdf && handleDownload(entry.document)}
+                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] font-semibold transition-all ${badge.bg} ${hasPdf ? "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95" : "opacity-70"}`}
+                          title={hasPdf ? `Descargar PDF: ${badge.label}` : badge.label}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            {hasPdf ? (
+                              <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>
+                            ) : (
+                              <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>
+                            )}
+                          </svg>
                           {badge.label}
-                        </span>
+                        </button>
                       )}
                     </TableCell>
                     <TableCell></TableCell>

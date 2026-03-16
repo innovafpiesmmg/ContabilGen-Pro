@@ -374,7 +374,7 @@ export function UniverseViewer({ universe, onSave, isSaving, hideSaveButton }: U
             </TabsContent>
           )}
           <TabsContent value="diario" className="mt-0 outline-none">
-            <JournalView entries={universe.journalEntries} />
+            <JournalView entries={universe.journalEntries} universe={universe} />
           </TabsContent>
           {hasBankDebitNotes && (
             <TabsContent value="notas_cargo" className="mt-0 outline-none">
