@@ -2435,6 +2435,86 @@ function buildDeterministicJournal(
     }
   }
 
+  const insurancePolicies = Array.isArray(universe.insurancePolicies) ? universe.insurancePolicies as Record<string, unknown>[] : [];
+  for (const pol of insurancePolicies) {
+    const ref = String(pol.policyNumber ?? "");
+    const date = String(pol.startDate ?? "");
+    if (ref) allDocRefs.push({ ref, type: "seguro", date });
+  }
+
+  const casualtyEvt = universe.casualtyEvent as Record<string, unknown> | undefined;
+  if (casualtyEvt && casualtyEvt.date) {
+    allDocRefs.push({ ref: "Siniestro", type: "siniestro", date: String(casualtyEvt.date) });
+  }
+
+  const extraExpenses = Array.isArray(universe.extraordinaryExpenses) ? universe.extraordinaryExpenses as Record<string, unknown>[] : [];
+  for (const ex of extraExpenses) {
+    allDocRefs.push({ ref: `${ex.type}-${ex.date}`, type: "extraordinario", date: String(ex.date ?? "") });
+  }
+
+  const loanDoc = universe.bankLoan as Record<string, unknown> | undefined;
+  if (loanDoc) {
+    const lRef = String(loanDoc.loanNumber ?? "");
+    if (lRef) {
+      const startD = String(loanDoc.startDate ?? `${params.year}-01-01`);
+      allDocRefs.push({ ref: lRef, type: "préstamo", date: startD });
+      const amortT = Array.isArray(loanDoc.amortizationTable) ? loanDoc.amortizationTable as Record<string, unknown>[] : [];
+      for (const cuota of amortT) {
+        allDocRefs.push({ ref: lRef, type: "cuota-préstamo", date: String(cuota.date ?? cuota.paymentDate ?? "") });
+      }
+    }
+  }
+
+  const mortgageDoc = universe.mortgage as Record<string, unknown> | undefined;
+  if (mortgageDoc) {
+    const mRef = String(mortgageDoc.loanNumber ?? "");
+    if (mRef) {
+      const startD = String(mortgageDoc.startDate ?? `${params.year}-01-01`);
+      allDocRefs.push({ ref: mRef, type: "hipoteca", date: startD });
+      const amortT = Array.isArray(mortgageDoc.amortizationTable) ? mortgageDoc.amortizationTable as Record<string, unknown>[] : [];
+      for (const cuota of amortT) {
+        allDocRefs.push({ ref: mRef, type: "cuota-hipoteca", date: String(cuota.date ?? cuota.paymentDate ?? "") });
+      }
+    }
+  }
+
+  const creditPol = universe.creditPolicy as Record<string, unknown> | undefined;
+  if (creditPol) {
+    const cpRef = String(creditPol.policyNumber ?? "");
+    if (cpRef) allDocRefs.push({ ref: cpRef, type: "póliza-crédito", date: String(creditPol.startDate ?? `${params.year}-01-15`) });
+  }
+
+  const cardDoc = universe.creditCardStatement as Record<string, unknown> | undefined;
+  if (cardDoc) {
+    const cardMovs = Array.isArray(cardDoc.movements) ? cardDoc.movements as Record<string, unknown>[] : [];
+    for (const mov of cardMovs) {
+      allDocRefs.push({ ref: "Tarjeta-liquidación", type: "tarjeta", date: String(mov.date ?? "") });
+    }
+  }
+
+  const fixedAssetDocs = Array.isArray(universe.fixedAssets) ? universe.fixedAssets as Record<string, unknown>[] : [];
+  for (const fa of fixedAssetDocs) {
+    const code = String(fa.code ?? "");
+    if (code) allDocRefs.push({ ref: `Amort-${code}`, type: "amortización", date: `${params.year}-12-31` });
+  }
+
+  if (initialBS && initialBS.accountDebits) {
+    allDocRefs.push({ ref: "Asiento apertura", type: "apertura", date: `${params.year}-01-01` });
+  }
+
+  if (dividends && dividends.accountDebits) {
+    const divDate = String(dividends.date ?? dividends.approvalDate ?? `${params.year}-06-30`);
+    allDocRefs.push({ ref: "Dividendos", type: "dividendos", date: divDate });
+    const divPayEntry = dividends.paymentEntry as Record<string, unknown> | undefined;
+    if (divPayEntry) {
+      allDocRefs.push({ ref: "Dividendos", type: "pago-dividendos", date: String(divPayEntry.date ?? dividends.paymentDate ?? `${params.year}-07-15`) });
+    }
+  }
+
+  if (shareholderAccts && shareholderAccts.accountDebits) {
+    allDocRefs.push({ ref: "CC-Socios", type: "cc-socios", date: `${params.year}-01-15` });
+  }
+
   const docsWithoutEntry = allDocRefs.filter(d => {
     if (entryDocs.has(d.ref)) return false;
     for (const eDoc of entryDocs) {
@@ -2465,7 +2545,7 @@ function buildDeterministicJournal(
   if (entriesWithoutDoc.length > 0) {
     const filtered = entriesWithoutDoc.filter(e => {
       const doc = e.document;
-      return doc && !["Asiento apertura", "Dividendos", "Tarjeta-liquidación"].includes(doc)
+      return doc && !["Asiento apertura", "Dividendos", "Tarjeta-liquidación", "Siniestro", "CC-Socios"].includes(doc)
         && !doc.startsWith("Amort-") && !doc.startsWith("Mod.") && !doc.startsWith("TC1-")
         && !doc.startsWith("Nómina") && !doc.startsWith("POL-") && !doc.startsWith("SEG-");
     });
@@ -2477,26 +2557,28 @@ function buildDeterministicJournal(
     }
   }
 
-  const monthlyMap = new Map<string, { docs: number; entries: number }>();
+  const monthlyMap = new Map<string, { docs: number; entries: number; types: Map<string, number> }>();
   for (const d of allDocRefs) {
     const m = d.date.slice(0, 7);
-    if (!m) continue;
-    const v = monthlyMap.get(m) ?? { docs: 0, entries: 0 };
+    if (!m || m.length < 7) continue;
+    const v = monthlyMap.get(m) ?? { docs: 0, entries: 0, types: new Map() };
     v.docs++;
+    v.types.set(d.type, (v.types.get(d.type) ?? 0) + 1);
     monthlyMap.set(m, v);
   }
   for (const e of entries) {
     const m = e.date.slice(0, 7);
-    if (!m) continue;
-    const v = monthlyMap.get(m) ?? { docs: 0, entries: 0 };
+    if (!m || m.length < 7) continue;
+    const v = monthlyMap.get(m) ?? { docs: 0, entries: 0, types: new Map() };
     v.entries++;
     monthlyMap.set(m, v);
   }
   const sortedMonths = [...monthlyMap.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   console.log(`[cobertura] Cobertura mensual (docs/asientos):`);
-  for (const [month, { docs, entries: ents }] of sortedMonths) {
+  for (const [month, { docs, entries: ents, types }] of sortedMonths) {
     const status = docs === 0 && ents > 0 ? " ⚠️ asientos sin docs" : ents === 0 && docs > 0 ? " ⚠️ docs sin asientos" : "";
-    console.log(`  ${month}: ${docs} docs → ${ents} asientos${status}`);
+    const typeStr = [...types.entries()].map(([t, c]) => `${t}:${c}`).join(", ");
+    console.log(`  ${month}: ${docs} docs → ${ents} asientos [${typeStr}]${status}`);
   }
 
   console.log(`[journal] Diario determinista: ${entries.length} asientos generados desde documentos reales`);
