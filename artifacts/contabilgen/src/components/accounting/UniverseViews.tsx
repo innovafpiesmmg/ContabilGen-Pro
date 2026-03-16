@@ -1761,6 +1761,7 @@ interface ChronoEvent {
   amount?: number;
   pdfGenerator?: () => Blob;
   pdfFilename?: string;
+  journalEntry?: JournalEntry;
 }
 
 const KIND_META: Record<EventKind, { color: string; bg: string; text: string; dot: string }> = {
@@ -1821,10 +1822,51 @@ function buildCP(universe: AccountingUniverse): CP {
   };
 }
 
+function buildJournalLookup(entries: JournalEntry[]): Map<string, JournalEntry[]> {
+  const map = new Map<string, JournalEntry[]>();
+  const addKey = (key: string, e: JournalEntry) => {
+    if (!key) return;
+    const k = key.trim().toLowerCase();
+    if (!k) return;
+    const arr = map.get(k) ?? [];
+    arr.push(e);
+    map.set(k, arr);
+  };
+  for (const e of entries) {
+    if (e.document) addKey(e.document, e);
+    const refs = (e.concept || "").match(/(?:Ref|Fra|Nº|Factura|Recibo|Póliza|Préstamo|Hipoteca|Nómina)[.:# ]*\s*([A-Z0-9][\w\-/]*)/gi);
+    if (refs) {
+      for (const r of refs) {
+        const val = r.replace(/^[^:# ]*[.:# ]*\s*/i, "").trim();
+        addKey(val, e);
+      }
+    }
+  }
+  return map;
+}
+
+function findJournalEntry(lookup: Map<string, JournalEntry[]>, docRef: string, date?: string): JournalEntry | undefined {
+  const key = (docRef || "").trim().toLowerCase();
+  if (!key) return undefined;
+
+  const pickBest = (candidates: JournalEntry[]): JournalEntry => {
+    if (candidates.length === 1 || !date) return candidates[0];
+    const byDate = candidates.filter(j => j.date === date);
+    return byDate.length > 0 ? byDate[0] : candidates[0];
+  };
+
+  if (lookup.has(key)) return pickBest(lookup.get(key)!);
+  for (const [k, arr] of lookup) {
+    if (k.includes(key) || (key.includes(k) && k.length > 3)) return pickBest(arr);
+  }
+  return undefined;
+}
+
 function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
   const events: ChronoEvent[] = [];
   const cp = buildCP(universe);
   const safe = (s: string) => (s || "").replace(/[/\\?%*:|"<>]/g, "-").substring(0, 50);
+  const jLookup = buildJournalLookup(universe.journalEntries ?? []);
 
   (universe.invoices ?? []).forEach((inv) => {
     const kind: EventKind = inv.type === "sale" ? "factura_venta"
@@ -1833,7 +1875,8 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
     events.push({ date: inv.date, kind, label: inv.invoiceNumber,
       subtitle: inv.partyName, amount: inv.total,
       pdfGenerator: () => generateInvoicePdf(inv, cp),
-      pdfFilename: `Factura_${tipo}_${safe(inv.invoiceNumber)}.pdf` });
+      pdfFilename: `Factura_${tipo}_${safe(inv.invoiceNumber)}.pdf`,
+      journalEntry: findJournalEntry(jLookup, inv.invoiceNumber, inv.date) });
   });
 
   (universe.journalEntries ?? []).forEach((e) => {
@@ -1994,6 +2037,23 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
       pdfFilename: `${pr.type === "cobro" ? "Cobro" : "Pago"}_${safe(pr.receiptNumber || "")}.pdf` });
   });
 
+  const journalEntries = universe.journalEntries ?? [];
+  events.forEach(ev => {
+    if (ev.kind === "asiento" || ev.journalEntry) return;
+    const je = findJournalEntry(jLookup, ev.label, ev.date);
+    if (je) { ev.journalEntry = je; return; }
+    const byDate = journalEntries.filter(j => j.date === ev.date);
+    if (byDate.length === 1) { ev.journalEntry = byDate[0]; return; }
+    const evLabel = (ev.label || "").toLowerCase();
+    const conceptMatch = byDate.find(j => {
+      if (evLabel && (j.concept || "").toLowerCase().includes(evLabel)) return true;
+      const jDoc = (j.document || "").toLowerCase();
+      if (jDoc && evLabel && evLabel.includes(jDoc)) return true;
+      return false;
+    });
+    if (conceptMatch) ev.journalEntry = conceptMatch;
+  });
+
   return events.filter(e => e.date && /^\d{4}-\d{2}-\d{2}/.test(e.date))
     .sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -2002,6 +2062,15 @@ const MONTH_NAMES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct"
 
 export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data }) => {
   const events = useMemo(() => collectEvents(data), [data]);
+  const [expandedEntries, setExpandedEntries] = React.useState<Set<string>>(new Set());
+  React.useEffect(() => { setExpandedEntries(new Set()); }, [data]);
+  const toggleEntry = useCallback((key: string) => {
+    setExpandedEntries(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  }, []);
 
   const byMonth = useMemo(() => {
     const map: Record<string, ChronoEvent[]> = {};
@@ -2113,43 +2182,102 @@ export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data })
             <div className="space-y-2 pl-2">
               {evs.map((e, i) => {
                 const meta = KIND_META[e.kind];
+                const entryKey = `${m}-${i}`;
+                const isExpanded = expandedEntries.has(entryKey);
+                const je = e.journalEntry;
                 return (
-                  <div
-                    key={i}
-                    className={`flex items-start gap-3 rounded-xl border px-3 py-2 ${meta.bg}`}
-                  >
-                    <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${meta.dot}`} />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-baseline gap-2 flex-wrap">
-                        <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>
-                          {meta.text}
-                        </span>
-                        <span className="text-xs text-muted-foreground">{formatDate(e.date)}</span>
+                  <div key={i} className="space-y-0">
+                    <div className={`flex items-start gap-3 rounded-xl border px-3 py-2 ${meta.bg} ${je ? "cursor-pointer" : ""}`}
+                      onClick={() => je && toggleEntry(entryKey)}
+                    >
+                      <div className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${meta.dot}`} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-baseline gap-2 flex-wrap">
+                          <span className={`text-xs font-semibold uppercase tracking-wide ${meta.color}`}>
+                            {meta.text}
+                          </span>
+                          <span className="text-xs text-muted-foreground">{formatDate(e.date)}</span>
+                          {je && (
+                            <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/></svg>
+                              Asiento {je.entryNumber}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm font-medium text-foreground truncate">{e.label}</div>
+                        {e.subtitle && <div className="text-xs text-muted-foreground truncate">{e.subtitle}</div>}
                       </div>
-                      <div className="text-sm font-medium text-foreground truncate">{e.label}</div>
-                      {e.subtitle && <div className="text-xs text-muted-foreground truncate">{e.subtitle}</div>}
+                      {e.amount !== undefined && (
+                        <div className={`text-sm font-mono font-semibold flex-shrink-0 ${meta.color}`}>
+                          {formatEuro(Math.abs(e.amount))}
+                        </div>
+                      )}
+                      {e.pdfGenerator && (
+                        <button
+                          type="button"
+                          title="Descargar PDF"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            try {
+                              const blob = e.pdfGenerator!();
+                              saveAs(blob, e.pdfFilename || "documento.pdf");
+                            } catch (err) {
+                              console.error("Error generando PDF:", err);
+                            }
+                          }}
+                          className="flex-shrink-0 mt-0.5 p-1.5 rounded-lg hover:bg-white/60 transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={meta.color}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        </button>
+                      )}
+                      {je && (
+                        <div className="flex-shrink-0 mt-0.5 p-1">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`text-slate-400 transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}><polyline points="6 9 12 15 18 9"/></svg>
+                        </div>
+                      )}
                     </div>
-                    {e.amount !== undefined && (
-                      <div className={`text-sm font-mono font-semibold flex-shrink-0 ${meta.color}`}>
-                        {formatEuro(Math.abs(e.amount))}
+                    {je && isExpanded && (
+                      <div className="ml-5 mt-1 mb-1 rounded-lg border border-slate-200 bg-white shadow-sm overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="px-3 py-1.5 bg-slate-800 text-white flex items-center justify-between">
+                          <span className="text-xs font-semibold">Asiento {je.entryNumber}</span>
+                          <span className="text-[10px] text-slate-300">{je.concept}</span>
+                        </div>
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-slate-50 border-b text-slate-500">
+                              <th className="text-left px-3 py-1 font-medium w-20">Cuenta</th>
+                              <th className="text-left px-3 py-1 font-medium">Concepto</th>
+                              <th className="text-right px-3 py-1 font-medium w-24">Debe</th>
+                              <th className="text-right px-3 py-1 font-medium w-24">Haber</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {je.debits.map((d, di) => (
+                              <tr key={`d${di}`} className="border-b border-slate-100">
+                                <td className="px-3 py-1 font-mono text-slate-500">{d.accountCode}</td>
+                                <td className="px-3 py-1 text-slate-700">{d.accountName}</td>
+                                <td className="px-3 py-1 text-right font-mono font-medium text-blue-700">{formatEuro(d.amount)}</td>
+                                <td className="px-3 py-1"></td>
+                              </tr>
+                            ))}
+                            {je.credits.map((c, ci) => (
+                              <tr key={`c${ci}`} className="border-b border-slate-100">
+                                <td className="px-3 py-1 font-mono text-slate-500">{c.accountCode}</td>
+                                <td className="px-3 py-1 text-slate-700 pl-6 italic">{c.accountName}</td>
+                                <td className="px-3 py-1"></td>
+                                <td className="px-3 py-1 text-right font-mono font-medium text-emerald-700">{formatEuro(c.amount)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-slate-50 font-semibold">
+                              <td className="px-3 py-1" colSpan={2}>Total</td>
+                              <td className="px-3 py-1 text-right font-mono text-blue-700">{formatEuro(je.debits.reduce((s, d) => s + d.amount, 0))}</td>
+                              <td className="px-3 py-1 text-right font-mono text-emerald-700">{formatEuro(je.credits.reduce((s, c) => s + c.amount, 0))}</td>
+                            </tr>
+                          </tfoot>
+                        </table>
                       </div>
-                    )}
-                    {e.pdfGenerator && (
-                      <button
-                        type="button"
-                        title="Descargar PDF"
-                        onClick={() => {
-                          try {
-                            const blob = e.pdfGenerator!();
-                            saveAs(blob, e.pdfFilename || "documento.pdf");
-                          } catch (err) {
-                            console.error("Error generando PDF:", err);
-                          }
-                        }}
-                        className="flex-shrink-0 mt-0.5 p-1.5 rounded-lg hover:bg-white/60 transition-colors"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={meta.color}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                      </button>
                     )}
                   </div>
                 );
