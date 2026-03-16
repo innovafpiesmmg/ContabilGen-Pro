@@ -1985,7 +1985,7 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
   }
 
   if (universe.initialBalanceSheet?.date) {
-    const priorYr = (universe.initialBalanceSheet as any).priorYear;
+    const priorYr = universe.initialBalanceSheet.priorYear;
     events.push({ date: universe.initialBalanceSheet.date, kind: "apertura",
       label: priorYr ? `Balance Final Ej. ${priorYr} — Apertura` : "Balance de apertura",
       subtitle: universe.initialBalanceSheet.description ?? "Asiento de apertura", amount: universe.initialBalanceSheet.totalAssets,

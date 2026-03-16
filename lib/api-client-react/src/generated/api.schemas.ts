@@ -570,6 +570,10 @@ export interface BalanceSheetLine {
 export interface InitialBalanceSheet {
   /** Opening date (typically Jan 1 of fiscal year) */
   date: string;
+  /** End date of prior fiscal year (e.g. 2024-12-31) */
+  priorYearEndDate?: string;
+  /** Prior fiscal year number */
+  priorYear?: number;
   description: string;
   /** Activo no corriente */
   nonCurrentAssets: BalanceSheetLine[];
