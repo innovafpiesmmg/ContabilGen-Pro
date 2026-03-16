@@ -133,7 +133,7 @@ const ACTIVITIES_BY_SECTOR: Record<string, string[]> = {
 const formSchema = z.object({
   taxRegime: z.enum(["IVA", "IGIC"]),
   sector: z.enum(["Comercio", "Servicios", "Industria", "Hostelería"]),
-  activity: z.string().optional().nullable(),
+  activity: z.string().optional(),
   complexity: z.enum(["Avanzado"]),
   year: z.coerce.number().min(2000).max(2100),
   companyName: z.string().optional().nullable(),
