@@ -28,7 +28,7 @@ export interface InitialBalanceSheet {
   totalAssets: number;
   totalEquityAndLiabilities: number;
   /** Didactic note for the opening entry (asiento de apertura) */
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

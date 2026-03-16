@@ -8,12 +8,14 @@ const router: IRouter = Router();
 type AsyncHandler = (req: Request, res: Response, next: NextFunction) => Promise<void>;
 const wrap = (fn: AsyncHandler): AsyncHandler => (req, res, next) => fn(req, res, next).catch(next);
 
-const SETTINGS_KEYS = ["provider", "deepseekApiKey", "deepseekBaseUrl", "deepseekModel"] as const;
+const SETTINGS_KEYS = ["provider", "deepseekApiKey", "deepseekBaseUrl", "deepseekModel", "openaiApiKey", "openaiModel"] as const;
 const DEFAULTS: Record<string, string> = {
   provider: "deepseek",
   deepseekApiKey: "",
   deepseekBaseUrl: "https://api.deepseek.com",
   deepseekModel: "deepseek-chat",
+  openaiApiKey: "",
+  openaiModel: "gpt-4o-mini",
 };
 
 async function getSharedDeepseekConfig(): Promise<{ enabled: boolean; apiKey: string; baseUrl: string; model: string }> {
@@ -47,10 +49,12 @@ router.get("/settings", wrap(async (req, res): Promise<void> => {
     getSharedDeepseekConfig(),
   ]);
   res.json({
-    provider: settings.provider as "deepseek" | "shared_deepseek",
+    provider: settings.provider as "deepseek" | "shared_deepseek" | "openai",
     deepseekApiKey: settings.deepseekApiKey || null,
     deepseekBaseUrl: settings.deepseekBaseUrl,
     deepseekModel: settings.deepseekModel,
+    openaiApiKey: settings.openaiApiKey || null,
+    openaiModel: settings.openaiModel || "gpt-4o-mini",
     sharedDeepseekAvailable: shared.enabled,
     sharedDeepseekModel: shared.enabled ? shared.model : null,
   });
@@ -69,13 +73,15 @@ router.put("/settings", wrap(async (req, res): Promise<void> => {
   }
 
   const userId = req.user.id;
-  const { provider, deepseekApiKey, deepseekBaseUrl, deepseekModel } = parsed.data;
+  const { provider, deepseekApiKey, deepseekBaseUrl, deepseekModel, openaiApiKey, openaiModel } = parsed.data;
 
   const updates: Array<{ key: string; value: string }> = [
     { key: "provider", value: provider },
     { key: "deepseekApiKey", value: deepseekApiKey ?? "" },
     { key: "deepseekBaseUrl", value: deepseekBaseUrl },
     { key: "deepseekModel", value: deepseekModel },
+    { key: "openaiApiKey", value: openaiApiKey ?? "" },
+    { key: "openaiModel", value: openaiModel },
   ];
 
   for (const { key, value } of updates) {
@@ -92,10 +98,12 @@ router.put("/settings", wrap(async (req, res): Promise<void> => {
 
   const shared = await getSharedDeepseekConfig();
   res.json({
-    provider: provider as "deepseek" | "shared_deepseek",
+    provider: provider as "deepseek" | "shared_deepseek" | "openai",
     deepseekApiKey: deepseekApiKey ?? null,
     deepseekBaseUrl,
     deepseekModel,
+    openaiApiKey: openaiApiKey ?? null,
+    openaiModel,
     sharedDeepseekAvailable: shared.enabled,
     sharedDeepseekModel: shared.enabled ? shared.model : null,
   });

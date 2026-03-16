@@ -23,7 +23,7 @@ export interface ShareholdersInfo {
   registryEntry: string;
   shareholders: Shareholder[];
   /** Didactic note explaining the capital accounts (100, 118, etc.) */
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

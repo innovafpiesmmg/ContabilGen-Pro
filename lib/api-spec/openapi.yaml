@@ -397,7 +397,7 @@ components:
       properties:
         provider:
           type: string
-          enum: [deepseek, shared_deepseek]
+          enum: [deepseek, shared_deepseek, openai]
           description: "Which AI provider to use for generation"
         deepseekApiKey:
           type: ["string", "null"]
@@ -408,6 +408,12 @@ components:
         deepseekModel:
           type: string
           description: "DeepSeek model to use (e.g. deepseek-chat)"
+        openaiApiKey:
+          type: ["string", "null"]
+          description: "OpenAI API key"
+        openaiModel:
+          type: string
+          description: "OpenAI model to use (e.g. gpt-4o-mini)"
         sharedDeepseekAvailable:
           type: boolean
           description: "Whether the admin has enabled the shared DeepSeek key"
@@ -419,6 +425,8 @@ components:
         - deepseekApiKey
         - deepseekBaseUrl
         - deepseekModel
+        - openaiApiKey
+        - openaiModel
 
     ErrorResponse:
       type: object
@@ -500,13 +508,20 @@ components:
         includeDividends:
           type: boolean
           description: "Include dividend distribution approved at the shareholders meeting"
+        activity:
+          type: ["string", "null"]
+          description: "Optional sub-sector activity for contextualizing the exercises"
+        includeWarehouse:
+          type: boolean
+          description: "Include warehouse cards (fichas de almacén) with PMP"
+        includeExtraordinary:
+          type: boolean
+          description: "Include extraordinary expenses (siniestros, pérdidas inmovilizado)"
         startDate:
           type: string
-          format: date
           description: "Custom period start date (YYYY-MM-DD). If set, overrides the default Jan 1 of fiscal year."
         endDate:
           type: string
-          format: date
           description: "Custom period end date (YYYY-MM-DD). If set, overrides the default Dec 31 of fiscal year."
       required:
         - taxRegime

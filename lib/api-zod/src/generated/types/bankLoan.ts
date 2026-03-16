@@ -8,23 +8,6 @@
 import type { AccountEntry } from "./accountEntry";
 import type { AmortizationRow } from "./amortizationRow";
 
-export interface DebtClassification {
-  longTerm170: number;
-  shortTerm5200: number;
-}
-
-export interface ReclassificationInfo {
-  date: string;
-  longTerm170?: number;
-  shortTerm5200: number;
-}
-
-export interface SubEntry {
-  journalNote?: string;
-  accountDebits: AccountEntry[];
-  accountCredits: AccountEntry[];
-}
-
 export interface BankLoan {
   entity: string;
   loanNumber: string;
@@ -33,13 +16,8 @@ export interface BankLoan {
   termMonths: number;
   startDate: string;
   monthlyInstallment: number;
-  initialClassification?: DebtClassification;
-  reclassification31Dec?: ReclassificationInfo;
   amortizationTable: AmortizationRow[];
-  journalNote?: string;
-  accountDebits?: AccountEntry[];
-  accountCredits?: AccountEntry[];
-  formalizationEntry?: SubEntry;
-  installmentEntry?: SubEntry;
-  reclassificationEntry?: SubEntry;
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
 }

@@ -54,6 +54,7 @@ export type AiSettingsProvider =
 export const AiSettingsProvider = {
   deepseek: "deepseek",
   shared_deepseek: "shared_deepseek",
+  openai: "openai",
 } as const;
 
 export interface AiSettings {
@@ -68,6 +69,13 @@ export interface AiSettings {
   deepseekBaseUrl: string;
   /** DeepSeek model to use (e.g. deepseek-chat) */
   deepseekModel: string;
+  /**
+   * OpenAI API key
+   * @nullable
+   */
+  openaiApiKey: string | null;
+  /** OpenAI model to use (e.g. gpt-4o-mini) */
+  openaiModel: string;
   /** Whether the admin has enabled the shared DeepSeek key */
   sharedDeepseekAvailable?: boolean;
   /**
@@ -128,7 +136,6 @@ export interface GenerateUniverseRequest {
   /** IVA for Peninsula/Baleares, IGIC for Canarias */
   taxRegime: GenerateUniverseRequestTaxRegime;
   sector: GenerateUniverseRequestSector;
-  activity?: string | null;
   complexity: GenerateUniverseRequestComplexity;
   /** Fiscal year for the accounting universe */
   year: number;
@@ -169,6 +176,15 @@ export interface GenerateUniverseRequest {
   includeShareholderAccounts?: boolean;
   /** Include dividend distribution approved at the shareholders meeting */
   includeDividends?: boolean;
+  /**
+   * Optional sub-sector activity for contextualizing the exercises
+   * @nullable
+   */
+  activity?: string | null;
+  /** Include warehouse cards (fichas de almacén) with PMP */
+  includeWarehouse?: boolean;
+  /** Include extraordinary expenses (siniestros, pérdidas inmovilizado) */
+  includeExtraordinary?: boolean;
   /** Custom period start date (YYYY-MM-DD). If set, overrides the default Jan 1 of fiscal year. */
   startDate?: string;
   /** Custom period end date (YYYY-MM-DD). If set, overrides the default Dec 31 of fiscal year. */
@@ -177,11 +193,10 @@ export interface GenerateUniverseRequest {
 
 export interface CompanyProfile {
   name: string;
-  nif?: string;
-  address?: string;
+  nif: string;
+  address: string;
   city: string;
   sector: string;
-  activity?: string | null;
   taxRegime: string;
   fiscalYear: number;
   description: string;
@@ -195,8 +210,8 @@ export interface InventoryItem {
   code: string;
   description: string;
   quantity: number;
-  unitCost?: number;
-  totalCost?: number;
+  unitCost: number;
+  totalCost: number;
   /** PGC account code (e.g. 300, 310) */
   accountCode: string;
 }
@@ -207,13 +222,13 @@ export interface Inventory {
   initialTotal: number;
   finalTotal: number;
   /** Variación de existencias (positive = increase, negative = decrease) */
-  stockVariation?: number;
+  stockVariation: number;
 }
 
 export interface Supplier {
   name: string;
-  nif?: string;
-  address?: string;
+  nif: string;
+  address: string;
   city: string;
   /** PGC account (400, 401) */
   accountCode: string;
@@ -221,8 +236,8 @@ export interface Supplier {
 
 export interface Client {
   name: string;
-  nif?: string;
-  address?: string;
+  nif: string;
+  address: string;
   city: string;
   /** PGC account (430, 431) */
   accountCode: string;
@@ -240,7 +255,7 @@ export interface InvoiceLine {
   description: string;
   quantity: number;
   unitPrice: number;
-  discount?: number;
+  discount: number;
   subtotal: number;
   taxRate: number;
   taxAmount: number;
@@ -256,14 +271,13 @@ export const InvoicePaymentMethod = {
   check: "check",
   promissory_note: "promissory_note",
   credit: "credit",
-  CARD: 'card',
 } as const;
 
 export interface AccountEntry {
   accountCode: string;
   accountName: string;
   amount: number;
-  description?: string;
+  description: string;
 }
 
 export interface Invoice {
@@ -271,7 +285,7 @@ export interface Invoice {
   date: string;
   type: InvoiceType;
   partyName: string;
-  partyNif?: string;
+  partyNif: string;
   lines: InvoiceLine[];
   subtotal: number;
   taxBase: number;
@@ -279,37 +293,20 @@ export interface Invoice {
   total: number;
   paymentMethod: InvoicePaymentMethod;
   /** @nullable */
-  dueDate?: string | null;
+  dueDate: string | null;
   /** Explanation of accounting entries */
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
 
 export interface AmortizationRow {
-  period?: number | string;
+  period: number;
   date: string;
-  installment?: number;
-  interest?: number;
+  installment: number;
+  interest: number;
   principal: number;
-  balance?: number;
-}
-
-export interface DebtClassification {
-  longTerm170: number;
-  shortTerm5200: number;
-}
-
-export interface ReclassificationInfo {
-  date: string;
-  longTerm170?: number;
-  shortTerm5200: number;
-}
-
-export interface SubEntry {
-  journalNote?: string;
-  accountDebits: AccountEntry[];
-  accountCredits: AccountEntry[];
+  balance: number;
 }
 
 export interface BankLoan {
@@ -320,15 +317,10 @@ export interface BankLoan {
   termMonths: number;
   startDate: string;
   monthlyInstallment: number;
-  initialClassification?: DebtClassification;
-  reclassification31Dec?: ReclassificationInfo;
   amortizationTable: AmortizationRow[];
-  journalNote?: string;
-  accountDebits?: AccountEntry[];
-  accountCredits?: AccountEntry[];
-  formalizationEntry?: SubEntry;
-  installmentEntry?: SubEntry;
-  reclassificationEntry?: SubEntry;
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
 }
 
 export interface Mortgage {
@@ -341,15 +333,10 @@ export interface Mortgage {
   termMonths: number;
   startDate: string;
   monthlyInstallment: number;
-  initialClassification?: DebtClassification;
-  reclassification31Dec?: ReclassificationInfo;
   amortizationTable: AmortizationRow[];
-  journalNote?: string;
-  accountDebits?: AccountEntry[];
-  accountCredits?: AccountEntry[];
-  acquisitionEntry?: SubEntry;
-  installmentEntry?: SubEntry;
-  reclassificationEntry?: SubEntry;
+  journalNote: string;
+  accountDebits: AccountEntry[];
+  accountCredits: AccountEntry[];
 }
 
 export interface CreditPolicy {
@@ -364,7 +351,7 @@ export interface CreditPolicy {
   endDate: string;
   interestAmount: number;
   totalSettlement: number;
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -385,7 +372,7 @@ export interface CreditCardStatement {
   movements: CreditCardMovement[];
   totalCharges: number;
   settlementDate: string;
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -398,8 +385,8 @@ export interface InsurancePolicy {
   startDate: string;
   endDate: string;
   /** Amount to defer to next period (cuenta 480) */
-  prepaidExpense?: number;
-  journalNote?: string;
+  prepaidExpense: number;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -411,46 +398,9 @@ export interface CasualtyEvent {
   bookValue: number;
   insuranceCompensation: number;
   netLoss: number;
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
-}
-
-export interface ExtraordinaryExpense {
-  date: string;
-  type: 'multa' | 'donacion' | 'perdida_inmovilizado' | 'ingreso_extraordinario' | 'otro';
-  description: string;
-  amount: number;
-  accountCode: string;
-  accountName: string;
-  counterpartAccountCode: string;
-  counterpartAccountName: string;
-  journalNote?: string;
-  accountDebits: AccountEntry[];
-  accountCredits: AccountEntry[];
-}
-
-export interface WarehouseMovement {
-  date: string;
-  concept: string;
-  document: string;
-  entryQty: number;
-  entryUnitCost: number;
-  entryTotal: number;
-  exitQty: number;
-  exitUnitCost: number;
-  exitTotal: number;
-  balanceQty: number;
-  balanceUnitCost: number;
-  balanceTotal: number;
-}
-
-export interface WarehouseCard {
-  productCode: string;
-  productDescription: string;
-  accountCode: string;
-  valuationMethod: string;
-  movements: WarehouseMovement[];
 }
 
 export interface PayrollEmployee {
@@ -470,13 +420,13 @@ export interface PayrollEmployee {
 export interface Payroll {
   month: string;
   employees: PayrollEmployee[];
-  totalGross?: number;
+  totalGross: number;
   totalIrpf: number;
   totalSsEmployee: number;
   totalNetSalary: number;
   totalSsEmployer: number;
   totalLaborCost: number;
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -484,15 +434,15 @@ export interface Payroll {
 export interface SocialSecurityPayment {
   month: string;
   dueDate: string;
-  employeeCount?: number;
-  totalGross?: number;
+  employeeCount: number;
+  totalGross: number;
   /** Cuota obrera (SS a cargo del trabajador) */
   ssEmployeeAmount: number;
   /** Cuota patronal (SS a cargo de la empresa) */
   ssEmployerAmount: number;
   /** Total TC1: ssEmployeeAmount + ssEmployerAmount */
   totalPayment: number;
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -507,7 +457,6 @@ export const TaxLiquidationModel = {
   NUMBER_303: "303",
   NUMBER_420: "420",
   IS: "IS",
-  NUMBER_111: "111",
 } as const;
 
 export type TaxLiquidationPaymentType =
@@ -533,7 +482,7 @@ export interface TaxLiquidation {
   /** Positive = to pay, negative = refund */
   result: number;
   paymentType: TaxLiquidationPaymentType;
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -555,7 +504,7 @@ export interface FixedAsset {
   accDepreciationCode: string;
   /** Depreciation expense account (e.g. 681) */
   depExpenseCode: string;
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -574,11 +523,11 @@ export const ShareholderRole = {
 
 export interface Shareholder {
   name: string;
-  nif?: string;
+  nif: string;
   /** Role in the company */
   role: ShareholderRole;
   /** Ownership percentage (0-100) */
-  participationPercentage?: number;
+  participationPercentage: number;
   /** Nominal value per share/participation */
   nominalValuePerShare: number;
   /** Number of shares or participations held */
@@ -597,12 +546,12 @@ export interface ShareholdersInfo {
   nominalValuePerShare: number;
   totalShares: number;
   /** Date of constitution */
-  constitutionDate?: string;
+  constitutionDate: string;
   /** Registro Mercantil entry reference */
-  registryEntry?: string;
+  registryEntry: string;
   shareholders: Shareholder[];
   /** Didactic note explaining the capital accounts (100, 118, etc.) */
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -634,7 +583,7 @@ export interface InitialBalanceSheet {
   totalAssets: number;
   totalEquityAndLiabilities: number;
   /** Didactic note for the opening entry (asiento de apertura) */
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -642,13 +591,13 @@ export interface InitialBalanceSheet {
 export interface ShareholderAccountTransaction {
   date: string;
   concept: string;
-  shareholderName?: string;
+  shareholderName: string;
   /** 551 = Cuenta corriente con administradores, 553 = Cuenta corriente con socios */
   accountCode: string;
   accountName: string;
   debit?: number | null;
   credit?: number | null;
-  balance?: number;
+  balance: number;
 }
 
 /**
@@ -662,18 +611,18 @@ export interface ShareholderAccounts {
   /** Closing balance on account 553 (shareholders) */
   closingBalance553: number;
   /** Didactic note about accounts 551 and 553, their nature and use */
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
 
 export interface DividendPerShareholder {
-  shareholderName?: string;
-  participationPercentage?: number;
-  grossDividend?: number;
+  shareholderName: string;
+  participationPercentage: number;
+  grossDividend: number;
   irpfWithholdingRate: number;
-  irpfWithholdingAmount?: number;
-  netDividend?: number;
+  irpfWithholdingAmount: number;
+  netDividend: number;
 }
 
 /**
@@ -698,7 +647,7 @@ export interface DividendDistribution {
   irpfWithholdingRate: number;
   perShareholder: DividendPerShareholder[];
   /** Didactic note: result allocation entries, withholding (4751), payment (526) */
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }
@@ -707,10 +656,10 @@ export interface BankTransaction {
   date: string;
   concept: string;
   /** @nullable */
-  debit?: number | null;
+  debit: number | null;
   /** @nullable */
-  credit?: number | null;
-  balance?: number;
+  credit: number | null;
+  balance: number;
 }
 
 export interface BankStatement {
@@ -727,7 +676,7 @@ export interface JournalEntry {
   date: string;
   concept: string;
   /** Reference document (invoice number, etc.) */
-  document?: string;
+  document: string;
   debits: AccountEntry[];
   credits: AccountEntry[];
   totalAmount: number;
@@ -745,8 +694,6 @@ export interface AccountingUniverse {
   creditCardStatement?: CreditCardStatement;
   insurancePolicies?: InsurancePolicy[];
   casualtyEvent?: CasualtyEvent;
-  extraordinaryExpenses?: ExtraordinaryExpense[];
-  warehouseCards?: WarehouseCard[];
   payroll?: Payroll;
   socialSecurityPayments?: SocialSecurityPayment[];
   taxLiquidations?: TaxLiquidation[];

@@ -19,6 +19,13 @@ export interface AiSettings {
   deepseekBaseUrl: string;
   /** DeepSeek model to use (e.g. deepseek-chat) */
   deepseekModel: string;
+  /**
+   * OpenAI API key
+   * @nullable
+   */
+  openaiApiKey: string | null;
+  /** OpenAI model to use (e.g. gpt-4o-mini) */
+  openaiModel: string;
   /** Whether the admin has enabled the shared DeepSeek key */
   sharedDeepseekAvailable?: boolean;
   /**

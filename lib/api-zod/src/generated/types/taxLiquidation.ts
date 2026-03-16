@@ -23,7 +23,7 @@ export interface TaxLiquidation {
   /** Positive = to pay, negative = refund */
   result: number;
   paymentType: TaxLiquidationPaymentType;
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

@@ -54,6 +54,15 @@ export interface GenerateUniverseRequest {
   includeShareholderAccounts?: boolean;
   /** Include dividend distribution approved at the shareholders meeting */
   includeDividends?: boolean;
+  /**
+   * Optional sub-sector activity for contextualizing the exercises
+   * @nullable
+   */
+  activity?: string | null;
+  /** Include warehouse cards (fichas de almacén) with PMP */
+  includeWarehouse?: boolean;
+  /** Include extraordinary expenses (siniestros, pérdidas inmovilizado) */
+  includeExtraordinary?: boolean;
   /** Custom period start date (YYYY-MM-DD). If set, overrides the default Jan 1 of fiscal year. */
   startDate?: string;
   /** Custom period end date (YYYY-MM-DD). If set, overrides the default Dec 31 of fiscal year. */

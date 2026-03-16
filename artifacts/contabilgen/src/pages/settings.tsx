@@ -21,19 +21,28 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Settings as SettingsIcon, Save, Cpu, Share2 } from "lucide-react";
+import { Settings as SettingsIcon, Save, Cpu, Share2, Sparkles } from "lucide-react";
 
 const settingsSchema = z.object({
-  provider: z.enum(["deepseek", "shared_deepseek"]),
+  provider: z.enum(["deepseek", "shared_deepseek", "openai"]),
   deepseekApiKey: z.string().optional(),
   deepseekBaseUrl: z.string().min(1, "La URL base es requerida"),
   deepseekModel: z.string().min(1, "El modelo es requerido"),
+  openaiApiKey: z.string().optional(),
+  openaiModel: z.string().min(1, "El modelo es requerido"),
 }).superRefine((data, ctx) => {
   if (data.provider === "deepseek" && !data.deepseekApiKey) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "La API Key es requerida cuando se usa DeepSeek propio",
       path: ["deepseekApiKey"],
+    });
+  }
+  if (data.provider === "openai" && !data.openaiApiKey) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "La API Key es requerida cuando se usa OpenAI",
+      path: ["openaiApiKey"],
     });
   }
 });
@@ -56,17 +65,22 @@ export default function SettingsPage() {
       deepseekApiKey: "",
       deepseekBaseUrl: "https://api.deepseek.com",
       deepseekModel: "deepseek-chat",
+      openaiApiKey: "",
+      openaiModel: "gpt-4o-mini",
     },
   });
 
   useEffect(() => {
     if (settings) {
       const p = settings.provider as AiSettingsProvider;
+      const validProvider = (p === "deepseek" || p === "shared_deepseek" || p === "openai") ? p : "deepseek";
       form.reset({
-        provider: (p === "deepseek" || p === "shared_deepseek") ? p : "deepseek",
+        provider: validProvider,
         deepseekApiKey: settings.deepseekApiKey || "",
         deepseekBaseUrl: settings.deepseekBaseUrl || "https://api.deepseek.com",
         deepseekModel: settings.deepseekModel || "deepseek-chat",
+        openaiApiKey: (settings as any).openaiApiKey || "",
+        openaiModel: (settings as any).openaiModel || "gpt-4o-mini",
       });
     }
   }, [settings, form]);
@@ -81,6 +95,8 @@ export default function SettingsPage() {
           deepseekApiKey: data.deepseekApiKey || null,
           deepseekBaseUrl: data.deepseekBaseUrl,
           deepseekModel: data.deepseekModel,
+          openaiApiKey: data.openaiApiKey || null,
+          openaiModel: data.openaiModel,
         }
       });
       
@@ -143,8 +159,8 @@ export default function SettingsPage() {
             <CardHeader className="pb-6 relative">
               <div className="absolute right-6 top-6">
                 <Badge variant="secondary" className="shadow-sm gap-1.5 px-3 py-1">
-                  {provider === "shared_deepseek" ? <Share2 className="w-3.5 h-3.5" /> : <Cpu className="w-3.5 h-3.5" />}
-                  Usando: {provider === "shared_deepseek" ? "DeepSeek compartido" : "DeepSeek"} ✓
+                  {provider === "shared_deepseek" ? <Share2 className="w-3.5 h-3.5" /> : provider === "openai" ? <Sparkles className="w-3.5 h-3.5" /> : <Cpu className="w-3.5 h-3.5" />}
+                  Usando: {provider === "shared_deepseek" ? "DeepSeek compartido" : provider === "openai" ? "OpenAI" : "DeepSeek"} ✓
                 </Badge>
               </div>
               <CardTitle className="text-xl">Configuración de IA</CardTitle>
@@ -158,8 +174,8 @@ export default function SettingsPage() {
                 <Label className="text-base font-semibold">Proveedor de IA</Label>
                 <RadioGroup 
                   value={provider} 
-                  onValueChange={(value) => form.setValue("provider", value as "deepseek" | "shared_deepseek", { shouldValidate: true })}
-                  className={`grid gap-4 ${sharedAvailable ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}
+                  onValueChange={(value) => form.setValue("provider", value as "deepseek" | "shared_deepseek" | "openai", { shouldValidate: true })}
+                  className={`grid gap-4 grid-cols-1 sm:grid-cols-2 ${sharedAvailable ? "lg:grid-cols-3" : ""}`}
                 >
                   <div>
                     <RadioGroupItem value="deepseek" id="deepseek" className="peer sr-only" />
@@ -169,8 +185,22 @@ export default function SettingsPage() {
                     >
                       <Cpu className="mb-3 h-8 w-8" />
                       <div className="text-center">
-                        <div className="font-semibold">DeepSeek (API Key propia)</div>
-                        <div className="text-xs text-muted-foreground mt-1">Introduce tu propia clave de DeepSeek</div>
+                        <div className="font-semibold">DeepSeek</div>
+                        <div className="text-xs text-muted-foreground mt-1">API Key propia de DeepSeek</div>
+                      </div>
+                    </Label>
+                  </div>
+
+                  <div>
+                    <RadioGroupItem value="openai" id="openai" className="peer sr-only" />
+                    <Label
+                      htmlFor="openai"
+                      className="flex flex-col items-center justify-between rounded-xl border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer transition-all"
+                    >
+                      <Sparkles className="mb-3 h-8 w-8 text-emerald-600" />
+                      <div className="text-center">
+                        <div className="font-semibold">OpenAI</div>
+                        <div className="text-xs text-muted-foreground mt-1">GPT-4o, GPT-4o-mini, etc.</div>
                       </div>
                     </Label>
                   </div>
@@ -241,6 +271,43 @@ export default function SettingsPage() {
                         <p className="text-sm text-destructive font-medium">{form.formState.errors.deepseekModel.message}</p>
                       )}
                     </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {provider === "openai" && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-5 p-5 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800"
+                >
+                  <div className="space-y-2">
+                    <Label htmlFor="openaiApiKey">API Key de OpenAI</Label>
+                    <Input 
+                      id="openaiApiKey"
+                      type="password"
+                      placeholder="sk-..."
+                      {...form.register("openaiApiKey")}
+                      className={form.formState.errors.openaiApiKey ? "border-destructive focus-visible:ring-destructive" : ""}
+                    />
+                    {form.formState.errors.openaiApiKey && (
+                      <p className="text-sm text-destructive font-medium">{form.formState.errors.openaiApiKey.message}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">Consigue tu clave en platform.openai.com</p>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="openaiModel">Modelo</Label>
+                    <Input 
+                      id="openaiModel"
+                      placeholder="gpt-4o-mini"
+                      {...form.register("openaiModel")}
+                    />
+                    <p className="text-xs text-muted-foreground">Disponibles: gpt-4o-mini (recomendado, barato), gpt-4o (mejor calidad, más caro), gpt-4.1-mini</p>
+                    {form.formState.errors.openaiModel && (
+                      <p className="text-sm text-destructive font-medium">{form.formState.errors.openaiModel.message}</p>
+                    )}
                   </div>
                 </motion.div>
               )}

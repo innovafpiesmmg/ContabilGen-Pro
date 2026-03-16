@@ -99,13 +99,15 @@ export const ResetPasswordResponse = zod.object({
  */
 export const GetSettingsResponse = zod.object({
   provider: zod
-    .enum(["deepseek", "shared_deepseek"])
+    .enum(["deepseek", "shared_deepseek", "openai"])
     .describe("Which AI provider to use for generation"),
   deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
   deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
   deepseekModel: zod
     .string()
     .describe("DeepSeek model to use (e.g. deepseek-chat)"),
+  openaiApiKey: zod.string().nullable().describe("OpenAI API key"),
+  openaiModel: zod.string().describe("OpenAI model to use (e.g. gpt-4o-mini)"),
   sharedDeepseekAvailable: zod
     .boolean()
     .optional()
@@ -121,13 +123,15 @@ export const GetSettingsResponse = zod.object({
  */
 export const UpdateSettingsBody = zod.object({
   provider: zod
-    .enum(["deepseek", "shared_deepseek"])
+    .enum(["deepseek", "shared_deepseek", "openai"])
     .describe("Which AI provider to use for generation"),
   deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
   deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
   deepseekModel: zod
     .string()
     .describe("DeepSeek model to use (e.g. deepseek-chat)"),
+  openaiApiKey: zod.string().nullable().describe("OpenAI API key"),
+  openaiModel: zod.string().describe("OpenAI model to use (e.g. gpt-4o-mini)"),
   sharedDeepseekAvailable: zod
     .boolean()
     .optional()
@@ -140,13 +144,15 @@ export const UpdateSettingsBody = zod.object({
 
 export const UpdateSettingsResponse = zod.object({
   provider: zod
-    .enum(["deepseek", "shared_deepseek"])
+    .enum(["deepseek", "shared_deepseek", "openai"])
     .describe("Which AI provider to use for generation"),
   deepseekApiKey: zod.string().nullable().describe("DeepSeek API key"),
   deepseekBaseUrl: zod.string().describe("DeepSeek API base URL"),
   deepseekModel: zod
     .string()
     .describe("DeepSeek model to use (e.g. deepseek-chat)"),
+  openaiApiKey: zod.string().nullable().describe("OpenAI API key"),
+  openaiModel: zod.string().describe("OpenAI model to use (e.g. gpt-4o-mini)"),
   sharedDeepseekAvailable: zod
     .boolean()
     .optional()
@@ -169,10 +175,6 @@ export const GenerateAccountingUniverseBody = zod.object({
     .enum(["IVA", "IGIC"])
     .describe("IVA for Peninsula\/Baleares, IGIC for Canarias"),
   sector: zod.enum(["Comercio", "Servicios", "Industria", "Hostelería"]),
-  activity: zod
-    .string()
-    .nullish()
-    .describe("Specific business activity within the sector (e.g. Agrícola, Tecnología, Textil)"),
   complexity: zod.enum(["Avanzado"]),
   year: zod.number().describe("Fiscal year for the accounting universe"),
   companyName: zod
@@ -245,6 +247,20 @@ export const GenerateAccountingUniverseBody = zod.object({
     .describe(
       "Include dividend distribution approved at the shareholders meeting",
     ),
+  activity: zod
+    .string()
+    .nullish()
+    .describe("Optional sub-sector activity for contextualizing the exercises"),
+  includeWarehouse: zod
+    .boolean()
+    .optional()
+    .describe("Include warehouse cards (fichas de almacén) with PMP"),
+  includeExtraordinary: zod
+    .boolean()
+    .optional()
+    .describe(
+      "Include extraordinary expenses (siniestros, pérdidas inmovilizado)",
+    ),
   startDate: zod
     .string()
     .optional()
@@ -262,11 +278,10 @@ export const GenerateAccountingUniverseBody = zod.object({
 export const GenerateAccountingUniverseResponse = zod.object({
   companyProfile: zod.object({
     name: zod.string(),
-    nif: zod.string().optional(),
-    address: zod.string().optional(),
+    nif: zod.string(),
+    address: zod.string(),
     city: zod.string(),
     sector: zod.string(),
-    activity: zod.string().nullish(),
     taxRegime: zod.string(),
     fiscalYear: zod.number(),
     description: zod.string(),
@@ -285,8 +300,8 @@ export const GenerateAccountingUniverseResponse = zod.object({
         code: zod.string(),
         description: zod.string(),
         quantity: zod.number(),
-        unitCost: zod.number().optional(),
-        totalCost: zod.number().optional(),
+        unitCost: zod.number(),
+        totalCost: zod.number(),
         accountCode: zod.string().describe("PGC account code (e.g. 300, 310)"),
       }),
     ),
@@ -295,8 +310,8 @@ export const GenerateAccountingUniverseResponse = zod.object({
         code: zod.string(),
         description: zod.string(),
         quantity: zod.number(),
-        unitCost: zod.number().optional(),
-        totalCost: zod.number().optional(),
+        unitCost: zod.number(),
+        totalCost: zod.number(),
         accountCode: zod.string().describe("PGC account code (e.g. 300, 310)"),
       }),
     ),
@@ -304,15 +319,15 @@ export const GenerateAccountingUniverseResponse = zod.object({
     finalTotal: zod.number(),
     stockVariation: zod
       .number()
-      .optional()      .describe(
+      .describe(
         "Variación de existencias (positive = increase, negative = decrease)",
       ),
   }),
   suppliers: zod.array(
     zod.object({
       name: zod.string(),
-      nif: zod.string().optional(),
-      address: zod.string().optional(),
+      nif: zod.string(),
+      address: zod.string(),
       city: zod.string(),
       accountCode: zod.string().describe("PGC account (400, 401)"),
     }),
@@ -320,8 +335,8 @@ export const GenerateAccountingUniverseResponse = zod.object({
   clients: zod.array(
     zod.object({
       name: zod.string(),
-      nif: zod.string().optional(),
-      address: zod.string().optional(),
+      nif: zod.string(),
+      address: zod.string(),
       city: zod.string(),
       accountCode: zod.string().describe("PGC account (430, 431)"),
     }),
@@ -332,13 +347,13 @@ export const GenerateAccountingUniverseResponse = zod.object({
       date: zod.string(),
       type: zod.enum(["purchase", "sale", "rectification"]),
       partyName: zod.string(),
-      partyNif: zod.string().optional(),
+      partyNif: zod.string(),
       lines: zod.array(
         zod.object({
           description: zod.string(),
           quantity: zod.number(),
           unitPrice: zod.number(),
-          discount: zod.number().optional(),
+          discount: zod.number(),
           subtotal: zod.number(),
           taxRate: zod.number(),
           taxAmount: zod.number(),
@@ -355,10 +370,9 @@ export const GenerateAccountingUniverseResponse = zod.object({
         "check",
         "promissory_note",
         "credit",
-        "card",
       ]),
-      dueDate: zod.string().nullish(),
-      journalNote: zod.string().optional().describe("Explanation of accounting entries"),
+      dueDate: zod.string().nullable(),
+      journalNote: zod.string().describe("Explanation of accounting entries"),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -386,26 +400,17 @@ export const GenerateAccountingUniverseResponse = zod.object({
       termMonths: zod.number(),
       startDate: zod.string(),
       monthlyInstallment: zod.number(),
-      initialClassification: zod.object({
-        longTerm170: zod.number(),
-        shortTerm5200: zod.number(),
-      }).optional(),
-      reclassification31Dec: zod.object({
-        date: zod.string(),
-        longTerm170: zod.number().optional(),
-        shortTerm5200: zod.number(),
-      }).optional(),
       amortizationTable: zod.array(
         zod.object({
-          period: zod.union([zod.number(), zod.string()]).optional(),
-          date: zod.string().optional(),
-          installment: zod.number().optional(),
-          interest: zod.number().optional(),
-          principal: zod.number().optional(),
-          balance: zod.number().optional(),
+          period: zod.number(),
+          date: zod.string(),
+          installment: zod.number(),
+          interest: zod.number(),
+          principal: zod.number(),
+          balance: zod.number(),
         }),
       ),
-      journalNote: zod.string().optional(),
+      journalNote: zod.string(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -413,7 +418,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           amount: zod.number(),
           description: zod.string(),
         }),
-      ).optional(),
+      ),
       accountCredits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -421,22 +426,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           amount: zod.number(),
           description: zod.string(),
         }),
-      ).optional(),
-      formalizationEntry: zod.object({
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-      }).optional(),
-      installmentEntry: zod.object({
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-      }).optional(),
-      reclassificationEntry: zod.object({
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-      }).optional(),
+      ),
     })
     .optional(),
   mortgage: zod
@@ -450,26 +440,17 @@ export const GenerateAccountingUniverseResponse = zod.object({
       termMonths: zod.number(),
       startDate: zod.string(),
       monthlyInstallment: zod.number(),
-      initialClassification: zod.object({
-        longTerm170: zod.number(),
-        shortTerm5200: zod.number(),
-      }).optional(),
-      reclassification31Dec: zod.object({
-        date: zod.string(),
-        longTerm170: zod.number().optional(),
-        shortTerm5200: zod.number(),
-      }).optional(),
       amortizationTable: zod.array(
         zod.object({
-          period: zod.union([zod.number(), zod.string()]).optional(),
-          date: zod.string().optional(),
-          installment: zod.number().optional(),
-          interest: zod.number().optional(),
-          principal: zod.number().optional(),
-          balance: zod.number().optional(),
+          period: zod.number(),
+          date: zod.string(),
+          installment: zod.number(),
+          interest: zod.number(),
+          principal: zod.number(),
+          balance: zod.number(),
         }),
       ),
-      journalNote: zod.string().optional(),
+      journalNote: zod.string(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -477,7 +458,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           amount: zod.number(),
           description: zod.string(),
         }),
-      ).optional(),
+      ),
       accountCredits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -485,22 +466,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           amount: zod.number(),
           description: zod.string(),
         }),
-      ).optional(),
-      acquisitionEntry: zod.object({
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-      }).optional(),
-      installmentEntry: zod.object({
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-      }).optional(),
-      reclassificationEntry: zod.object({
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })),
-      }).optional(),
+      ),
     })
     .optional(),
   creditPolicy: zod
@@ -516,7 +482,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       endDate: zod.string(),
       interestAmount: zod.number(),
       totalSettlement: zod.number(),
-      journalNote: zod.string().optional(),
+      journalNote: zod.string(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -552,7 +518,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       ),
       totalCharges: zod.number(),
       settlementDate: zod.string(),
-      journalNote: zod.string().optional(),
+      journalNote: zod.string(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -582,8 +548,8 @@ export const GenerateAccountingUniverseResponse = zod.object({
         endDate: zod.string(),
         prepaidExpense: zod
           .number()
-          .optional()          .describe("Amount to defer to next period (cuenta 480)"),
-        journalNote: zod.string().optional(),
+          .describe("Amount to defer to next period (cuenta 480)"),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -611,7 +577,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       bookValue: zod.number(),
       insuranceCompensation: zod.number(),
       netLoss: zod.number(),
-      journalNote: zod.string().optional(),
+      journalNote: zod.string(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -629,63 +595,6 @@ export const GenerateAccountingUniverseResponse = zod.object({
         }),
       ),
     })
-    .optional(),
-  extraordinaryExpenses: zod
-    .array(
-      zod.object({
-        date: zod.string(),
-        type: zod.enum(['multa', 'donacion', 'perdida_inmovilizado', 'ingreso_extraordinario', 'otro']),
-        description: zod.string(),
-        amount: zod.number(),
-        accountCode: zod.string(),
-        accountName: zod.string(),
-        counterpartAccountCode: zod.string(),
-        counterpartAccountName: zod.string(),
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(
-          zod.object({
-            accountCode: zod.string(),
-            accountName: zod.string(),
-            amount: zod.number(),
-            description: zod.string(),
-          }),
-        ),
-        accountCredits: zod.array(
-          zod.object({
-            accountCode: zod.string(),
-            accountName: zod.string(),
-            amount: zod.number(),
-            description: zod.string(),
-          }),
-        ),
-      }),
-    )
-    .optional(),
-  warehouseCards: zod
-    .array(
-      zod.object({
-        productCode: zod.string(),
-        productDescription: zod.string(),
-        accountCode: zod.string(),
-        valuationMethod: zod.string(),
-        movements: zod.array(
-          zod.object({
-            date: zod.string(),
-            concept: zod.string(),
-            document: zod.string(),
-            entryQty: zod.number(),
-            entryUnitCost: zod.number(),
-            entryTotal: zod.number(),
-            exitQty: zod.number(),
-            exitUnitCost: zod.number(),
-            exitTotal: zod.number(),
-            balanceQty: zod.number(),
-            balanceUnitCost: zod.number(),
-            balanceTotal: zod.number(),
-          }),
-        ),
-      }),
-    )
     .optional(),
   payroll: zod
     .object({
@@ -705,13 +614,13 @@ export const GenerateAccountingUniverseResponse = zod.object({
           ssEmployerAmount: zod.number(),
         }),
       ),
-      totalGross: zod.number().optional(),
+      totalGross: zod.number(),
       totalIrpf: zod.number(),
       totalSsEmployee: zod.number(),
       totalNetSalary: zod.number(),
       totalSsEmployer: zod.number(),
       totalLaborCost: zod.number(),
-      journalNote: zod.string().optional(),
+      journalNote: zod.string(),
       accountDebits: zod.array(
         zod.object({
           accountCode: zod.string(),
@@ -735,8 +644,8 @@ export const GenerateAccountingUniverseResponse = zod.object({
       zod.object({
         month: zod.string(),
         dueDate: zod.string(),
-        employeeCount: zod.number().optional(),
-        totalGross: zod.number().optional(),
+        employeeCount: zod.number(),
+        totalGross: zod.number(),
         ssEmployeeAmount: zod
           .number()
           .describe("Cuota obrera (SS a cargo del trabajador)"),
@@ -746,7 +655,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         totalPayment: zod
           .number()
           .describe("Total TC1: ssEmployeeAmount + ssEmployerAmount"),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -770,7 +679,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
     .array(
       zod.object({
         model: zod
-          .enum(["303", "420", "IS", "111"])
+          .enum(["303", "420", "IS"])
           .describe("303=IVA, 420=IGIC, IS=Impuesto Sociedades"),
         period: zod.string().describe("T1, T2, T3, T4 or Annual"),
         dueDate: zod.string(),
@@ -779,7 +688,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         inputTax: zod.number().describe("Cuota IVA\/IGIC deducible"),
         result: zod.number().describe("Positive = to pay, negative = refund"),
         paymentType: zod.enum(["ingreso", "devolución", "compensación"]),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -820,7 +729,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         depExpenseCode: zod
           .string()
           .describe("Depreciation expense account (e.g. 681)"),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -853,14 +762,14 @@ export const GenerateAccountingUniverseResponse = zod.object({
         .describe("Total registered share capital (capital social)"),
       nominalValuePerShare: zod.number(),
       totalShares: zod.number(),
-      constitutionDate: zod.string().optional().describe("Date of constitution"),
+      constitutionDate: zod.string().describe("Date of constitution"),
       registryEntry: zod
-        .string().optional()
+        .string()
         .describe("Registro Mercantil entry reference"),
       shareholders: zod.array(
         zod.object({
           name: zod.string(),
-          nif: zod.string().optional(),
+          nif: zod.string(),
           role: zod
             .enum(["socio", "administrador", "socio_administrador"])
             .describe("Role in the company"),
@@ -882,7 +791,6 @@ export const GenerateAccountingUniverseResponse = zod.object({
       ),
       journalNote: zod
         .string()
-        .optional()
         .describe(
           "Didactic note explaining the capital accounts (100, 118, etc.)",
         ),
@@ -964,7 +872,6 @@ export const GenerateAccountingUniverseResponse = zod.object({
       totalEquityAndLiabilities: zod.number(),
       journalNote: zod
         .string()
-        .optional()
         .describe("Didactic note for the opening entry (asiento de apertura)"),
       accountDebits: zod.array(
         zod.object({
@@ -994,7 +901,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         zod.object({
           date: zod.string(),
           concept: zod.string(),
-          shareholderName: zod.string().optional(),
+          shareholderName: zod.string(),
           accountCode: zod
             .string()
             .describe(
@@ -1014,7 +921,6 @@ export const GenerateAccountingUniverseResponse = zod.object({
         .describe("Closing balance on account 553 (shareholders)"),
       journalNote: zod
         .string()
-        .optional()
         .describe(
           "Didactic note about accounts 551 and 553, their nature and use",
         ),
@@ -1059,25 +965,21 @@ export const GenerateAccountingUniverseResponse = zod.object({
         .describe("Voluntary reserve allocation (Reserva Voluntaria cta 113)"),
       totalDividends: zod.number().describe("Total gross dividends declared"),
       dividendPerShare: zod.number(),
-      irpfWithholdingAmount: zod.number().optional(),
-      netDividendPaid: zod.number().optional(),
-      mod123DueDate: zod.string().optional(),
       irpfWithholdingRate: zod
         .number()
         .describe("IRPF withholding rate on dividends (typically 19%)"),
       perShareholder: zod.array(
         zod.object({
-          shareholderName: zod.string().optional(),
-          participationPercentage: zod.number().optional(),
-          grossDividend: zod.number().optional(),
+          shareholderName: zod.string(),
+          participationPercentage: zod.number(),
+          grossDividend: zod.number(),
           irpfWithholdingRate: zod.number(),
-          irpfWithholdingAmount: zod.number().optional(),
-          netDividend: zod.number().optional(),
+          irpfWithholdingAmount: zod.number(),
+          netDividend: zod.number(),
         }),
       ),
       journalNote: zod
         .string()
-        .optional()
         .describe(
           "Didactic note: result allocation entries, withholding (4751), payment (526)",
         ),
@@ -1111,8 +1013,8 @@ export const GenerateAccountingUniverseResponse = zod.object({
         zod.object({
           date: zod.string(),
           concept: zod.string(),
-          debit: zod.number().nullish(),
-          credit: zod.number().nullish(),
+          debit: zod.number().nullable(),
+          credit: zod.number().nullable(),
           balance: zod.number(),
         }),
       ),
@@ -1124,14 +1026,14 @@ export const GenerateAccountingUniverseResponse = zod.object({
       date: zod.string(),
       concept: zod.string(),
       document: zod
-        .string().optional()
+        .string()
         .describe("Reference document (invoice number, etc.)"),
       debits: zod.array(
         zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string().optional(),
+          description: zod.string(),
         }),
       ),
       credits: zod.array(
@@ -1139,7 +1041,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
           accountCode: zod.string(),
           accountName: zod.string(),
           amount: zod.number(),
-          description: zod.string().optional(),
+          description: zod.string(),
         }),
       ),
       totalAmount: zod.number(),
@@ -1171,8 +1073,8 @@ export const SaveGenerationBody = zod.object({
   universeJson: zod.object({
     companyProfile: zod.object({
       name: zod.string(),
-      nif: zod.string().optional(),
-      address: zod.string().optional(),
+      nif: zod.string(),
+      address: zod.string(),
       city: zod.string(),
       sector: zod.string(),
       taxRegime: zod.string(),
@@ -1193,8 +1095,8 @@ export const SaveGenerationBody = zod.object({
           code: zod.string(),
           description: zod.string(),
           quantity: zod.number(),
-          unitCost: zod.number().optional(),
-          totalCost: zod.number().optional(),
+          unitCost: zod.number(),
+          totalCost: zod.number(),
           accountCode: zod
             .string()
             .describe("PGC account code (e.g. 300, 310)"),
@@ -1205,8 +1107,8 @@ export const SaveGenerationBody = zod.object({
           code: zod.string(),
           description: zod.string(),
           quantity: zod.number(),
-          unitCost: zod.number().optional(),
-          totalCost: zod.number().optional(),
+          unitCost: zod.number(),
+          totalCost: zod.number(),
           accountCode: zod
             .string()
             .describe("PGC account code (e.g. 300, 310)"),
@@ -1216,15 +1118,15 @@ export const SaveGenerationBody = zod.object({
       finalTotal: zod.number(),
       stockVariation: zod
         .number()
-      .optional()        .describe(
+        .describe(
           "Variación de existencias (positive = increase, negative = decrease)",
         ),
     }),
     suppliers: zod.array(
       zod.object({
         name: zod.string(),
-        nif: zod.string().optional(),
-        address: zod.string().optional(),
+        nif: zod.string(),
+        address: zod.string(),
         city: zod.string(),
         accountCode: zod.string().describe("PGC account (400, 401)"),
       }),
@@ -1232,8 +1134,8 @@ export const SaveGenerationBody = zod.object({
     clients: zod.array(
       zod.object({
         name: zod.string(),
-        nif: zod.string().optional(),
-        address: zod.string().optional(),
+        nif: zod.string(),
+        address: zod.string(),
         city: zod.string(),
         accountCode: zod.string().describe("PGC account (430, 431)"),
       }),
@@ -1244,13 +1146,13 @@ export const SaveGenerationBody = zod.object({
         date: zod.string(),
         type: zod.enum(["purchase", "sale", "rectification"]),
         partyName: zod.string(),
-        partyNif: zod.string().optional(),
+        partyNif: zod.string(),
         lines: zod.array(
           zod.object({
             description: zod.string(),
             quantity: zod.number(),
             unitPrice: zod.number(),
-            discount: zod.number().optional(),
+            discount: zod.number(),
             subtotal: zod.number(),
             taxRate: zod.number(),
             taxAmount: zod.number(),
@@ -1267,10 +1169,9 @@ export const SaveGenerationBody = zod.object({
           "check",
           "promissory_note",
           "credit",
-        "card",
         ]),
-        dueDate: zod.string().nullish(),
-        journalNote: zod.string().optional().describe("Explanation of accounting entries"),
+        dueDate: zod.string().nullable(),
+        journalNote: zod.string().describe("Explanation of accounting entries"),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1298,24 +1199,33 @@ export const SaveGenerationBody = zod.object({
         termMonths: zod.number(),
         startDate: zod.string(),
         monthlyInstallment: zod.number(),
-        initialClassification: zod.object({ longTerm170: zod.number(), shortTerm5200: zod.number() }).optional(),
-        reclassification31Dec: zod.object({ date: zod.string(), longTerm170: zod.number().optional(), shortTerm5200: zod.number() }).optional(),
         amortizationTable: zod.array(
           zod.object({
-            period: zod.union([zod.number(), zod.string()]).optional(),
-            date: zod.string().optional(),
-            installment: zod.number().optional(),
-            interest: zod.number().optional(),
-            principal: zod.number().optional(),
-            balance: zod.number().optional(),
+            period: zod.number(),
+            date: zod.string(),
+            installment: zod.number(),
+            interest: zod.number(),
+            principal: zod.number(),
+            balance: zod.number(),
           }),
         ),
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
-        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
-        formalizationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
-        installmentEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
-        reclassificationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
       })
       .optional(),
     mortgage: zod
@@ -1329,24 +1239,33 @@ export const SaveGenerationBody = zod.object({
         termMonths: zod.number(),
         startDate: zod.string(),
         monthlyInstallment: zod.number(),
-        initialClassification: zod.object({ longTerm170: zod.number(), shortTerm5200: zod.number() }).optional(),
-        reclassification31Dec: zod.object({ date: zod.string(), longTerm170: zod.number().optional(), shortTerm5200: zod.number() }).optional(),
         amortizationTable: zod.array(
           zod.object({
-            period: zod.union([zod.number(), zod.string()]).optional(),
-            date: zod.string().optional(),
-            installment: zod.number().optional(),
-            interest: zod.number().optional(),
-            principal: zod.number().optional(),
-            balance: zod.number().optional(),
+            period: zod.number(),
+            date: zod.string(),
+            installment: zod.number(),
+            interest: zod.number(),
+            principal: zod.number(),
+            balance: zod.number(),
           }),
         ),
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
-        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
-        acquisitionEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
-        installmentEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
-        reclassificationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
       })
       .optional(),
     creditPolicy: zod
@@ -1362,7 +1281,7 @@ export const SaveGenerationBody = zod.object({
         endDate: zod.string(),
         interestAmount: zod.number(),
         totalSettlement: zod.number(),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1398,7 +1317,7 @@ export const SaveGenerationBody = zod.object({
         ),
         totalCharges: zod.number(),
         settlementDate: zod.string(),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1428,8 +1347,8 @@ export const SaveGenerationBody = zod.object({
           endDate: zod.string(),
           prepaidExpense: zod
             .number()
-          .optional()            .describe("Amount to defer to next period (cuenta 480)"),
-          journalNote: zod.string().optional(),
+            .describe("Amount to defer to next period (cuenta 480)"),
+          journalNote: zod.string(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -1457,7 +1376,7 @@ export const SaveGenerationBody = zod.object({
         bookValue: zod.number(),
         insuranceCompensation: zod.number(),
         netLoss: zod.number(),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1475,63 +1394,6 @@ export const SaveGenerationBody = zod.object({
           }),
         ),
       })
-      .optional(),
-    extraordinaryExpenses: zod
-      .array(
-        zod.object({
-          date: zod.string(),
-          type: zod.enum(['multa', 'donacion', 'perdida_inmovilizado', 'ingreso_extraordinario', 'otro']),
-          description: zod.string(),
-          amount: zod.number(),
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          counterpartAccountCode: zod.string(),
-          counterpartAccountName: zod.string(),
-          journalNote: zod.string().optional(),
-          accountDebits: zod.array(
-            zod.object({
-              accountCode: zod.string(),
-              accountName: zod.string(),
-              amount: zod.number(),
-              description: zod.string(),
-            }),
-          ),
-          accountCredits: zod.array(
-            zod.object({
-              accountCode: zod.string(),
-              accountName: zod.string(),
-              amount: zod.number(),
-              description: zod.string(),
-            }),
-          ),
-        }),
-      )
-      .optional(),
-    warehouseCards: zod
-      .array(
-        zod.object({
-          productCode: zod.string(),
-          productDescription: zod.string(),
-          accountCode: zod.string(),
-          valuationMethod: zod.string(),
-          movements: zod.array(
-            zod.object({
-              date: zod.string(),
-              concept: zod.string(),
-              document: zod.string(),
-              entryQty: zod.number(),
-              entryUnitCost: zod.number(),
-              entryTotal: zod.number(),
-              exitQty: zod.number(),
-              exitUnitCost: zod.number(),
-              exitTotal: zod.number(),
-              balanceQty: zod.number(),
-              balanceUnitCost: zod.number(),
-              balanceTotal: zod.number(),
-            }),
-          ),
-        }),
-      )
       .optional(),
     payroll: zod
       .object({
@@ -1551,13 +1413,13 @@ export const SaveGenerationBody = zod.object({
             ssEmployerAmount: zod.number(),
           }),
         ),
-        totalGross: zod.number().optional(),
+        totalGross: zod.number(),
         totalIrpf: zod.number(),
         totalSsEmployee: zod.number(),
         totalNetSalary: zod.number(),
         totalSsEmployer: zod.number(),
         totalLaborCost: zod.number(),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -1581,8 +1443,8 @@ export const SaveGenerationBody = zod.object({
         zod.object({
           month: zod.string(),
           dueDate: zod.string(),
-          employeeCount: zod.number().optional(),
-          totalGross: zod.number().optional(),
+          employeeCount: zod.number(),
+          totalGross: zod.number(),
           ssEmployeeAmount: zod
             .number()
             .describe("Cuota obrera (SS a cargo del trabajador)"),
@@ -1592,7 +1454,7 @@ export const SaveGenerationBody = zod.object({
           totalPayment: zod
             .number()
             .describe("Total TC1: ssEmployeeAmount + ssEmployerAmount"),
-          journalNote: zod.string().optional(),
+          journalNote: zod.string(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -1616,7 +1478,7 @@ export const SaveGenerationBody = zod.object({
       .array(
         zod.object({
           model: zod
-            .enum(["303", "420", "IS", "111"])
+            .enum(["303", "420", "IS"])
             .describe("303=IVA, 420=IGIC, IS=Impuesto Sociedades"),
           period: zod.string().describe("T1, T2, T3, T4 or Annual"),
           dueDate: zod.string(),
@@ -1625,7 +1487,7 @@ export const SaveGenerationBody = zod.object({
           inputTax: zod.number().describe("Cuota IVA\/IGIC deducible"),
           result: zod.number().describe("Positive = to pay, negative = refund"),
           paymentType: zod.enum(["ingreso", "devolución", "compensación"]),
-          journalNote: zod.string().optional(),
+          journalNote: zod.string(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -1666,7 +1528,7 @@ export const SaveGenerationBody = zod.object({
           depExpenseCode: zod
             .string()
             .describe("Depreciation expense account (e.g. 681)"),
-          journalNote: zod.string().optional(),
+          journalNote: zod.string(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -1699,14 +1561,14 @@ export const SaveGenerationBody = zod.object({
           .describe("Total registered share capital (capital social)"),
         nominalValuePerShare: zod.number(),
         totalShares: zod.number(),
-        constitutionDate: zod.string().optional().describe("Date of constitution"),
+        constitutionDate: zod.string().describe("Date of constitution"),
         registryEntry: zod
-          .string().optional()
+          .string()
           .describe("Registro Mercantil entry reference"),
         shareholders: zod.array(
           zod.object({
             name: zod.string(),
-            nif: zod.string().optional(),
+            nif: zod.string(),
             role: zod
               .enum(["socio", "administrador", "socio_administrador"])
               .describe("Role in the company"),
@@ -1728,7 +1590,6 @@ export const SaveGenerationBody = zod.object({
         ),
         journalNote: zod
           .string()
-        .optional()
           .describe(
             "Didactic note explaining the capital accounts (100, 118, etc.)",
           ),
@@ -1810,7 +1671,6 @@ export const SaveGenerationBody = zod.object({
         totalEquityAndLiabilities: zod.number(),
         journalNote: zod
           .string()
-        .optional()
           .describe(
             "Didactic note for the opening entry (asiento de apertura)",
           ),
@@ -1842,7 +1702,7 @@ export const SaveGenerationBody = zod.object({
           zod.object({
             date: zod.string(),
             concept: zod.string(),
-            shareholderName: zod.string().optional(),
+            shareholderName: zod.string(),
             accountCode: zod
               .string()
               .describe(
@@ -1862,7 +1722,6 @@ export const SaveGenerationBody = zod.object({
           .describe("Closing balance on account 553 (shareholders)"),
         journalNote: zod
           .string()
-        .optional()
           .describe(
             "Didactic note about accounts 551 and 553, their nature and use",
           ),
@@ -1911,25 +1770,21 @@ export const SaveGenerationBody = zod.object({
           ),
         totalDividends: zod.number().describe("Total gross dividends declared"),
         dividendPerShare: zod.number(),
-        irpfWithholdingAmount: zod.number().optional(),
-        netDividendPaid: zod.number().optional(),
-        mod123DueDate: zod.string().optional(),
         irpfWithholdingRate: zod
           .number()
           .describe("IRPF withholding rate on dividends (typically 19%)"),
         perShareholder: zod.array(
           zod.object({
-            shareholderName: zod.string().optional(),
-            participationPercentage: zod.number().optional(),
-            grossDividend: zod.number().optional(),
+            shareholderName: zod.string(),
+            participationPercentage: zod.number(),
+            grossDividend: zod.number(),
             irpfWithholdingRate: zod.number(),
-            irpfWithholdingAmount: zod.number().optional(),
-            netDividend: zod.number().optional(),
+            irpfWithholdingAmount: zod.number(),
+            netDividend: zod.number(),
           }),
         ),
         journalNote: zod
           .string()
-        .optional()
           .describe(
             "Didactic note: result allocation entries, withholding (4751), payment (526)",
           ),
@@ -1963,8 +1818,8 @@ export const SaveGenerationBody = zod.object({
           zod.object({
             date: zod.string(),
             concept: zod.string(),
-            debit: zod.number().nullish(),
-            credit: zod.number().nullish(),
+            debit: zod.number().nullable(),
+            credit: zod.number().nullable(),
             balance: zod.number(),
           }),
         ),
@@ -1976,14 +1831,14 @@ export const SaveGenerationBody = zod.object({
         date: zod.string(),
         concept: zod.string(),
         document: zod
-          .string().optional()
+          .string()
           .describe("Reference document (invoice number, etc.)"),
         debits: zod.array(
           zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string().optional(),
+            description: zod.string(),
           }),
         ),
         credits: zod.array(
@@ -1991,7 +1846,7 @@ export const SaveGenerationBody = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string().optional(),
+            description: zod.string(),
           }),
         ),
         totalAmount: zod.number(),
@@ -2017,8 +1872,8 @@ export const GetGenerationResponse = zod.object({
   universeJson: zod.object({
     companyProfile: zod.object({
       name: zod.string(),
-      nif: zod.string().optional(),
-      address: zod.string().optional(),
+      nif: zod.string(),
+      address: zod.string(),
       city: zod.string(),
       sector: zod.string(),
       taxRegime: zod.string(),
@@ -2039,8 +1894,8 @@ export const GetGenerationResponse = zod.object({
           code: zod.string(),
           description: zod.string(),
           quantity: zod.number(),
-          unitCost: zod.number().optional(),
-          totalCost: zod.number().optional(),
+          unitCost: zod.number(),
+          totalCost: zod.number(),
           accountCode: zod
             .string()
             .describe("PGC account code (e.g. 300, 310)"),
@@ -2051,8 +1906,8 @@ export const GetGenerationResponse = zod.object({
           code: zod.string(),
           description: zod.string(),
           quantity: zod.number(),
-          unitCost: zod.number().optional(),
-          totalCost: zod.number().optional(),
+          unitCost: zod.number(),
+          totalCost: zod.number(),
           accountCode: zod
             .string()
             .describe("PGC account code (e.g. 300, 310)"),
@@ -2062,15 +1917,15 @@ export const GetGenerationResponse = zod.object({
       finalTotal: zod.number(),
       stockVariation: zod
         .number()
-      .optional()        .describe(
+        .describe(
           "Variación de existencias (positive = increase, negative = decrease)",
         ),
     }),
     suppliers: zod.array(
       zod.object({
         name: zod.string(),
-        nif: zod.string().optional(),
-        address: zod.string().optional(),
+        nif: zod.string(),
+        address: zod.string(),
         city: zod.string(),
         accountCode: zod.string().describe("PGC account (400, 401)"),
       }),
@@ -2078,8 +1933,8 @@ export const GetGenerationResponse = zod.object({
     clients: zod.array(
       zod.object({
         name: zod.string(),
-        nif: zod.string().optional(),
-        address: zod.string().optional(),
+        nif: zod.string(),
+        address: zod.string(),
         city: zod.string(),
         accountCode: zod.string().describe("PGC account (430, 431)"),
       }),
@@ -2090,13 +1945,13 @@ export const GetGenerationResponse = zod.object({
         date: zod.string(),
         type: zod.enum(["purchase", "sale", "rectification"]),
         partyName: zod.string(),
-        partyNif: zod.string().optional(),
+        partyNif: zod.string(),
         lines: zod.array(
           zod.object({
             description: zod.string(),
             quantity: zod.number(),
             unitPrice: zod.number(),
-            discount: zod.number().optional(),
+            discount: zod.number(),
             subtotal: zod.number(),
             taxRate: zod.number(),
             taxAmount: zod.number(),
@@ -2113,10 +1968,9 @@ export const GetGenerationResponse = zod.object({
           "check",
           "promissory_note",
           "credit",
-        "card",
         ]),
-        dueDate: zod.string().nullish(),
-        journalNote: zod.string().optional().describe("Explanation of accounting entries"),
+        dueDate: zod.string().nullable(),
+        journalNote: zod.string().describe("Explanation of accounting entries"),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2144,24 +1998,33 @@ export const GetGenerationResponse = zod.object({
         termMonths: zod.number(),
         startDate: zod.string(),
         monthlyInstallment: zod.number(),
-        initialClassification: zod.object({ longTerm170: zod.number(), shortTerm5200: zod.number() }).optional(),
-        reclassification31Dec: zod.object({ date: zod.string(), longTerm170: zod.number().optional(), shortTerm5200: zod.number() }).optional(),
         amortizationTable: zod.array(
           zod.object({
-            period: zod.union([zod.number(), zod.string()]).optional(),
-            date: zod.string().optional(),
-            installment: zod.number().optional(),
-            interest: zod.number().optional(),
-            principal: zod.number().optional(),
-            balance: zod.number().optional(),
+            period: zod.number(),
+            date: zod.string(),
+            installment: zod.number(),
+            interest: zod.number(),
+            principal: zod.number(),
+            balance: zod.number(),
           }),
         ),
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
-        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
-        formalizationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
-        installmentEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
-        reclassificationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
       })
       .optional(),
     mortgage: zod
@@ -2175,24 +2038,33 @@ export const GetGenerationResponse = zod.object({
         termMonths: zod.number(),
         startDate: zod.string(),
         monthlyInstallment: zod.number(),
-        initialClassification: zod.object({ longTerm170: zod.number(), shortTerm5200: zod.number() }).optional(),
-        reclassification31Dec: zod.object({ date: zod.string(), longTerm170: zod.number().optional(), shortTerm5200: zod.number() }).optional(),
         amortizationTable: zod.array(
           zod.object({
-            period: zod.union([zod.number(), zod.string()]).optional(),
-            date: zod.string().optional(),
-            installment: zod.number().optional(),
-            interest: zod.number().optional(),
-            principal: zod.number().optional(),
-            balance: zod.number().optional(),
+            period: zod.number(),
+            date: zod.string(),
+            installment: zod.number(),
+            interest: zod.number(),
+            principal: zod.number(),
+            balance: zod.number(),
           }),
         ),
-        journalNote: zod.string().optional(),
-        accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
-        accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })).optional(),
-        acquisitionEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
-        installmentEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
-        reclassificationEntry: zod.object({ journalNote: zod.string().optional(), accountDebits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })), accountCredits: zod.array(zod.object({ accountCode: zod.string(), accountName: zod.string(), amount: zod.number(), description: zod.string() })) }).optional(),
+        journalNote: zod.string(),
+        accountDebits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
+        accountCredits: zod.array(
+          zod.object({
+            accountCode: zod.string(),
+            accountName: zod.string(),
+            amount: zod.number(),
+            description: zod.string(),
+          }),
+        ),
       })
       .optional(),
     creditPolicy: zod
@@ -2208,7 +2080,7 @@ export const GetGenerationResponse = zod.object({
         endDate: zod.string(),
         interestAmount: zod.number(),
         totalSettlement: zod.number(),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2244,7 +2116,7 @@ export const GetGenerationResponse = zod.object({
         ),
         totalCharges: zod.number(),
         settlementDate: zod.string(),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2274,8 +2146,8 @@ export const GetGenerationResponse = zod.object({
           endDate: zod.string(),
           prepaidExpense: zod
             .number()
-          .optional()            .describe("Amount to defer to next period (cuenta 480)"),
-          journalNote: zod.string().optional(),
+            .describe("Amount to defer to next period (cuenta 480)"),
+          journalNote: zod.string(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -2303,7 +2175,7 @@ export const GetGenerationResponse = zod.object({
         bookValue: zod.number(),
         insuranceCompensation: zod.number(),
         netLoss: zod.number(),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2321,63 +2193,6 @@ export const GetGenerationResponse = zod.object({
           }),
         ),
       })
-      .optional(),
-    extraordinaryExpenses: zod
-      .array(
-        zod.object({
-          date: zod.string(),
-          type: zod.enum(['multa', 'donacion', 'perdida_inmovilizado', 'ingreso_extraordinario', 'otro']),
-          description: zod.string(),
-          amount: zod.number(),
-          accountCode: zod.string(),
-          accountName: zod.string(),
-          counterpartAccountCode: zod.string(),
-          counterpartAccountName: zod.string(),
-          journalNote: zod.string().optional(),
-          accountDebits: zod.array(
-            zod.object({
-              accountCode: zod.string(),
-              accountName: zod.string(),
-              amount: zod.number(),
-              description: zod.string(),
-            }),
-          ),
-          accountCredits: zod.array(
-            zod.object({
-              accountCode: zod.string(),
-              accountName: zod.string(),
-              amount: zod.number(),
-              description: zod.string(),
-            }),
-          ),
-        }),
-      )
-      .optional(),
-    warehouseCards: zod
-      .array(
-        zod.object({
-          productCode: zod.string(),
-          productDescription: zod.string(),
-          accountCode: zod.string(),
-          valuationMethod: zod.string(),
-          movements: zod.array(
-            zod.object({
-              date: zod.string(),
-              concept: zod.string(),
-              document: zod.string(),
-              entryQty: zod.number(),
-              entryUnitCost: zod.number(),
-              entryTotal: zod.number(),
-              exitQty: zod.number(),
-              exitUnitCost: zod.number(),
-              exitTotal: zod.number(),
-              balanceQty: zod.number(),
-              balanceUnitCost: zod.number(),
-              balanceTotal: zod.number(),
-            }),
-          ),
-        }),
-      )
       .optional(),
     payroll: zod
       .object({
@@ -2397,13 +2212,13 @@ export const GetGenerationResponse = zod.object({
             ssEmployerAmount: zod.number(),
           }),
         ),
-        totalGross: zod.number().optional(),
+        totalGross: zod.number(),
         totalIrpf: zod.number(),
         totalSsEmployee: zod.number(),
         totalNetSalary: zod.number(),
         totalSsEmployer: zod.number(),
         totalLaborCost: zod.number(),
-        journalNote: zod.string().optional(),
+        journalNote: zod.string(),
         accountDebits: zod.array(
           zod.object({
             accountCode: zod.string(),
@@ -2427,8 +2242,8 @@ export const GetGenerationResponse = zod.object({
         zod.object({
           month: zod.string(),
           dueDate: zod.string(),
-          employeeCount: zod.number().optional(),
-          totalGross: zod.number().optional(),
+          employeeCount: zod.number(),
+          totalGross: zod.number(),
           ssEmployeeAmount: zod
             .number()
             .describe("Cuota obrera (SS a cargo del trabajador)"),
@@ -2438,7 +2253,7 @@ export const GetGenerationResponse = zod.object({
           totalPayment: zod
             .number()
             .describe("Total TC1: ssEmployeeAmount + ssEmployerAmount"),
-          journalNote: zod.string().optional(),
+          journalNote: zod.string(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -2462,7 +2277,7 @@ export const GetGenerationResponse = zod.object({
       .array(
         zod.object({
           model: zod
-            .enum(["303", "420", "IS", "111"])
+            .enum(["303", "420", "IS"])
             .describe("303=IVA, 420=IGIC, IS=Impuesto Sociedades"),
           period: zod.string().describe("T1, T2, T3, T4 or Annual"),
           dueDate: zod.string(),
@@ -2471,7 +2286,7 @@ export const GetGenerationResponse = zod.object({
           inputTax: zod.number().describe("Cuota IVA\/IGIC deducible"),
           result: zod.number().describe("Positive = to pay, negative = refund"),
           paymentType: zod.enum(["ingreso", "devolución", "compensación"]),
-          journalNote: zod.string().optional(),
+          journalNote: zod.string(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -2512,7 +2327,7 @@ export const GetGenerationResponse = zod.object({
           depExpenseCode: zod
             .string()
             .describe("Depreciation expense account (e.g. 681)"),
-          journalNote: zod.string().optional(),
+          journalNote: zod.string(),
           accountDebits: zod.array(
             zod.object({
               accountCode: zod.string(),
@@ -2545,14 +2360,14 @@ export const GetGenerationResponse = zod.object({
           .describe("Total registered share capital (capital social)"),
         nominalValuePerShare: zod.number(),
         totalShares: zod.number(),
-        constitutionDate: zod.string().optional().describe("Date of constitution"),
+        constitutionDate: zod.string().describe("Date of constitution"),
         registryEntry: zod
-          .string().optional()
+          .string()
           .describe("Registro Mercantil entry reference"),
         shareholders: zod.array(
           zod.object({
             name: zod.string(),
-            nif: zod.string().optional(),
+            nif: zod.string(),
             role: zod
               .enum(["socio", "administrador", "socio_administrador"])
               .describe("Role in the company"),
@@ -2574,7 +2389,6 @@ export const GetGenerationResponse = zod.object({
         ),
         journalNote: zod
           .string()
-        .optional()
           .describe(
             "Didactic note explaining the capital accounts (100, 118, etc.)",
           ),
@@ -2656,7 +2470,6 @@ export const GetGenerationResponse = zod.object({
         totalEquityAndLiabilities: zod.number(),
         journalNote: zod
           .string()
-        .optional()
           .describe(
             "Didactic note for the opening entry (asiento de apertura)",
           ),
@@ -2688,7 +2501,7 @@ export const GetGenerationResponse = zod.object({
           zod.object({
             date: zod.string(),
             concept: zod.string(),
-            shareholderName: zod.string().optional(),
+            shareholderName: zod.string(),
             accountCode: zod
               .string()
               .describe(
@@ -2708,7 +2521,6 @@ export const GetGenerationResponse = zod.object({
           .describe("Closing balance on account 553 (shareholders)"),
         journalNote: zod
           .string()
-        .optional()
           .describe(
             "Didactic note about accounts 551 and 553, their nature and use",
           ),
@@ -2757,25 +2569,21 @@ export const GetGenerationResponse = zod.object({
           ),
         totalDividends: zod.number().describe("Total gross dividends declared"),
         dividendPerShare: zod.number(),
-        irpfWithholdingAmount: zod.number().optional(),
-        netDividendPaid: zod.number().optional(),
-        mod123DueDate: zod.string().optional(),
         irpfWithholdingRate: zod
           .number()
           .describe("IRPF withholding rate on dividends (typically 19%)"),
         perShareholder: zod.array(
           zod.object({
-            shareholderName: zod.string().optional(),
-            participationPercentage: zod.number().optional(),
-            grossDividend: zod.number().optional(),
+            shareholderName: zod.string(),
+            participationPercentage: zod.number(),
+            grossDividend: zod.number(),
             irpfWithholdingRate: zod.number(),
-            irpfWithholdingAmount: zod.number().optional(),
-            netDividend: zod.number().optional(),
+            irpfWithholdingAmount: zod.number(),
+            netDividend: zod.number(),
           }),
         ),
         journalNote: zod
           .string()
-        .optional()
           .describe(
             "Didactic note: result allocation entries, withholding (4751), payment (526)",
           ),
@@ -2809,8 +2617,8 @@ export const GetGenerationResponse = zod.object({
           zod.object({
             date: zod.string(),
             concept: zod.string(),
-            debit: zod.number().nullish(),
-            credit: zod.number().nullish(),
+            debit: zod.number().nullable(),
+            credit: zod.number().nullable(),
             balance: zod.number(),
           }),
         ),
@@ -2822,14 +2630,14 @@ export const GetGenerationResponse = zod.object({
         date: zod.string(),
         concept: zod.string(),
         document: zod
-          .string().optional()
+          .string()
           .describe("Reference document (invoice number, etc.)"),
         debits: zod.array(
           zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string().optional(),
+            description: zod.string(),
           }),
         ),
         credits: zod.array(
@@ -2837,7 +2645,7 @@ export const GetGenerationResponse = zod.object({
             accountCode: zod.string(),
             accountName: zod.string(),
             amount: zod.number(),
-            description: zod.string().optional(),
+            description: zod.string(),
           }),
         ),
         totalAmount: zod.number(),

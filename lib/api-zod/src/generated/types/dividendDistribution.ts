@@ -30,7 +30,7 @@ export interface DividendDistribution {
   irpfWithholdingRate: number;
   perShareholder: DividendPerShareholder[];
   /** Didactic note: result allocation entries, withholding (4751), payment (526) */
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

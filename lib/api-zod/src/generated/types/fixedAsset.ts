@@ -24,7 +24,7 @@ export interface FixedAsset {
   accDepreciationCode: string;
   /** Depreciation expense account (e.g. 681) */
   depExpenseCode: string;
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

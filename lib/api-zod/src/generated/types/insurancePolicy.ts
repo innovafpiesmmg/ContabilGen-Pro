@@ -16,7 +16,7 @@ export interface InsurancePolicy {
   endDate: string;
   /** Amount to defer to next period (cuenta 480) */
   prepaidExpense: number;
-  journalNote?: string;
+  journalNote: string;
   accountDebits: AccountEntry[];
   accountCredits: AccountEntry[];
 }

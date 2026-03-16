@@ -27,9 +27,12 @@ interface GenerateParams {
 
 interface AiConfig {
   provider: string;
-  deepseekApiKey: string;
-  deepseekBaseUrl: string;
-  deepseekModel: string;
+  deepseekApiKey?: string;
+  deepseekBaseUrl?: string;
+  deepseekModel?: string;
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
 }
 
 const TAX_RATES: Record<string, { standard: number; reduced: number; superreduced: number }> = {
@@ -1383,6 +1386,15 @@ REGLAS:
 
 // ─── MAIN EXPORT ──────────────────────────────────────────────────────────────
 function getClient(config: AiConfig): OpenAI {
+  if (config.provider === "openai") {
+    if (!config.apiKey) {
+      throw new Error("No hay ninguna API Key de OpenAI configurada. Añade tu clave en Configuración.");
+    }
+    return new OpenAI({
+      apiKey: config.apiKey,
+      baseURL: config.baseUrl || "https://api.openai.com/v1",
+    });
+  }
   if (!config.deepseekApiKey) {
     throw new Error("No hay ninguna API Key de DeepSeek configurada. Añade tu clave en Configuración o contacta al administrador.");
   }
@@ -1393,6 +1405,9 @@ function getClient(config: AiConfig): OpenAI {
 }
 
 function getModel(config: AiConfig): string {
+  if (config.provider === "openai") {
+    return config.model || "gpt-4o-mini";
+  }
   return config.deepseekModel || "deepseek-chat";
 }
 

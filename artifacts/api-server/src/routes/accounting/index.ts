@@ -50,7 +50,7 @@ function buildParams(d: any) {
 }
 
 function resolveAiConfig(settings: any, shared?: any) {
-  const provider = settings.provider ?? "openai";
+  const provider = settings.provider ?? "deepseek";
   if (provider === "shared_deepseek" && shared?.enabled) {
     return {
       provider: "deepseek",
@@ -59,8 +59,16 @@ function resolveAiConfig(settings: any, shared?: any) {
       deepseekModel: shared.model,
     };
   }
+  if (provider === "openai") {
+    return {
+      provider: "openai",
+      apiKey: settings.openaiApiKey ?? "",
+      baseUrl: "https://api.openai.com/v1",
+      model: settings.openaiModel ?? "gpt-4o-mini",
+    };
+  }
   return {
-    provider,
+    provider: "deepseek",
     deepseekApiKey: settings.deepseekApiKey ?? "",
     deepseekBaseUrl: settings.deepseekBaseUrl ?? "https://api.deepseek.com",
     deepseekModel: settings.deepseekModel ?? "deepseek-chat",
@@ -81,7 +89,7 @@ router.post("/accounting/generate", wrap(async (req, res): Promise<void> => {
 
   const d = parsed.data;
   const settings = await getSettingsForUser(req.user.id);
-  const provider = settings.provider ?? "openai";
+  const provider = settings.provider ?? "deepseek";
 
   let aiConfig;
   if (provider === "shared_deepseek") {
