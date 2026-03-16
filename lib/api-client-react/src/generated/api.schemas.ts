@@ -271,6 +271,7 @@ export const InvoicePaymentMethod = {
   check: "check",
   promissory_note: "promissory_note",
   credit: "credit",
+  card: "card",
 } as const;
 
 export interface AccountEntry {

@@ -800,6 +800,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       ),
       journalNote: zod
         .string()
+        .optional()
         .describe(
           "Didactic note explaining the capital accounts (100, 118, etc.)",
         ),
@@ -881,6 +882,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       totalEquityAndLiabilities: zod.number(),
       journalNote: zod
         .string()
+        .optional()
         .describe("Didactic note for the opening entry (asiento de apertura)"),
       accountDebits: zod.array(
         zod.object({
@@ -930,6 +932,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
         .describe("Closing balance on account 553 (shareholders)"),
       journalNote: zod
         .string()
+        .optional()
         .describe(
           "Didactic note about accounts 551 and 553, their nature and use",
         ),
@@ -989,6 +992,7 @@ export const GenerateAccountingUniverseResponse = zod.object({
       ),
       journalNote: zod
         .string()
+        .optional()
         .describe(
           "Didactic note: result allocation entries, withholding (4751), payment (526)",
         ),
@@ -1650,6 +1654,7 @@ export const SaveGenerationBody = zod.object({
         ),
         journalNote: zod
           .string()
+          .optional()
           .describe(
             "Didactic note explaining the capital accounts (100, 118, etc.)",
           ),
@@ -1731,6 +1736,7 @@ export const SaveGenerationBody = zod.object({
         totalEquityAndLiabilities: zod.number(),
         journalNote: zod
           .string()
+          .optional()
           .describe(
             "Didactic note for the opening entry (asiento de apertura)",
           ),
@@ -1782,6 +1788,7 @@ export const SaveGenerationBody = zod.object({
           .describe("Closing balance on account 553 (shareholders)"),
         journalNote: zod
           .string()
+          .optional()
           .describe(
             "Didactic note about accounts 551 and 553, their nature and use",
           ),
@@ -1845,6 +1852,7 @@ export const SaveGenerationBody = zod.object({
         ),
         journalNote: zod
           .string()
+          .optional()
           .describe(
             "Didactic note: result allocation entries, withholding (4751), payment (526)",
           ),
@@ -2492,6 +2500,7 @@ export const GetGenerationResponse = zod.object({
         ),
         journalNote: zod
           .string()
+          .optional()
           .describe(
             "Didactic note explaining the capital accounts (100, 118, etc.)",
           ),
@@ -2573,6 +2582,7 @@ export const GetGenerationResponse = zod.object({
         totalEquityAndLiabilities: zod.number(),
         journalNote: zod
           .string()
+          .optional()
           .describe(
             "Didactic note for the opening entry (asiento de apertura)",
           ),
@@ -2624,6 +2634,7 @@ export const GetGenerationResponse = zod.object({
           .describe("Closing balance on account 553 (shareholders)"),
         journalNote: zod
           .string()
+          .optional()
           .describe(
             "Didactic note about accounts 551 and 553, their nature and use",
           ),
@@ -2687,6 +2698,7 @@ export const GetGenerationResponse = zod.object({
         ),
         journalNote: zod
           .string()
+          .optional()
           .describe(
             "Didactic note: result allocation entries, withholding (4751), payment (526)",
           ),
