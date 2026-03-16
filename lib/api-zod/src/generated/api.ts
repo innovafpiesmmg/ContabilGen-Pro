@@ -861,6 +861,8 @@ export const GenerateAccountingUniverseResponse = zod.object({
       date: zod
         .string()
         .describe("Opening date (typically Jan 1 of fiscal year)"),
+      priorYearEndDate: zod.string().optional().describe("End date of prior fiscal year (e.g. 2024-12-31)"),
+      priorYear: zod.number().optional().describe("Prior fiscal year number"),
       description: zod.string(),
       nonCurrentAssets: zod
         .array(
@@ -1749,6 +1751,8 @@ export const SaveGenerationBody = zod.object({
         date: zod
           .string()
           .describe("Opening date (typically Jan 1 of fiscal year)"),
+        priorYearEndDate: zod.string().optional().describe("End date of prior fiscal year (e.g. 2024-12-31)"),
+        priorYear: zod.number().optional().describe("Prior fiscal year number"),
         description: zod.string(),
         nonCurrentAssets: zod
           .array(
@@ -2629,6 +2633,8 @@ export const GetGenerationResponse = zod.object({
         date: zod
           .string()
           .describe("Opening date (typically Jan 1 of fiscal year)"),
+        priorYearEndDate: zod.string().optional().describe("End date of prior fiscal year (e.g. 2024-12-31)"),
+        priorYear: zod.number().optional().describe("Prior fiscal year number"),
         description: zod.string(),
         nonCurrentAssets: zod
           .array(

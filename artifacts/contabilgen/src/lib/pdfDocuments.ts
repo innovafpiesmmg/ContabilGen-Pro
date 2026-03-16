@@ -896,7 +896,11 @@ export function generateInitialBalancePdf(bal: any, cp: CP): Blob {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const pageNum = { n: 1 };
 
-  let y = headerBlock(doc, "BALANCE DE APERTURA", bal.date || "", cp);
+  const priorYear = (bal as any).priorYear;
+  const pdfTitle = priorYear
+    ? `BALANCE DE SITUACIÓN FINAL — EJERCICIO ${priorYear}`
+    : "BALANCE DE APERTURA";
+  let y = headerBlock(doc, pdfTitle, bal.date || "", cp);
 
   const sections = [
     { title: "ACTIVO NO CORRIENTE", data: bal.nonCurrentAssets },

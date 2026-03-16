@@ -1153,9 +1153,12 @@ async function generateEquityBlock(
   }
 
   if (withInitialBalance) {
+    const priorYear = params.year - 1;
     sections.push(`"initialBalanceSheet": {
     "date": "${periodStart}",
-    "description": "Balance de apertura a ${periodStart} — Asiento de apertura del ejercicio",
+    "priorYearEndDate": "${priorYear}-12-31",
+    "priorYear": ${priorYear},
+    "description": "Balance de Situación Final del ejercicio ${priorYear} — Base del asiento de apertura ${params.year}",
     "nonCurrentAssets": [{"accountCode":"XXX","accountName":"...","amount":X}],
     "currentAssets": [{"accountCode":"300","accountName":"Mercaderías","amount":X},{"accountCode":"430","accountName":"Clientes","amount":X},{"accountCode":"572","accountName":"Bancos c/c","amount":X}],
     "equity": [{"accountCode":"100","accountName":"Capital social","amount":X},{"accountCode":"112","accountName":"Reserva legal","amount":X},{"accountCode":"129","accountName":"Resultado del ejercicio","amount":X}],
@@ -1163,7 +1166,7 @@ async function generateEquityBlock(
     "currentLiabilities": [{"accountCode":"400","accountName":"Proveedores","amount":X},{"accountCode":"477","accountName":"${params.taxRegime} repercutido","amount":X}],
     "totalAssets": X,
     "totalEquityAndLiabilities": X,
-    "journalNote": "Asiento de apertura: se cargan todos los activos y se abonan pasivos y patrimonio neto. Total Activo = Total Pasivo + PN.",
+    "journalNote": "Asiento de apertura: reproduce el Balance de Situación Final a 31/12/${priorYear}. Se cargan (DEBE) todos los activos y se abonan (HABER) todos los pasivos y el patrimonio neto. Total Activo = Total Pasivo + PN.",
     "accountDebits": [{"accountCode":"XXX","accountName":"Nombre activo","amount":X,"description":"Activo en apertura"}],
     "accountCredits": [{"accountCode":"XXX","accountName":"Nombre pasivo/PN","amount":X,"description":"Pasivo/PN en apertura"}]
   }`);

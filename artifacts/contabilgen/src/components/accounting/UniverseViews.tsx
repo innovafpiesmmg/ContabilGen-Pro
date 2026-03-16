@@ -1601,7 +1601,24 @@ export const InitialBalanceSheetView = ({ data }: { data?: InitialBalanceSheet |
   }
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <SectionTitle title="Balance de Apertura" description={data.description} />
+      <SectionTitle
+        title={data.priorYear
+          ? `Balance de Situación Final — Ejercicio ${data.priorYear}`
+          : "Balance de Apertura"}
+        description={data.description}
+      />
+      {data.priorYearEndDate && (
+        <Card className="rounded-2xl shadow-md border-amber-200 bg-amber-50/50 print-break-inside-avoid">
+          <CardContent className="p-4 flex items-center gap-3">
+            <span className="text-amber-600 text-lg">📋</span>
+            <p className="text-sm text-amber-800">
+              Este balance corresponde al cierre del ejercicio {data.priorYear} (a {data.priorYearEndDate}) y
+              constituye la base del <strong>asiento de apertura</strong> del ejercicio actual.
+              Se cargan todos los activos al Debe y se abonan todos los pasivos y el patrimonio neto al Haber.
+            </p>
+          </CardContent>
+        </Card>
+      )}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card className="rounded-2xl shadow-md overflow-hidden print-break-inside-avoid">
           <CardHeader className="bg-blue-50 border-b border-blue-100">
@@ -1968,8 +1985,10 @@ function collectEvents(universe: AccountingUniverse): ChronoEvent[] {
   }
 
   if (universe.initialBalanceSheet?.date) {
+    const priorYr = (universe.initialBalanceSheet as any).priorYear;
     events.push({ date: universe.initialBalanceSheet.date, kind: "apertura",
-      label: "Balance de apertura", subtitle: universe.initialBalanceSheet.description ?? "Asiento de apertura", amount: universe.initialBalanceSheet.totalAssets,
+      label: priorYr ? `Balance Final Ej. ${priorYr} — Apertura` : "Balance de apertura",
+      subtitle: universe.initialBalanceSheet.description ?? "Asiento de apertura", amount: universe.initialBalanceSheet.totalAssets,
       pdfGenerator: () => generateInitialBalancePdf(universe.initialBalanceSheet!, cp),
       pdfFilename: `Balance_Apertura.pdf` });
   }
