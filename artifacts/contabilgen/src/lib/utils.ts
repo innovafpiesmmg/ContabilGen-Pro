@@ -29,6 +29,7 @@ export function formatDate(dateString: string | null | undefined): string {
   }
 }
 
-export function formatAccountCode(code: string, name: string): string {
-  return `${code} - ${name}`;
+export function formatAccountCode(code: string, name?: string): string {
+  if (name) return `${code} - ${name}`;
+  return code;
 }
