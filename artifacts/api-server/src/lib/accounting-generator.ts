@@ -2675,6 +2675,7 @@ function buildDeterministicJournal(
     if (code) allDocRefs.push({ ref: `Amort-${code}`, type: "amortización", date: `${params.year}-12-31` });
   }
 
+  const initialBS = universe.initialBalanceSheet as Record<string, unknown> | undefined;
   if (initialBS && initialBS.accountDebits) {
     allDocRefs.push({ ref: "Asiento apertura", type: "apertura", date: `${params.year}-01-01` });
   }
