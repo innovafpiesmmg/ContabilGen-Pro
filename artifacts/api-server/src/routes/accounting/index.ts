@@ -45,6 +45,7 @@ function buildParams(d: any) {
     includeShareholderAccounts: d.includeShareholderAccounts ?? null, includeDividends: d.includeDividends ?? null,
     includeWarehouse: d.includeWarehouse ?? null, includeExtraordinary: d.includeExtraordinary ?? null,
     startDate: d.startDate ?? null, endDate: d.endDate ?? null,
+    accountDigits: d.accountDigits ?? null,
   };
 }
 

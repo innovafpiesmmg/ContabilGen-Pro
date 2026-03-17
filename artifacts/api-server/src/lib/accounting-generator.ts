@@ -2392,7 +2392,9 @@ function buildDeterministicJournal(
   // en el balance de apertura (initialBalanceSheet), no como asiento independiente.
 
   const initialBS = universe.initialBalanceSheet as Record<string, unknown> | undefined;
+  console.log(`[journal] initialBalanceSheet exists: ${!!initialBS}, isNewCompany: ${params.isNewCompany}, accountDigits: ${params.accountDigits}`);
   if (initialBS) {
+    console.log(`[journal] initialBS keys: ${Object.keys(initialBS).join(", ")}, hasAccountDebits: ${!!initialBS.accountDebits}, accountDebitsLen: ${Array.isArray(initialBS.accountDebits) ? (initialBS.accountDebits as unknown[]).length : 'N/A'}`);
     if (!initialBS.accountDebits || !Array.isArray(initialBS.accountDebits) || (initialBS.accountDebits as unknown[]).length === 0) {
       const debits: Array<Record<string, unknown>> = [];
       const credits: Array<Record<string, unknown>> = [];
