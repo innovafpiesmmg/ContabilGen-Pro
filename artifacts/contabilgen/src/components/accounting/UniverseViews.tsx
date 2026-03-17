@@ -1057,9 +1057,52 @@ function findPdf(pdfMap: Map<string, { gen: () => Blob; filename: string }>, doc
   return undefined;
 }
 
+function PdfPreviewModal({ blobUrl, filename, onClose }: { blobUrl: string; filename: string; onClose: () => void }) {
+  React.useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleEsc);
+    return () => document.removeEventListener("keydown", handleEsc);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-[95vw] max-w-4xl h-[90vh] bg-white rounded-2xl shadow-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-3 border-b bg-slate-50">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 truncate">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            {filename}
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={blobUrl}
+              download={filename}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Descargar
+            </a>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-700 transition-colors" title="Cerrar">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 bg-slate-100">
+          <iframe src={blobUrl} className="w-full h-full border-0" title={filename} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export const JournalView = ({ entries, universe, highlightEntry, onHighlightClear }: { entries: JournalEntry[]; universe?: AccountingUniverse; highlightEntry?: string | null; onHighlightClear?: () => void }) => {
   const pdfMap = useMemo(() => universe ? buildPdfLookup(universe) : new Map<string, { gen: () => Blob; filename: string }>(), [universe]);
   const highlightRef = React.useRef<HTMLTableRowElement>(null);
+  const [preview, setPreview] = React.useState<{ url: string; filename: string } | null>(null);
+
+  React.useEffect(() => {
+    return () => { if (preview) URL.revokeObjectURL(preview.url); };
+  }, [preview]);
 
   React.useEffect(() => {
     if (highlightEntry && highlightRef.current) {
@@ -1073,16 +1116,23 @@ export const JournalView = ({ entries, universe, highlightEntry, onHighlightClea
     }
   }, [highlightEntry, onHighlightClear]);
 
-  const handleDownload = useCallback((docRef: string) => {
+  const handlePreview = useCallback((docRef: string) => {
     const pdf = findPdf(pdfMap, docRef);
     if (!pdf) return;
     try {
+      if (preview) URL.revokeObjectURL(preview.url);
       const blob = pdf.gen();
-      saveAs(blob, pdf.filename);
+      const url = URL.createObjectURL(blob);
+      setPreview({ url, filename: pdf.filename });
     } catch (err) {
       console.error("Error generando PDF:", err);
     }
-  }, [pdfMap]);
+  }, [pdfMap, preview]);
+
+  const closePreview = useCallback(() => {
+    if (preview) URL.revokeObjectURL(preview.url);
+    setPreview(null);
+  }, [preview]);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1122,13 +1172,13 @@ export const JournalView = ({ entries, universe, highlightEntry, onHighlightClea
                         <button
                           type="button"
                           disabled={!hasPdf}
-                          onClick={() => hasPdf && handleDownload(entry.document)}
+                          onClick={() => hasPdf && handlePreview(entry.document)}
                           className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md border text-[11px] font-semibold transition-all ${badge.bg} ${hasPdf ? "cursor-pointer hover:shadow-md hover:scale-105 active:scale-95" : "opacity-70"}`}
-                          title={hasPdf ? `Descargar PDF: ${badge.label}` : badge.label}
+                          title={hasPdf ? `Ver documento: ${badge.label}` : badge.label}
                         >
                           <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                             {hasPdf ? (
-                              <><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></>
+                              <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>
                             ) : (
                               <><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></>
                             )}
@@ -1171,6 +1221,9 @@ export const JournalView = ({ entries, universe, highlightEntry, onHighlightClea
           </Table>
         </div>
       </Card>
+      {preview && (
+        <PdfPreviewModal blobUrl={preview.url} filename={preview.filename} onClose={closePreview} />
+      )}
     </div>
   );
 };
@@ -2031,15 +2084,21 @@ function parsePayrollDate(month: string, year: number): string {
 
 function buildCP(universe: AccountingUniverse): CP {
   const p = universe.companyProfile;
+  const a = p as any;
   return {
     name: p?.name || "Empresa",
-    nif: p?.nif || (p as any)?.cif || "",
+    nif: p?.nif || a?.cif || "",
     address: p?.address || "",
     city: p?.city || "",
+    postalCode: a?.postalCode || "",
+    phone: a?.phone || "",
+    email: a?.email || "",
+    legalForm: p?.legalForm || a?.legalForm || "",
+    registrationInfo: a?.registrationInfo || "",
     sector: p?.sector || "",
     taxRegime: p?.taxRegime || "",
     fiscalYear: p?.fiscalYear as number | undefined,
-    description: (p as any)?.description || "",
+    description: a?.description || "",
   };
 }
 
@@ -2355,7 +2414,9 @@ const MONTH_NAMES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct"
 export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data }) => {
   const events = useMemo(() => collectEvents(data), [data]);
   const [expandedEntries, setExpandedEntries] = React.useState<Set<string>>(new Set());
+  const [preview, setPreview] = React.useState<{ url: string; filename: string } | null>(null);
   React.useEffect(() => { setExpandedEntries(new Set()); }, [data]);
+  React.useEffect(() => { return () => { if (preview) URL.revokeObjectURL(preview.url); }; }, [preview]);
   const toggleEntry = useCallback((key: string) => {
     setExpandedEntries(prev => {
       const next = new Set(prev);
@@ -2508,19 +2569,21 @@ export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data })
                       {e.pdfGenerator && (
                         <button
                           type="button"
-                          title="Descargar PDF"
+                          title="Ver documento PDF"
                           onClick={(ev) => {
                             ev.stopPropagation();
                             try {
+                              if (preview) URL.revokeObjectURL(preview.url);
                               const blob = e.pdfGenerator!();
-                              saveAs(blob, e.pdfFilename || "documento.pdf");
+                              const url = URL.createObjectURL(blob);
+                              setPreview({ url, filename: e.pdfFilename || "documento.pdf" });
                             } catch (err) {
                               console.error("Error generando PDF:", err);
                             }
                           }}
                           className="flex-shrink-0 mt-0.5 p-1.5 rounded-lg hover:bg-white/60 transition-colors"
                         >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={meta.color}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={meta.color}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         </button>
                       )}
                       {je && (
@@ -2586,6 +2649,9 @@ export const CronologiaView: React.FC<{ data: AccountingUniverse }> = ({ data })
             No hay documentos con fecha en este universo.
           </CardContent>
         </Card>
+      )}
+      {preview && (
+        <PdfPreviewModal blobUrl={preview.url} filename={preview.filename} onClose={() => { URL.revokeObjectURL(preview.url); setPreview(null); }} />
       )}
     </div>
   );

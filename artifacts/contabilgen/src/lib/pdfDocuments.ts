@@ -44,6 +44,11 @@ export interface CP {
   nif?: string;
   address?: string;
   city?: string;
+  postalCode?: string;
+  phone?: string;
+  email?: string;
+  legalForm?: string;
+  registrationInfo?: string;
   sector?: string;
   taxRegime?: string;
   fiscalYear?: number;
@@ -72,7 +77,7 @@ function headerBlock(doc: jsPDF, title: string, subtitle: string, cp: CP): numbe
   const c = getColor();
   let y = M;
   doc.setFillColor(c[0], c[1], c[2]);
-  doc.rect(0, 0, A4W, 32, "F");
+  doc.rect(0, 0, A4W, 38, "F");
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
@@ -83,12 +88,34 @@ function headerBlock(doc: jsPDF, title: string, subtitle: string, cp: CP): numbe
   doc.setFont("helvetica", "normal");
   doc.text(subtitle, M, y + 20);
 
-  doc.setFontSize(9);
-  doc.text(cp.name || "", A4W - M, y + 10, { align: "right" });
-  doc.text(`CIF: ${cp.nif || ""}`, A4W - M, y + 16, { align: "right" });
-  doc.text(`${cp.address || ""}, ${cp.city || ""}`, A4W - M, y + 22, { align: "right" });
+  const rx = A4W - M;
+  doc.setFontSize(8.5);
+  const legalSuffix = cp.legalForm ? ` (${cp.legalForm})` : "";
+  doc.text((cp.name || "") + legalSuffix, rx, y + 8, { align: "right" });
+  doc.text(`CIF: ${cp.nif || ""}`, rx, y + 13, { align: "right" });
 
-  return 42;
+  const postalPart = cp.postalCode ? `${cp.postalCode} ` : "";
+  doc.text(`${cp.address || ""} — ${postalPart}${cp.city || ""}`, rx, y + 18, { align: "right" });
+
+  const contactParts: string[] = [];
+  if (cp.phone) contactParts.push(`Tel: ${cp.phone}`);
+  if (cp.email) contactParts.push(cp.email);
+  if (contactParts.length > 0) {
+    doc.text(contactParts.join(" | "), rx, y + 23, { align: "right" });
+  }
+
+  if (cp.registrationInfo) {
+    doc.setFontSize(6.5);
+    doc.text(cp.registrationInfo, rx, y + 28, { align: "right" });
+  }
+
+  y = 48;
+
+  doc.setFontSize(7);
+  doc.setTextColor(120, 120, 120);
+  doc.setFont("helvetica", "normal");
+
+  return y;
 }
 
 function footer(doc: jsPDF, page: number, total: number) {

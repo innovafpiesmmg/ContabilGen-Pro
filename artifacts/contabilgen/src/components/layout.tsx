@@ -8,12 +8,14 @@ import {
   FileText, 
   X, 
   Trash2,
-  Printer,
   ChevronRight,
+  ChevronLeft,
   Settings,
   LogOut,
   User,
-  Shield
+  Shield,
+  PanelLeftClose,
+  PanelLeftOpen
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useListGenerations, useDeleteGeneration, getListGenerationsQueryKey } from "@workspace/api-client-react";
@@ -29,6 +31,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [location, setLocation] = useLocation();
   const { data: generations, isLoading } = useListGenerations();
   const deleteMutation = useDeleteGeneration();
@@ -59,131 +62,174 @@ export default function Layout({ children }: LayoutProps) {
     ? `${user.firstName}${user.lastName ? " " + user.lastName : ""}`
     : user?.email ?? "Usuario";
 
-  const SidebarContent = () => (
+  const SidebarContent = ({ forceExpanded = false }: { forceExpanded?: boolean }) => {
+    const collapsed = forceExpanded ? false : sidebarCollapsed;
+    return (
     <div className="flex flex-col h-full bg-sidebar border-r border-sidebar-border shadow-lg">
       <div className="p-6 flex items-center gap-3 border-b border-sidebar-border">
         <img src="/logo.png" alt="ContabilGen Pro" className="w-10 h-10 shrink-0" />
-        <div>
-          <h1 className="font-display font-bold text-xl leading-tight text-sidebar-foreground">ContabilGen</h1>
-          <p className="text-xs text-muted-foreground font-medium tracking-wide uppercase">Pro Edition</p>
-        </div>
+        {!collapsed && (
+          <div>
+            <h1 className="font-display font-bold text-xl leading-tight text-sidebar-foreground">ContabilGen</h1>
+            <p className="text-xs text-muted-foreground font-medium tracking-wide uppercase">Pro Edition</p>
+          </div>
+        )}
       </div>
 
       <div className="p-4">
         <Link href="/" onClick={closeSidebar} className="w-full">
-          <Button variant="default" className="w-full justify-start gap-2 shadow-md hover:shadow-lg transition-all rounded-xl py-6 bg-gradient-to-r from-primary to-primary/90">
-            <Plus className="w-5 h-5" />
-            <span className="font-semibold text-base">Nuevo Universo</span>
+          <Button variant="default" className={cn("w-full gap-2 shadow-md hover:shadow-lg transition-all rounded-xl py-6 bg-gradient-to-r from-primary to-primary/90", collapsed ? "justify-center px-2" : "justify-start")}>
+            <Plus className="w-5 h-5 shrink-0" />
+            {!collapsed && <span className="font-semibold text-base">Nuevo Universo</span>}
           </Button>
         </Link>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-4 py-2 space-y-6">
-        <div>
-          <div className="flex items-center gap-2 px-2 mb-3 text-sm font-semibold text-muted-foreground">
-            <History className="w-4 h-4" />
-            Historial de Generaciones
-          </div>
-          
-          <div className="space-y-1.5">
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-14 w-full rounded-xl" />
-              ))
-            ) : generations?.length === 0 ? (
-              <div className="text-sm text-muted-foreground px-2 py-4 text-center border border-dashed rounded-xl bg-muted/30">
-                No hay universos guardados
-              </div>
-            ) : (
-              generations?.map((gen) => {
-                const isActive = location === `/generations/${gen.id}`;
-                return (
-                  <Link key={gen.id} href={`/generations/${gen.id}`} onClick={closeSidebar} className="block">
-                    <div className={cn(
-                      "group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 border",
-                      isActive 
-                        ? "bg-primary/5 border-primary/20 shadow-sm" 
-                        : "bg-transparent border-transparent hover:bg-muted/50 hover:border-border"
-                    )}>
-                      <div className="flex items-center gap-3 overflow-hidden">
-                        <div className={cn(
-                          "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors",
-                          isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary"
-                        )}>
-                          <FileText className="w-4 h-4" />
+      {!collapsed && (
+        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-6">
+          <div>
+            <div className="flex items-center gap-2 px-2 mb-3 text-sm font-semibold text-muted-foreground">
+              <History className="w-4 h-4" />
+              Historial de Generaciones
+            </div>
+            
+            <div className="space-y-1.5">
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <Skeleton key={i} className="h-14 w-full rounded-xl" />
+                ))
+              ) : generations?.length === 0 ? (
+                <div className="text-sm text-muted-foreground px-2 py-4 text-center border border-dashed rounded-xl bg-muted/30">
+                  No hay universos guardados
+                </div>
+              ) : (
+                generations?.map((gen) => {
+                  const isActive = location === `/generations/${gen.id}`;
+                  return (
+                    <Link key={gen.id} href={`/generations/${gen.id}`} onClick={closeSidebar} className="block">
+                      <div className={cn(
+                        "group flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 border",
+                        isActive 
+                          ? "bg-primary/5 border-primary/20 shadow-sm" 
+                          : "bg-transparent border-transparent hover:bg-muted/50 hover:border-border"
+                      )}>
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className={cn(
+                            "w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors",
+                            isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground group-hover:bg-primary/5 group-hover:text-primary"
+                          )}>
+                            <FileText className="w-4 h-4" />
+                          </div>
+                          <div className="truncate">
+                            <p className={cn("text-sm font-semibold truncate transition-colors", isActive ? "text-primary" : "text-foreground group-hover:text-foreground")}>
+                              {gen.companyName}
+                            </p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {gen.sector} • {gen.fiscalYear}
+                            </p>
+                          </div>
                         </div>
-                        <div className="truncate">
-                          <p className={cn("text-sm font-semibold truncate transition-colors", isActive ? "text-primary" : "text-foreground group-hover:text-foreground")}>
-                            {gen.companyName}
-                          </p>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {gen.sector} • {gen.fiscalYear}
-                          </p>
+                        <div className="flex items-center">
+                          <button 
+                            onClick={(e) => handleDelete(gen.id, e)}
+                            className={cn(
+                              "p-2 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors",
+                              isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                            )}
+                            title="Eliminar universo"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
-                      <div className="flex items-center">
-                        <button 
-                          onClick={(e) => handleDelete(gen.id, e)}
-                          className={cn(
-                            "p-2 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors",
-                            isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-                          )}
-                          title="Eliminar universo"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })
-            )}
+                    </Link>
+                  );
+                })
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="p-4 border-t border-sidebar-border mt-auto shrink-0 space-y-2">
+      {collapsed && (
+        <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1">
+          {!isLoading && generations?.map((gen) => {
+            const isActive = location === `/generations/${gen.id}`;
+            return (
+              <Link key={gen.id} href={`/generations/${gen.id}`} onClick={closeSidebar} className="block">
+                <div className={cn(
+                  "w-10 h-10 mx-auto rounded-lg flex items-center justify-center transition-colors cursor-pointer",
+                  isActive ? "bg-primary/10 text-primary" : "bg-muted/50 text-muted-foreground hover:bg-primary/5 hover:text-primary"
+                )} title={gen.companyName}>
+                  <FileText className="w-4 h-4" />
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
+      <div className={cn("border-t border-sidebar-border mt-auto shrink-0 space-y-2", collapsed ? "p-2" : "p-4")}>
         <Link href="/settings" onClick={closeSidebar} className="block w-full">
-          <Button variant={location === "/settings" ? "secondary" : "ghost"} className="w-full justify-start gap-2 rounded-xl">
-            <Settings className="w-5 h-5" />
-            <span className="font-semibold text-sm">Configuración</span>
+          <Button variant={location === "/settings" ? "secondary" : "ghost"} className={cn("w-full rounded-xl", collapsed ? "justify-center px-2" : "justify-start gap-2")}>
+            <Settings className="w-5 h-5 shrink-0" />
+            {!collapsed && <span className="font-semibold text-sm">Configuración</span>}
           </Button>
         </Link>
         {user?.isAdmin && (
           <Link href="/admin/users" onClick={closeSidebar} className="block w-full">
-            <Button variant="ghost" className="w-full justify-start gap-2 rounded-xl text-primary hover:bg-primary/5 hover:text-primary">
-              <Shield className="w-5 h-5" />
-              <span className="font-semibold text-sm">Panel de administración</span>
+            <Button variant="ghost" className={cn("w-full rounded-xl text-primary hover:bg-primary/5 hover:text-primary", collapsed ? "justify-center px-2" : "justify-start gap-2")}>
+              <Shield className="w-5 h-5 shrink-0" />
+              {!collapsed && <span className="font-semibold text-sm">Panel de administración</span>}
             </Button>
           </Link>
         )}
 
-        <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-muted/40 border border-border/50">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-            <User className="w-4 h-4 text-primary" />
+        {!collapsed && (
+          <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-muted/40 border border-border/50">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+              <User className="w-4 h-4 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold truncate text-foreground">{displayName}</p>
+              {user?.email && (
+                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+              )}
+            </div>
+            <button
+              onClick={logout}
+              title="Cerrar sesión"
+              className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold truncate text-foreground">{displayName}</p>
-            {user?.email && (
-              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
-            )}
-          </div>
+        )}
+        {collapsed && (
           <button
             onClick={logout}
             title="Cerrar sesión"
-            className="p-1.5 rounded-lg text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors shrink-0"
+            className="w-10 h-10 mx-auto rounded-lg flex items-center justify-center text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
           >
             <LogOut className="w-4 h-4" />
           </button>
-        </div>
+        )}
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="flex h-screen w-full bg-gradient-to-br from-slate-50 to-blue-50/30 overflow-hidden">
-      <aside className="hidden md:block w-80 shrink-0 h-full z-10 no-print">
+      <aside className={cn("hidden md:block shrink-0 h-full z-10 no-print transition-all duration-300 relative", sidebarCollapsed ? "w-16" : "w-80")}>
         <SidebarContent />
+        <button
+          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          className="absolute -right-3 top-20 z-20 w-6 h-6 rounded-full bg-white border border-border shadow-sm flex items-center justify-center text-muted-foreground hover:text-foreground hover:shadow transition-all"
+          title={sidebarCollapsed ? "Expandir menú" : "Contraer menú"}
+        >
+          {sidebarCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+        </button>
       </aside>
 
       <AnimatePresence>
@@ -203,7 +249,7 @@ export default function Layout({ children }: LayoutProps) {
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
               className="fixed inset-y-0 left-0 w-80 z-50 md:hidden no-print"
             >
-              <SidebarContent />
+              <SidebarContent forceExpanded />
               <button 
                 onClick={closeSidebar}
                 className="absolute top-6 -right-12 p-2 bg-white rounded-xl shadow-xl text-foreground"
@@ -216,7 +262,7 @@ export default function Layout({ children }: LayoutProps) {
       </AnimatePresence>
 
       <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        <header className="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-border flex items-center justify-between px-4 sm:px-8 sticky top-0 z-20 no-print">
+        <header className="h-16 shrink-0 bg-white/80 backdrop-blur-md border-b border-border flex items-center px-4 sm:px-8 sticky top-0 z-20 no-print">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -230,15 +276,6 @@ export default function Layout({ children }: LayoutProps) {
               <span className="text-foreground">{location === '/' ? 'Nuevo Universo' : location === '/settings' ? 'Configuración' : 'Universo Guardado'}</span>
             </div>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="gap-2 rounded-xl shadow-sm hover:shadow bg-white"
-            onClick={() => window.print()}
-          >
-            <Printer className="w-4 h-4" />
-            <span className="hidden sm:inline">Imprimir Vista</span>
-          </Button>
         </header>
         
         <div className="flex-1 overflow-y-auto p-4 sm:p-8 custom-scrollbar">

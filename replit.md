@@ -102,8 +102,10 @@ React + Vite frontend at path `/`.
 
 - Config form to set generation parameters
 - Tabbed viewer for all generated documents
-- Sidebar with saved generation history
-- Print/export functionality
+- Collapsible sidebar with saved generation history (desktop: toggle button, mobile: always expanded drawer)
+- PDF preview modal (inline iframe viewer with download button)
+- Journal-to-Ledger cross-navigation (clickable entry numbers with highlight)
+- Complete fiscal data in PDF documents (postal code, phone, email, legal form, registration info)
 
 ### `lib/db` (`@workspace/db`)
 

@@ -344,12 +344,16 @@ Genera exactamente este JSON (SIN facturas — se generan aparte):
     "nif": "(del escenario)",
     "address": "(del escenario)",
     "city": "(del escenario)",
+    "postalCode": "(del escenario)",
+    "phone": "(del escenario)",
+    "email": "(del escenario)",
     "sector": "${params.sector}",
     "taxRegime": "${params.taxRegime}",
     "fiscalYear": ${params.year},
     "description": "(del escenario)",
     "companyType": "SL",
-    "legalForm": "(del escenario)"
+    "legalForm": "(del escenario)",
+    "registrationInfo": "Inscrita en el Registro Mercantil de (ciudad), Tomo ..., Folio ..., Hoja ..."
   },
   "inventory": {
     "initialInventory": [
@@ -2752,16 +2756,32 @@ const SUBACCOUNT_BASES: Record<string, string> = {
   "400": "Proveedores",
   "401": "Proveedores, efectos comerciales a pagar",
   "410": "Acreedores por prestaciones de servicios",
+  "411": "Acreedores, efectos comerciales a pagar",
   "430": "Clientes",
   "431": "Clientes, efectos comerciales a cobrar",
   "440": "Deudores",
+  "441": "Deudores, efectos comerciales a cobrar",
   "460": "Anticipos de remuneraciones",
   "465": "Remuneraciones pendientes de pago",
+  "470": "Hacienda Pública, deudora",
+  "4700": "HP deudora por IVA",
+  "471": "Organismos de la Seguridad Social, deudores",
+  "472": "HP IVA soportado",
+  "473": "HP retenciones y pagos a cuenta",
+  "4750": "HP acreedora por IVA",
+  "4751": "HP acreedora por retenciones practicadas",
+  "475": "HP acreedora por conceptos fiscales",
+  "476": "Organismos de la Seguridad Social, acreedores",
+  "477": "HP IVA repercutido",
   "551": "Cuenta corriente con socios y administradores",
   "553": "Cuenta corriente con socios y administradores",
+  "570": "Caja",
   "572": "Bancos e instituciones de crédito c/c",
   "520": "Deudas a corto plazo con entidades de crédito",
   "170": "Deudas a largo plazo con entidades de crédito",
+  "171": "Deudas a largo plazo",
+  "173": "Proveedores de inmovilizado a largo plazo",
+  "523": "Proveedores de inmovilizado a corto plazo",
   "5200": "Préstamos a corto plazo de entidades de crédito",
   "5201": "Deudas a c/p por crédito dispuesto",
   "174": "Acreedores por arrendamiento financiero a l/p",
@@ -2876,6 +2896,8 @@ function assignSubAccounts(universe: Record<string, unknown>, digits: number): v
   }
 
   function replaceInEntry(entry: Record<string, unknown>, entityHint: string) {
+    const hintLower = entityHint.toLowerCase();
+
     const replaceLines = (lines: Array<Record<string, unknown>>) => {
       for (const line of lines) {
         if (line.accountName === undefined || line.accountName === null) {
@@ -2884,7 +2906,7 @@ function assignSubAccounts(universe: Record<string, unknown>, digits: number): v
         if (line.accountCode === undefined || line.accountCode === null) {
           line.accountCode = "";
         }
-        const code = String(line.accountCode);
+        const code = String(line.accountCode).trim();
 
         if (!code || code === "undefined") {
           line.accountCode = "";
@@ -2892,15 +2914,21 @@ function assignSubAccounts(universe: Record<string, unknown>, digits: number): v
         }
 
         let replaced = false;
-        for (const base of [code, code.substring(0, 4), code.substring(0, 3)]) {
-          const normBase = base.replace(/^0+/, "") || base;
-          if (entityMap.has(normBase)) {
-            const map = entityMap.get(normBase)!;
+        const candidates = new Set<string>();
+        candidates.add(code);
+        if (code.length >= 4) candidates.add(code.substring(0, 4));
+        if (code.length >= 3) candidates.add(code.substring(0, 3));
+        if (code.length >= 2) candidates.add(code.substring(0, 2));
+
+        for (const base of candidates) {
+          if (entityMap.has(base)) {
+            const map = entityMap.get(base)!;
 
             let matched = false;
             for (const [, ent] of map) {
-              if (entityHint.toLowerCase().includes(ent.entityName.toLowerCase()) ||
-                  ent.entityName.toLowerCase().includes(entityHint.toLowerCase().substring(0, 10))) {
+              const entLower = ent.entityName.toLowerCase();
+              if (hintLower.includes(entLower) ||
+                  (entLower.length >= 4 && entLower.includes(hintLower.substring(0, Math.min(12, hintLower.length))))) {
                 line.accountCode = ent.subCode;
                 const currentName = String(line.accountName || "");
                 if (currentName && !currentName.includes(ent.entityName)) {
@@ -2916,7 +2944,7 @@ function assignSubAccounts(universe: Record<string, unknown>, digits: number): v
               line.accountCode = only.subCode;
               replaced = true;
             }
-            break;
+            if (replaced) break;
           }
         }
 
