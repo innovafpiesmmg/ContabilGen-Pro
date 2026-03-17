@@ -2392,8 +2392,38 @@ function buildDeterministicJournal(
   // en el balance de apertura (initialBalanceSheet), no como asiento independiente.
 
   const initialBS = universe.initialBalanceSheet as Record<string, unknown> | undefined;
-  if (initialBS && initialBS.accountDebits) {
-    copyEntry(`${params.year}-01-01`, "Asiento de apertura", "Asiento apertura", initialBS);
+  if (initialBS) {
+    if (!initialBS.accountDebits || !Array.isArray(initialBS.accountDebits) || (initialBS.accountDebits as unknown[]).length === 0) {
+      const debits: Array<Record<string, unknown>> = [];
+      const credits: Array<Record<string, unknown>> = [];
+      for (const section of ["nonCurrentAssets", "currentAssets"]) {
+        const items = initialBS[section] as Array<Record<string, unknown>> | undefined;
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            if (item.amount && Number(item.amount) > 0) {
+              debits.push({ accountCode: String(item.accountCode ?? ""), accountName: String(item.accountName ?? ""), amount: Number(item.amount), description: "Activo en apertura" });
+            }
+          }
+        }
+      }
+      for (const section of ["equity", "nonCurrentLiabilities", "currentLiabilities"]) {
+        const items = initialBS[section] as Array<Record<string, unknown>> | undefined;
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            if (item.amount && Number(item.amount) > 0) {
+              credits.push({ accountCode: String(item.accountCode ?? ""), accountName: String(item.accountName ?? ""), amount: Number(item.amount), description: "Pasivo/PN en apertura" });
+            }
+          }
+        }
+      }
+      if (debits.length > 0 && credits.length > 0) {
+        initialBS.accountDebits = debits;
+        initialBS.accountCredits = credits;
+      }
+    }
+    if (initialBS.accountDebits && (initialBS.accountDebits as unknown[]).length > 0) {
+      copyEntry(`${params.year}-01-01`, "Asiento de apertura", "Asiento apertura", initialBS);
+    }
   }
 
   const dividends = universe.dividendDistribution as Record<string, unknown> | undefined;
