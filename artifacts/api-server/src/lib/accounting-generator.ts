@@ -2385,9 +2385,12 @@ function buildDeterministicJournal(
     const legalReserve = Math.round(capital * 0.2);
     const voluntaryReserve = Math.round(netProfit * 0.15);
 
+    const debits: Array<Record<string, unknown>> = [];
+    const credits: Array<Record<string, unknown>> = [];
+
     const nonCurrentAssets: Array<Record<string, unknown>> = [];
     const currentAssets: Array<Record<string, unknown>> = [];
-    const equity: Array<Record<string, unknown>> = [];
+    const equityItems: Array<Record<string, unknown>> = [];
     const nonCurrentLiabilities: Array<Record<string, unknown>> = [];
     const currentLiabilities: Array<Record<string, unknown>> = [];
 
@@ -2399,11 +2402,25 @@ function buildDeterministicJournal(
         const name = String(fa.accountName ?? fa.description ?? "Inmovilizado");
         if (cost > 0) {
           nonCurrentAssets.push({ accountCode: code, accountName: name, amount: cost });
+          debits.push({ accountCode: code, accountName: name, amount: cost });
+          const amortCode = "28" + code.substring(1);
+          const priorAmort = r2(cost * 0.2);
+          if (priorAmort > 0) {
+            nonCurrentAssets.push({ accountCode: amortCode, accountName: `Amortización acumulada ${name}`, amount: -priorAmort });
+            credits.push({ accountCode: amortCode, accountName: `Amortización acumulada ${name}`, amount: priorAmort });
+          }
         }
       }
     } else {
       nonCurrentAssets.push({ accountCode: "217", accountName: "Equipos para procesos de información", amount: 3500 });
+      debits.push({ accountCode: "217", accountName: "Equipos para procesos de información", amount: 3500 });
+      nonCurrentAssets.push({ accountCode: "2817", accountName: "Amortización acum. equipos proc. información", amount: -700 });
+      credits.push({ accountCode: "2817", accountName: "Amortización acum. equipos proc. información", amount: 700 });
+
       nonCurrentAssets.push({ accountCode: "216", accountName: "Mobiliario", amount: 2800 });
+      debits.push({ accountCode: "216", accountName: "Mobiliario", amount: 2800 });
+      nonCurrentAssets.push({ accountCode: "2816", accountName: "Amortización acumulada mobiliario", amount: -560 });
+      credits.push({ accountCode: "2816", accountName: "Amortización acumulada mobiliario", amount: 560 });
     }
 
     const inventory = universe.initialInventory as Record<string, unknown> | undefined;
@@ -2419,61 +2436,100 @@ function buildDeterministicJournal(
     } else {
       inventoryAmount = 8000;
     }
-    currentAssets.push({ accountCode: "300", accountName: "Mercaderías", amount: Math.round(inventoryAmount * 100) / 100 });
+    currentAssets.push({ accountCode: "300", accountName: "Mercaderías", amount: r2(inventoryAmount) });
+    debits.push({ accountCode: "300", accountName: "Mercaderías", amount: r2(inventoryAmount) });
 
-    const suppliers = (universe.suppliers ?? (cp?.suppliers)) as Array<Record<string, unknown>> | undefined;
-    const firstSupplier = Array.isArray(suppliers) && suppliers.length > 0 ? String(suppliers[0].name ?? "Proveedor") : "Proveedor";
-    currentAssets.push({ accountCode: "430", accountName: "Clientes", amount: Math.round(fin.avgMonthlyRevenue ?? 12000) });
+    const clientsPending = r2(fin.avgMonthlyRevenue ?? 12000);
+    currentAssets.push({ accountCode: "430", accountName: "Clientes", amount: clientsPending });
+    debits.push({ accountCode: "430", accountName: "Clientes", amount: clientsPending });
+
+    const taxRegimeLabel = params.taxRegime === "IGIC" ? "IGIC" : "IVA";
+    const taxRate = params.taxRegime === "IGIC" ? 0.07 : 0.21;
+    const ivaDeudor = r2((fin.avgMonthlyCosts ?? 8000) * taxRate * 0.3);
+    if (ivaDeudor > 0) {
+      currentAssets.push({ accountCode: "472", accountName: `HP ${taxRegimeLabel} soportado`, amount: ivaDeudor });
+      debits.push({ accountCode: "472", accountName: `HP ${taxRegimeLabel} soportado`, amount: ivaDeudor });
+    }
 
     const bankBalance = fin.initialCash ?? 25000;
     currentAssets.push({ accountCode: "572", accountName: "Bancos c/c", amount: Math.round(bankBalance) });
+    debits.push({ accountCode: "572", accountName: "Bancos c/c", amount: Math.round(bankBalance) });
 
-    equity.push({ accountCode: "100", accountName: "Capital social", amount: capital });
-    equity.push({ accountCode: "112", accountName: "Reserva legal", amount: legalReserve });
+    equityItems.push({ accountCode: "100", accountName: "Capital social", amount: capital });
+    credits.push({ accountCode: "100", accountName: "Capital social", amount: capital });
+
+    equityItems.push({ accountCode: "112", accountName: "Reserva legal", amount: legalReserve });
+    credits.push({ accountCode: "112", accountName: "Reserva legal", amount: legalReserve });
+
     if (voluntaryReserve > 0) {
-      equity.push({ accountCode: "113", accountName: "Reservas voluntarias", amount: voluntaryReserve });
+      equityItems.push({ accountCode: "113", accountName: "Reservas voluntarias", amount: voluntaryReserve });
+      credits.push({ accountCode: "113", accountName: "Reservas voluntarias", amount: voluntaryReserve });
     }
-    equity.push({ accountCode: "129", accountName: "Resultado del ejercicio", amount: netProfit });
+
+    equityItems.push({ accountCode: "129", accountName: "Resultado del ejercicio", amount: netProfit });
+    credits.push({ accountCode: "129", accountName: "Resultado del ejercicio", amount: netProfit });
 
     const loanPrincipal = Number(fin.loanPrincipal ?? 0);
     if (loanPrincipal > 0 && params.includeBankLoan !== false) {
-      const lpPortion = Math.round(loanPrincipal * 0.8);
-      const cpPortion = loanPrincipal - lpPortion;
-      if (lpPortion > 0) nonCurrentLiabilities.push({ accountCode: "170", accountName: "Deudas a LP con entidades de crédito", amount: lpPortion });
-      if (cpPortion > 0) currentLiabilities.push({ accountCode: "520", accountName: "Deudas a CP con entidades de crédito", amount: cpPortion });
+      const lpPortion = r2(loanPrincipal * 0.8);
+      const cpPortion = r2(loanPrincipal - lpPortion);
+      if (lpPortion > 0) {
+        nonCurrentLiabilities.push({ accountCode: "170", accountName: "Deudas a LP con entidades de crédito", amount: lpPortion });
+        credits.push({ accountCode: "170", accountName: "Deudas a LP con entidades de crédito", amount: lpPortion });
+      }
+      if (cpPortion > 0) {
+        currentLiabilities.push({ accountCode: "5200", accountName: "Préstamos a CP con entidades de crédito", amount: cpPortion });
+        credits.push({ accountCode: "5200", accountName: "Préstamos a CP con entidades de crédito", amount: cpPortion });
+      }
     }
 
     const mortgagePrincipal = Number(fin.mortgagePrincipal ?? 0);
     if (mortgagePrincipal > 0 && params.includeMortgage !== false) {
-      const lpPortion = Math.round(mortgagePrincipal * 0.9);
-      const cpPortion = mortgagePrincipal - lpPortion;
-      if (lpPortion > 0) nonCurrentLiabilities.push({ accountCode: "170", accountName: "Deudas a LP con entidades de crédito (hipoteca)", amount: lpPortion });
-      if (cpPortion > 0) currentLiabilities.push({ accountCode: "520", accountName: "Deudas a CP con entidades de crédito (hipoteca)", amount: cpPortion });
-    }
-
-    currentLiabilities.push({ accountCode: "400", accountName: "Proveedores", amount: Math.round((fin.avgMonthlyCosts ?? 8000) * 0.6) });
-    const taxName = params.taxRegime === "IGIC" ? "IGIC repercutido" : "IVA repercutido";
-    currentLiabilities.push({ accountCode: "477", accountName: `HP ${taxName}`, amount: Math.round((fin.avgMonthlyRevenue ?? 12000) * 0.07) });
-
-    const totalAssetAmount = [...nonCurrentAssets, ...currentAssets].reduce((s, i) => s + Number(i.amount), 0);
-    const totalEquityLiab = [...equity, ...nonCurrentLiabilities, ...currentLiabilities].reduce((s, i) => s + Number(i.amount), 0);
-
-    const diff = Math.round((totalAssetAmount - totalEquityLiab) * 100) / 100;
-    if (Math.abs(diff) > 0.01) {
-      if (diff > 0) {
-        equity.push({ accountCode: "113", accountName: "Reservas voluntarias (ajuste)", amount: Math.round(diff * 100) / 100 });
-      } else {
-        currentAssets.push({ accountCode: "570", accountName: "Caja", amount: Math.round(Math.abs(diff) * 100) / 100 });
+      const lpPortion = r2(mortgagePrincipal * 0.9);
+      const cpPortion = r2(mortgagePrincipal - lpPortion);
+      if (lpPortion > 0) {
+        nonCurrentLiabilities.push({ accountCode: "171", accountName: "Deudas a LP (hipoteca)", amount: lpPortion });
+        credits.push({ accountCode: "171", accountName: "Deudas a LP (hipoteca)", amount: lpPortion });
+      }
+      if (cpPortion > 0) {
+        currentLiabilities.push({ accountCode: "520", accountName: "Deudas a CP (hipoteca)", amount: cpPortion });
+        credits.push({ accountCode: "520", accountName: "Deudas a CP (hipoteca)", amount: cpPortion });
       }
     }
 
-    const debits: Array<Record<string, unknown>> = [];
-    const credits: Array<Record<string, unknown>> = [];
-    for (const item of [...nonCurrentAssets, ...currentAssets]) {
-      debits.push({ accountCode: String(item.accountCode), accountName: String(item.accountName), amount: Number(item.amount), description: "Activo en apertura" });
+    const suppliersPending = r2((fin.avgMonthlyCosts ?? 8000) * 0.6);
+    currentLiabilities.push({ accountCode: "400", accountName: "Proveedores", amount: suppliersPending });
+    credits.push({ accountCode: "400", accountName: "Proveedores", amount: suppliersPending });
+
+    const ivaPendiente = r2((fin.avgMonthlyRevenue ?? 12000) * taxRate * 0.3);
+    if (ivaPendiente > 0) {
+      currentLiabilities.push({ accountCode: "477", accountName: `HP ${taxRegimeLabel} repercutido`, amount: ivaPendiente });
+      credits.push({ accountCode: "477", accountName: `HP ${taxRegimeLabel} repercutido`, amount: ivaPendiente });
     }
-    for (const item of [...equity, ...nonCurrentLiabilities, ...currentLiabilities]) {
-      credits.push({ accountCode: String(item.accountCode), accountName: String(item.accountName), amount: Number(item.amount), description: "Pasivo/PN en apertura" });
+
+    const irpfPendiente = r2((fin.avgMonthlyCosts ?? 8000) * 0.02);
+    if (irpfPendiente > 0) {
+      currentLiabilities.push({ accountCode: "4751", accountName: "HP acreedora por retenciones practicadas", amount: irpfPendiente });
+      credits.push({ accountCode: "4751", accountName: "HP acreedora por retenciones practicadas", amount: irpfPendiente });
+    }
+
+    const ssPendiente = r2((fin.avgMonthlyCosts ?? 8000) * 0.15);
+    if (ssPendiente > 0) {
+      currentLiabilities.push({ accountCode: "476", accountName: "Organismos de la SS, acreedores", amount: ssPendiente });
+      credits.push({ accountCode: "476", accountName: "Organismos de la SS, acreedores", amount: ssPendiente });
+    }
+
+    const totalDebits = r2(debits.reduce((s, d) => s + Number(d.amount), 0));
+    const totalCredits = r2(credits.reduce((s, c) => s + Number(c.amount), 0));
+    const diff = r2(totalDebits - totalCredits);
+    if (Math.abs(diff) > 0.01) {
+      if (diff > 0) {
+        equityItems.push({ accountCode: "113", accountName: "Reservas voluntarias", amount: r2(diff) });
+        credits.push({ accountCode: "113", accountName: "Reservas voluntarias", amount: r2(diff) });
+      } else {
+        currentAssets.push({ accountCode: "570", accountName: "Caja, euros", amount: r2(Math.abs(diff)) });
+        debits.push({ accountCode: "570", accountName: "Caja, euros", amount: r2(Math.abs(diff)) });
+      }
     }
 
     const initialBS: Record<string, unknown> = {
@@ -2484,17 +2540,17 @@ function buildDeterministicJournal(
       description: `Balance de Situación Final del ejercicio ${priorYear} — Base del asiento de apertura ${params.year}`,
       nonCurrentAssets,
       currentAssets,
-      equity,
+      equity: equityItems,
       nonCurrentLiabilities,
       currentLiabilities,
-      totalAssets: Math.round([...nonCurrentAssets, ...currentAssets].reduce((s, i) => s + Number(i.amount), 0) * 100) / 100,
-      totalEquityAndLiabilities: Math.round([...equity, ...nonCurrentLiabilities, ...currentLiabilities].reduce((s, i) => s + Number(i.amount), 0) * 100) / 100,
+      totalAssets: r2(nonCurrentAssets.reduce((s, i) => s + Number(i.amount), 0) + currentAssets.reduce((s, i) => s + Number(i.amount), 0)),
+      totalEquityAndLiabilities: r2(equityItems.reduce((s, i) => s + Number(i.amount), 0) + nonCurrentLiabilities.reduce((s, i) => s + Number(i.amount), 0) + currentLiabilities.reduce((s, i) => s + Number(i.amount), 0)),
       journalNote: `Asiento de apertura: reproduce el Balance de Situación Final a 31/12/${priorYear}. Se cargan (DEBE) todos los activos y se abonan (HABER) todos los pasivos y el patrimonio neto. Total Activo = Total Pasivo + PN.`,
       accountDebits: debits,
       accountCredits: credits,
     };
     universe.initialBalanceSheet = initialBS;
-    console.log(`[journal] initialBalanceSheet generado determinísticamente: ${debits.length} débitos, ${credits.length} créditos, totalAssets=${initialBS.totalAssets}`);
+    console.log(`[journal] Asiento apertura: ${debits.length} cuentas al Debe, ${credits.length} cuentas al Haber, totalDebe=${totalDebits}, totalHaber=${r2(totalCredits + (diff > 0 ? diff : 0))}`);
     copyEntry(`${params.year}-01-01`, "Asiento de apertura", "Asiento apertura", initialBS);
   }
 
