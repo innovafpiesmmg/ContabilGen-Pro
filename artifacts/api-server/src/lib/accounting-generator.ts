@@ -1171,25 +1171,8 @@ async function generateEquityBlock(
   }`);
   }
 
-  if (withInitialBalance) {
-    const priorYear = params.year - 1;
-    sections.push(`"initialBalanceSheet": {
-    "date": "${periodStart}",
-    "priorYearEndDate": "${priorYear}-12-31",
-    "priorYear": ${priorYear},
-    "description": "Balance de Situación Final del ejercicio ${priorYear} — Base del asiento de apertura ${params.year}",
-    "nonCurrentAssets": [{"accountCode":"XXX","accountName":"...","amount":X}],
-    "currentAssets": [{"accountCode":"300","accountName":"Mercaderías","amount":X},{"accountCode":"430","accountName":"Clientes","amount":X},{"accountCode":"572","accountName":"Bancos c/c","amount":X}],
-    "equity": [{"accountCode":"100","accountName":"Capital social","amount":X},{"accountCode":"112","accountName":"Reserva legal","amount":X},{"accountCode":"129","accountName":"Resultado del ejercicio","amount":X}],
-    "nonCurrentLiabilities": [{"accountCode":"170","accountName":"Deudas LP entidades crédito","amount":X}],
-    "currentLiabilities": [{"accountCode":"400","accountName":"Proveedores","amount":X},{"accountCode":"477","accountName":"${params.taxRegime} repercutido","amount":X}],
-    "totalAssets": X,
-    "totalEquityAndLiabilities": X,
-    "journalNote": "Asiento de apertura: reproduce el Balance de Situación Final a 31/12/${priorYear}. Se cargan (DEBE) todos los activos y se abonan (HABER) todos los pasivos y el patrimonio neto. Total Activo = Total Pasivo + PN.",
-    "accountDebits": [{"accountCode":"XXX","accountName":"Nombre activo","amount":X,"description":"Activo en apertura"}],
-    "accountCredits": [{"accountCode":"XXX","accountName":"Nombre pasivo/PN","amount":X,"description":"Pasivo/PN en apertura"}]
-  }`);
-  }
+  // initialBalanceSheet se genera determinísticamente en buildDeterministicJournal,
+  // no depende de la IA.
 
   if (withShareholderAccounts) {
     sections.push(`"shareholderAccounts": {
@@ -1259,7 +1242,6 @@ Genera exactamente este JSON con datos coherentes con el escenario:
 
 REGLAS:
 - Usa nombres y NIF exactos del escenario
-- Total Activo = Total Pasivo + PN (en initialBalanceSheet)
 - Asientos cuadrados en todos los elementos
 - journalNote didáctica explicando cuentas PGC en cada sección
 - Todas las fechas dentro de ${periodStart}–${periodEnd}`;
@@ -2391,41 +2373,129 @@ function buildDeterministicJournal(
   // Los datos de socios/capital social son informativos y se reflejan
   // en el balance de apertura (initialBalanceSheet), no como asiento independiente.
 
-  const initialBS = universe.initialBalanceSheet as Record<string, unknown> | undefined;
-  console.log(`[journal] initialBalanceSheet exists: ${!!initialBS}, isNewCompany: ${params.isNewCompany}, accountDigits: ${params.accountDigits}`);
-  if (initialBS) {
-    console.log(`[journal] initialBS keys: ${Object.keys(initialBS).join(", ")}, hasAccountDebits: ${!!initialBS.accountDebits}, accountDebitsLen: ${Array.isArray(initialBS.accountDebits) ? (initialBS.accountDebits as unknown[]).length : 'N/A'}`);
-    if (!initialBS.accountDebits || !Array.isArray(initialBS.accountDebits) || (initialBS.accountDebits as unknown[]).length === 0) {
-      const debits: Array<Record<string, unknown>> = [];
-      const credits: Array<Record<string, unknown>> = [];
-      for (const section of ["nonCurrentAssets", "currentAssets"]) {
-        const items = initialBS[section] as Array<Record<string, unknown>> | undefined;
-        if (Array.isArray(items)) {
-          for (const item of items) {
-            if (item.amount && Number(item.amount) > 0) {
-              debits.push({ accountCode: String(item.accountCode ?? ""), accountName: String(item.accountName ?? ""), amount: Number(item.amount), description: "Activo en apertura" });
-            }
-          }
+  const shouldHaveOpeningEntry = params.includeInitialBalance !== false && params.isNewCompany !== true;
+  if (shouldHaveOpeningEntry) {
+    const priorYear = params.year - 1;
+    const { periodStart } = getPeriodInfo(params);
+    const cp = universe.companyProfile as Record<string, unknown> | undefined;
+    const fin = (cp?.financials ?? (universe as Record<string, unknown>).financials ?? {}) as Record<string, number>;
+
+    const capital = fin.shareCapital ?? 10000;
+    const netProfit = fin.netProfitPriorYear ?? 20000;
+    const legalReserve = Math.round(capital * 0.2);
+    const voluntaryReserve = Math.round(netProfit * 0.15);
+
+    const nonCurrentAssets: Array<Record<string, unknown>> = [];
+    const currentAssets: Array<Record<string, unknown>> = [];
+    const equity: Array<Record<string, unknown>> = [];
+    const nonCurrentLiabilities: Array<Record<string, unknown>> = [];
+    const currentLiabilities: Array<Record<string, unknown>> = [];
+
+    const fixedAssets = universe.fixedAssets as Array<Record<string, unknown>> | undefined;
+    if (Array.isArray(fixedAssets) && fixedAssets.length > 0) {
+      for (const fa of fixedAssets) {
+        const cost = Number(fa.purchaseCost ?? fa.acquisitionValue ?? 0);
+        const code = String(fa.accountCode ?? fa.code ?? "217");
+        const name = String(fa.accountName ?? fa.description ?? "Inmovilizado");
+        if (cost > 0) {
+          nonCurrentAssets.push({ accountCode: code, accountName: name, amount: cost });
         }
       }
-      for (const section of ["equity", "nonCurrentLiabilities", "currentLiabilities"]) {
-        const items = initialBS[section] as Array<Record<string, unknown>> | undefined;
-        if (Array.isArray(items)) {
-          for (const item of items) {
-            if (item.amount && Number(item.amount) > 0) {
-              credits.push({ accountCode: String(item.accountCode ?? ""), accountName: String(item.accountName ?? ""), amount: Number(item.amount), description: "Pasivo/PN en apertura" });
-            }
-          }
+    } else {
+      nonCurrentAssets.push({ accountCode: "217", accountName: "Equipos para procesos de información", amount: 3500 });
+      nonCurrentAssets.push({ accountCode: "216", accountName: "Mobiliario", amount: 2800 });
+    }
+
+    const inventory = universe.initialInventory as Record<string, unknown> | undefined;
+    let inventoryAmount = 0;
+    if (inventory) {
+      const items = (inventory.items ?? inventory.products) as Array<Record<string, unknown>> | undefined;
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          inventoryAmount += Number(item.totalValue ?? item.amount ?? 0);
         }
       }
-      if (debits.length > 0 && credits.length > 0) {
-        initialBS.accountDebits = debits;
-        initialBS.accountCredits = credits;
+      if (inventoryAmount <= 0) inventoryAmount = Number(inventory.totalValue ?? 8000);
+    } else {
+      inventoryAmount = 8000;
+    }
+    currentAssets.push({ accountCode: "300", accountName: "Mercaderías", amount: Math.round(inventoryAmount * 100) / 100 });
+
+    const suppliers = (universe.suppliers ?? (cp?.suppliers)) as Array<Record<string, unknown>> | undefined;
+    const firstSupplier = Array.isArray(suppliers) && suppliers.length > 0 ? String(suppliers[0].name ?? "Proveedor") : "Proveedor";
+    currentAssets.push({ accountCode: "430", accountName: "Clientes", amount: Math.round(fin.avgMonthlyRevenue ?? 12000) });
+
+    const bankBalance = fin.initialCash ?? 25000;
+    currentAssets.push({ accountCode: "572", accountName: "Bancos c/c", amount: Math.round(bankBalance) });
+
+    equity.push({ accountCode: "100", accountName: "Capital social", amount: capital });
+    equity.push({ accountCode: "112", accountName: "Reserva legal", amount: legalReserve });
+    if (voluntaryReserve > 0) {
+      equity.push({ accountCode: "113", accountName: "Reservas voluntarias", amount: voluntaryReserve });
+    }
+    equity.push({ accountCode: "129", accountName: "Resultado del ejercicio", amount: netProfit });
+
+    const loanPrincipal = Number(fin.loanPrincipal ?? 0);
+    if (loanPrincipal > 0 && params.includeBankLoan !== false) {
+      const lpPortion = Math.round(loanPrincipal * 0.8);
+      const cpPortion = loanPrincipal - lpPortion;
+      if (lpPortion > 0) nonCurrentLiabilities.push({ accountCode: "170", accountName: "Deudas a LP con entidades de crédito", amount: lpPortion });
+      if (cpPortion > 0) currentLiabilities.push({ accountCode: "520", accountName: "Deudas a CP con entidades de crédito", amount: cpPortion });
+    }
+
+    const mortgagePrincipal = Number(fin.mortgagePrincipal ?? 0);
+    if (mortgagePrincipal > 0 && params.includeMortgage !== false) {
+      const lpPortion = Math.round(mortgagePrincipal * 0.9);
+      const cpPortion = mortgagePrincipal - lpPortion;
+      if (lpPortion > 0) nonCurrentLiabilities.push({ accountCode: "170", accountName: "Deudas a LP con entidades de crédito (hipoteca)", amount: lpPortion });
+      if (cpPortion > 0) currentLiabilities.push({ accountCode: "520", accountName: "Deudas a CP con entidades de crédito (hipoteca)", amount: cpPortion });
+    }
+
+    currentLiabilities.push({ accountCode: "400", accountName: "Proveedores", amount: Math.round((fin.avgMonthlyCosts ?? 8000) * 0.6) });
+    const taxName = params.taxRegime === "IGIC" ? "IGIC repercutido" : "IVA repercutido";
+    currentLiabilities.push({ accountCode: "477", accountName: `HP ${taxName}`, amount: Math.round((fin.avgMonthlyRevenue ?? 12000) * 0.07) });
+
+    const totalAssetAmount = [...nonCurrentAssets, ...currentAssets].reduce((s, i) => s + Number(i.amount), 0);
+    const totalEquityLiab = [...equity, ...nonCurrentLiabilities, ...currentLiabilities].reduce((s, i) => s + Number(i.amount), 0);
+
+    const diff = Math.round((totalAssetAmount - totalEquityLiab) * 100) / 100;
+    if (Math.abs(diff) > 0.01) {
+      if (diff > 0) {
+        equity.push({ accountCode: "113", accountName: "Reservas voluntarias (ajuste)", amount: Math.round(diff * 100) / 100 });
+      } else {
+        currentAssets.push({ accountCode: "570", accountName: "Caja", amount: Math.round(Math.abs(diff) * 100) / 100 });
       }
     }
-    if (initialBS.accountDebits && (initialBS.accountDebits as unknown[]).length > 0) {
-      copyEntry(`${params.year}-01-01`, "Asiento de apertura", "Asiento apertura", initialBS);
+
+    const debits: Array<Record<string, unknown>> = [];
+    const credits: Array<Record<string, unknown>> = [];
+    for (const item of [...nonCurrentAssets, ...currentAssets]) {
+      debits.push({ accountCode: String(item.accountCode), accountName: String(item.accountName), amount: Number(item.amount), description: "Activo en apertura" });
     }
+    for (const item of [...equity, ...nonCurrentLiabilities, ...currentLiabilities]) {
+      credits.push({ accountCode: String(item.accountCode), accountName: String(item.accountName), amount: Number(item.amount), description: "Pasivo/PN en apertura" });
+    }
+
+    const initialBS: Record<string, unknown> = {
+      date: periodStart,
+      priorYearEndDate: `${priorYear}-12-31`,
+      priorYear,
+      bankBalance: Math.round(bankBalance),
+      description: `Balance de Situación Final del ejercicio ${priorYear} — Base del asiento de apertura ${params.year}`,
+      nonCurrentAssets,
+      currentAssets,
+      equity,
+      nonCurrentLiabilities,
+      currentLiabilities,
+      totalAssets: Math.round([...nonCurrentAssets, ...currentAssets].reduce((s, i) => s + Number(i.amount), 0) * 100) / 100,
+      totalEquityAndLiabilities: Math.round([...equity, ...nonCurrentLiabilities, ...currentLiabilities].reduce((s, i) => s + Number(i.amount), 0) * 100) / 100,
+      journalNote: `Asiento de apertura: reproduce el Balance de Situación Final a 31/12/${priorYear}. Se cargan (DEBE) todos los activos y se abonan (HABER) todos los pasivos y el patrimonio neto. Total Activo = Total Pasivo + PN.`,
+      accountDebits: debits,
+      accountCredits: credits,
+    };
+    universe.initialBalanceSheet = initialBS;
+    console.log(`[journal] initialBalanceSheet generado determinísticamente: ${debits.length} débitos, ${credits.length} créditos, totalAssets=${initialBS.totalAssets}`);
+    copyEntry(`${params.year}-01-01`, "Asiento de apertura", "Asiento apertura", initialBS);
   }
 
   const dividends = universe.dividendDistribution as Record<string, unknown> | undefined;
